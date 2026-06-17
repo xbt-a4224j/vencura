@@ -4,6 +4,7 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { config as loadEnv } from 'dotenv';
+import { ZodValidationPipe, cleanupOpenApiDoc } from 'nestjs-zod';
 import { AppModule } from './app.module';
 
 // One root .env for the monorepo. Anchor to this file's compiled location (not cwd)
@@ -13,14 +14,20 @@ loadEnv({ path: resolve(__dirname, '../../../.env') });
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Validate every request body/param against the zod schema on its DTO (nestjs-zod).
+  // One schema is both the runtime validator and the OpenAPI definition (CLAUDE.md §3.1).
+  app.useGlobalPipes(new ZodValidationPipe());
+
   // Auto-generated OpenAPI + Swagger UI at /docs — demoability (CLAUDE.md §5) and
-  // the source for the generated SDK (T-025).
+  // the source for the generated SDK (T-025). cleanupOpenApiDoc finalizes the zod-derived
+  // schemas in the document (nestjs-zod v5).
   const config = new DocumentBuilder()
     .setTitle('VenCura API')
     .setDescription('Custodial Ethereum wallet platform — Sepolia testnet.')
     .setVersion('0.1.0')
     .build();
-  SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, config));
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('docs', app, cleanupOpenApiDoc(document));
 
   const port = Number(process.env.PORT ?? 3000);
   await app.listen(port);

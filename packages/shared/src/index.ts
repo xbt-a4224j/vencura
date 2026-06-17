@@ -10,3 +10,5 @@ export type Hex = `0x${string}`;
 /** Assets the platform can hold. ERC-20 token assets join this as they land. */
 export const NATIVE_ASSET = 'ETH' as const;
 export type NativeAsset = typeof NATIVE_ASSET;
+
+export * from './auth.schema';
