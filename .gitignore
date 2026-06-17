@@ -14,3 +14,7 @@ coverage/
 # local db / prisma
 *.db
 prisma/dev.db*
+
+# JetBrains / WebStorm
+.idea/
+*.iml
