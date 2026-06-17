@@ -130,6 +130,7 @@ separate "workers" feature. Keep modules small and domain-named; a reader should
 - **REST, resource-oriented:** `POST /wallets`, `GET /wallets/:id/balance`, `POST /wallets/:id/messages`
   (sign), `POST /wallets/:id/transactions` (send), `GET /wallets/:id/transactions` (history), `POST /admin/reset`.
 - **Money is never a float.** Amounts are **bigint strings** (wei / token base units) end-to-end.
+- **Validation: Zod is the single source of truth.** Schemas live in `packages/shared`; they validate API input via `nestjs-zod` (which also feeds the `ValidationPipe` + Swagger) **and** type the SDK and the web forms — one schema, no drift. Do **not** also use class-validator; one validation system, not two (§3.1).
 - **Errors:** one consistent JSON error shape (RFC-7807-ish), thrown via typed exceptions, mapped by a global filter.
 - **Secrets** (`MASTER_ENCRYPTION_KEY`, DB/Redis creds) come from env / secrets manager — never committed.
 - **Commits:** **Conventional Commits** (`feat:`, `fix:`, `chore:`, `test:`, …) — they drive semver.
