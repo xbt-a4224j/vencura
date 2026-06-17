@@ -3,8 +3,9 @@ import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { PrismaModule } from './infra/prisma/prisma.module';
 import { SignerModule } from './signer/signer.module';
+import { WalletsModule } from './wallets/wallets.module';
 
 // Composition root. Feature modules (auth, wallets, transactions, …) are imported
 // here as they land — one module per box in the architecture diagram (CLAUDE.md §6.1).
-@Module({ imports: [PrismaModule, AuthModule, SignerModule, HealthModule] })
+@Module({ imports: [PrismaModule, AuthModule, SignerModule, WalletsModule, HealthModule] })
 export class AppModule {}
