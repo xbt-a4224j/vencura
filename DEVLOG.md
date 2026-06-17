@@ -56,3 +56,81 @@ build `4 successful`.
   config-free now; we can opt into type-aware rules later if a bug class warrants it.
 - `api`/`web` `src/index.ts` are throwaway placeholders that exist only so `tsc` has something to emit;
   they name the ticket that replaces them.
+
+### Decisions & narration
+> The explanatory reasoning emitted while building this ticket, captured here so it's followable later.
+- **Reordered T-003a before T-003** (the only deviation from numeric order): `prisma migrate` needs a live
+  Postgres, which T-003a's `docker-compose` provides — a real dependency documented in `tickets.md`, not a preference.
+- **CommonJS for the backend trio (api/sdk/shared):** chosen over ESM so NestJS decorators + `emitDecoratorMetadata`
+  and Prisma work without ESM-interop friction. `web` is ESM via Vite later — fine, because Vite bundles it in isolation.
+- **One test runner (Vitest) everywhere** to satisfy §3.1 "no parallel idioms." Empty stub packages stay green with
+  `--passWithNoTests` rather than being faked with throwaway tests.
+- **`api/sdk/web` ship as stubs** because T-001 is a *scaffold* ticket — its deliverable is a green pipeline, not
+  features. Cross-package wiring is still proven now via `sdk → shared`.
+- **Two commits per ticket** (code, then a DEVLOG commit that links the code commit). Single-commit self-linking is
+  impossible: `--amend` changes the hash the entry would reference, so the link would always dangle.
+
+---
+
+## v0.1.0 · Block 1 · T-002 NestJS API skeleton + health endpoint &nbsp;([#2](https://github.com/xbt-a4224j/vencura/issues/2) · [commit](https://github.com/xbt-a4224j/vencura/commit/0571fcbf31a0ddff72afd7e98ccd836a6f647d51))
+
+**What & why** — Turn the empty `api` stub into a real NestJS app with a `GET /health` liveness route and
+auto-generated **Swagger UI at `/docs`**. Health gives deploy platforms and CI a smoke target; Swagger gives
+the demo a browsable API and is the source the typed SDK is generated from later (T-025).
+
+**How it works** — [main.ts](packages/api/src/main.ts) is the composition root: `NestFactory.create(AppModule)`
+boots the app, `DocumentBuilder` + `SwaggerModule.setup('docs', …)` reflects over the controllers' decorators to
+emit an OpenAPI document and serve Swagger UI. [AppModule](packages/api/src/app.module.ts) imports feature modules;
+right now just [HealthModule](packages/api/src/health/health.module.ts), which registers
+[HealthController](packages/api/src/health/health.controller.ts). The `@Controller('health')` + `@Get()` decorators
+map the route; `@ApiTags`/`@ApiOkResponse` feed the OpenAPI spec.
+
+**Files touched**
+- [packages/api/src/health/health.controller.ts](packages/api/src/health/health.controller.ts) → the `GET /health` handler.
+- [packages/api/src/health/health.module.ts](packages/api/src/health/health.module.ts) → registers the controller.
+- [packages/api/src/app.module.ts](packages/api/src/app.module.ts) → composition root; imports feature modules.
+- [packages/api/src/main.ts](packages/api/src/main.ts) → bootstrap + Swagger mount + listen/log.
+- [packages/api/vitest.config.ts](packages/api/vitest.config.ts) → SWC transform so decorator metadata survives in tests.
+- [packages/api/nest-cli.json](packages/api/nest-cli.json) → enables `nest start --watch` for dev.
+- [packages/api/package.json](packages/api/package.json) → Nest runtime + test/dev toolchain.
+
+**Key code** — the handler under test:
+```ts
+@Get()
+@ApiOkResponse({ description: 'The API process is up and serving requests.' })
+check() {
+  return { status: 'ok', service: 'vencura-api', timestamp: new Date().toISOString() };
+}
+```
+
+**Tests** — [health.controller.spec.ts](packages/api/src/health/health.controller.spec.ts) boots the real app via
+`Test.createTestingModule` and hits it with `supertest`, asserting `200` + `status: 'ok'` + a string `timestamp`.
+Red→green was real: first run failed with `Failed to load ./health.module — Does the file exist?` (feature absent),
+then passed once the module existed. No mocks — it exercises the actual HTTP surface.
+
+**Demo / verify** — `pnpm build && PORT=3111 node packages/api/dist/main.js`, then:
+- `curl /health` → `{"status":"ok","service":"vencura-api","timestamp":"2026-06-17T21:06:51.181Z"}`
+- `curl /docs` → `200`, `<title>Swagger UI</title>`
+- `curl /docs-json` → OpenAPI doc already listing `/health`
+- bootstrap log: `[Bootstrap] VenCura API listening on http://localhost:3111 (docs at /docs)`
+
+**Gotchas**
+- **Vitest + Nest decorators:** Vitest's default esbuild transform strips `emitDecoratorMetadata`, which Nest's
+  type-based DI depends on. [vitest.config.ts](packages/api/vitest.config.ts) swaps in `unplugin-swc` with
+  `legacyDecorator` + `decoratorMetadata` enabled. Health has no injected deps yet, but this prevents a painful
+  retrofit when auth/wallets add constructor injection.
+- **No global `ValidationPipe` yet** — there are no request inputs to validate this ticket, so adding it now would be
+  config that does nothing (§3.1 YAGNI). It lands with the first DTO in T-007.
+
+### Decisions & narration
+> The explanatory reasoning emitted while building this ticket, captured here so it's followable later.
+- **TDD for real here** (unlike the config-only T-001): health is genuine behavior, so I wrote the supertest spec
+  first and *watched it fail with the missing-module error* before writing the controller. Seeing the red is the
+  point — it proves the test exercises the route, not a tautology.
+- **Canonical Nest dev runner (`nest start --watch`), not `tsx`/esbuild:** I know constructor-injected providers
+  arrive in ~2 tickets (T-007–T-009). A `tsx` dev server would drop decorator metadata at *runtime* and break DI,
+  so picking the tsc-based Nest runner now avoids ripping it out later — "one way to do a thing."
+- **Production build stays on `tsc`** (consistent with every other package and already metadata-correct); SWC is used
+  *only* for the Vitest transform. Two mechanisms, but each is the standard one for its job.
+- **Swagger mounted now, not deferred:** it's load-bearing for both demoability (§5) and the SDK generation (T-025),
+  and it's near-free — the decorators that feed it are the same ones that define the routes.
