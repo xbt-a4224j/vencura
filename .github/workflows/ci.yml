@@ -1,7 +1,7 @@
 name: CI
 
 # Quality gate on every push to main (we commit directly to main — no PR gate, §11).
-# Also runs on PRs targeting main for safety. semantic-release lives in its own workflow (T-005).
+# Also runs on PRs targeting main for safety. semantic-release tags versions after verify passes.
 on:
   push:
     branches: [main]
@@ -17,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so commitlint can lint the pushed range
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -30,6 +32,13 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Commitlint
+        if: github.event_name == 'push'
+        run: |
+          base='${{ github.event.before }}'
+          if [ "$base" = "0000000000000000000000000000000000000000" ]; then base='HEAD~1'; fi
+          pnpm exec commitlint --from "$base" --to '${{ github.sha }}'
+
       - name: Lint
         run: pnpm lint
 
@@ -41,3 +50,33 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  release:
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create tags + GitHub releases
+      issues: write # comment on released issues
+      pull-requests: write # comment on released PRs
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # semantic-release needs full history + tags
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Release
+        run: pnpm exec semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
