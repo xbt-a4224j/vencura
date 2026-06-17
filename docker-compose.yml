@@ -1,0 +1,44 @@
+# Local dev infra for VenCura. Brought up by `pnpm bootstrap` (docker compose up -d --wait).
+# Postgres = derived projection store · Redis = locks/idempotency/BullMQ · anvil = local chain.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: vencura
+      POSTGRES_PASSWORD: vencura
+      POSTGRES_DB: vencura
+    ports:
+      # Host port is overridable for when 5432 is already taken; keep DATABASE_URL in sync.
+      - '${POSTGRES_HOST_PORT:-5432}:5432'
+    volumes:
+      - vencura_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U vencura -d vencura']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:latest
+    # Local Foundry node for integration tests and offline demos (no Sepolia key needed).
+    entrypoint: ['anvil', '--host', '0.0.0.0', '--chain-id', '31337']
+    ports:
+      - '8545:8545'
+    healthcheck:
+      test: ['CMD', 'cast', 'block-number', '--rpc-url', 'http://localhost:8545']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  vencura_pgdata:
