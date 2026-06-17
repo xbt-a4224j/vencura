@@ -76,17 +76,18 @@ Append to `packages/shared/src/index.ts`:
 export * from './auth.schema';
 ```
 
-- [ ] **Step 3: Wire global validation + Swagger in `main.ts`**
+- [ ] **Step 3: Wire global validation + Swagger in `main.ts`** (nestjs-zod **v5** API)
 
-In `packages/api/src/main.ts`, add imports and two lines (place `patchNestjsSwagger()` BEFORE `createDocument`, and `useGlobalPipes` after `NestFactory.create`):
+`nestjs-zod@5` removed the global `patchNestjsSwagger()`. In v5, `createZodDto` DTOs carry their own OpenAPI metadata; you register the global `ZodValidationPipe` and wrap the built Swagger document with `cleanupOpenApiDoc(...)`. In `packages/api/src/main.ts`:
 ```ts
-import { ZodValidationPipe, patchNestjsSwagger } from 'nestjs-zod';
+import { ZodValidationPipe, cleanupOpenApiDoc } from 'nestjs-zod';
 // ...
 const app = await NestFactory.create(AppModule);
 app.useGlobalPipes(new ZodValidationPipe());
-patchNestjsSwagger();
+// ...build `config` as today...
+const document = SwaggerModule.createDocument(app, config);
+SwaggerModule.setup('docs', app, cleanupOpenApiDoc(document));
 ```
-Note: the Swagger-patch export name has varied across `nestjs-zod` majors (`patchNestjsSwagger` / `patchNestJsSwagger`). Confirm against the installed version's `dist` types; use the one that exists.
 
 - [ ] **Step 4: Write the DTOs (createZodDto)**
 
@@ -322,7 +323,11 @@ import { JwtStrategy } from './jwt.strategy';
 @Module({
   imports: [
     PassportModule,
-    JwtModule.register({ secret: process.env.JWT_SECRET, signOptions: { expiresIn: '1d' } }),
+    // registerAsync: read JWT_SECRET at DI-instantiation time, not module-import time
+    // (env may be unset when the module is first imported).
+    JwtModule.registerAsync({
+      useFactory: () => ({ secret: process.env.JWT_SECRET, signOptions: { expiresIn: '1d' } }),
+    }),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],
@@ -868,6 +873,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { PrismaModule } from '../infra/prisma/prisma.module';
 import { PrismaService } from '../infra/prisma/prisma.service';
 import { SIGNER } from '../signer/signer';
 import { WalletsModule } from './wallets.module';
@@ -888,7 +894,7 @@ describe('Wallets HTTP', () => {
 
   beforeAll(async () => {
     process.env.JWT_SECRET = 'test-secret';
-    const moduleRef = await Test.createTestingModule({ imports: [WalletsModule] })
+    const moduleRef = await Test.createTestingModule({ imports: [PrismaModule, WalletsModule] })
       .overrideProvider(PrismaService)
       .useValue(prismaMock)
       .overrideProvider(SIGNER)

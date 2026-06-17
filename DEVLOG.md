@@ -405,3 +405,14 @@ CI + the v0.1.0 release are on the GitHub Actions tab / Releases.
 overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first release is `v0.1.0` (T-005).
 
 > **Addendum (post-recap):** two `fix(ci)` commits that relaxed commitlint (body length, subject-case) landed after the v0.1.0 tag, so semantic-release correctly cut a patch — **Block 1 latest is `v0.1.1`**. Same scope, just a patch bump from CI-config fixes.
+
+---
+
+## v0.2.0 · Block 2 · T-007 JWT auth (register / login)    ([#8](https://github.com/xbt-a4224j/vencura/issues/8) · [commit](https://github.com/xbt-a4224j/vencura/commit/7ed5687))
+**What & why** — Register/login with a JWT so every later wallet route can be owner-scoped. Access-token-only (YAGNI on refresh).
+**How it works** — argon2id hashes the password; `JwtModule.registerAsync` issues a `{sub,email}` token; `passport-jwt` `JwtStrategy` + `JwtAuthGuard` shape `req.user`. Validation is one zod schema in `shared`, surfaced via `nestjs-zod` `createZodDto` (also feeds Swagger).
+**Files touched** — [auth.service.ts](packages/api/src/auth/auth.service.ts) (hash/verify/issue) · [jwt.strategy.ts](packages/api/src/auth/jwt.strategy.ts) · [jwt-auth.guard.ts](packages/api/src/auth/jwt-auth.guard.ts) · [dto.ts](packages/api/src/auth/dto.ts) · [auth.schema.ts](packages/shared/src/auth.schema.ts) · [main.ts](packages/api/src/main.ts) (global `ZodValidationPipe` + `cleanupOpenApiDoc`).
+**Key code** — `register({email,password}) → {accessToken, user}`; login returns one error for unknown-email vs bad-password (no enumeration).
+**Tests** — [auth.service.spec.ts](packages/api/src/auth/auth.service.spec.ts) (hash≠plaintext, 409 dup, 401 bad pass) + [auth.e2e.spec.ts](packages/api/src/auth/auth.e2e.spec.ts) (400 invalid input, guard 401→200). 6 green.
+**Demo / verify** — `curl -XPOST localhost:3000/auth/register -H 'content-type: application/json' -d '{"email":"a@b.com","password":"password123"}'` → `{accessToken,...}`.
+**Gotchas** — `JwtModule.register` reads env at *import* time (undefined before dotenv/in tests) → use `registerAsync`. `nestjs-zod@5` dropped `patchNestjsSwagger`; use `cleanupOpenApiDoc`. Global RFC-7807 filter deferred to T-019.
