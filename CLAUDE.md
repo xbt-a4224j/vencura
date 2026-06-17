@@ -1,5 +1,11 @@
 # VenCura — Project Context (CLAUDE.md)
 
+> 🎯 **Prime directive:** maximize the **thoroughness and professionalism** of the implementation, *subject to*
+> minimizing code bloat, overengineering, and unreadability. Favor **commonly-accepted, well-maintained third-party
+> libraries** over reinventing — keep the dependency surface deliberate and the code legible. The full requirement
+> set lives in [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) — that's the **north star**; these simplicity constraints
+> are how we hit it.
+
 > Read this top-to-bottom before touching code. It is the single source of truth for *what* we're
 > building, *why*, and *how we work*. The tickets live in `tickets.md`.
 >
