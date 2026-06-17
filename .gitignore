@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+coverage/
+.turbo/
+*.log
+.DS_Store
+
+# secrets — NEVER commit
+.env
+.env.*
+!.env.example
+
+# local db / prisma
+*.db
+prisma/dev.db*

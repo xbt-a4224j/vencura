@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VenCura — Architecture Explainer</title>
+<style>
+  :root{
+    --bg:#ffffff; --panel:#f7f8fa; --panel2:#eef1f6; --ink:#1a1d24; --muted:#5a6472;
+    --line:#e3e7ef; --accent:#5b4bd6; --accent2:#0f8a6c; --warn:#b06a00; --red:#d23b3b;
+    --maxw:920px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:32px 22px 120px}
+  header.top{border-bottom:1px solid var(--line); padding-bottom:20px; margin-bottom:8px}
+  header.top .kick{color:var(--accent); font-weight:700; letter-spacing:.06em; text-transform:uppercase; font-size:12.5px}
+  header.top h1{margin:6px 0 4px; font-size:30px}
+  header.top .meta{color:var(--muted); font-size:14.5px}
+  nav.toc{position:static; background:var(--panel); border:1px solid var(--line); border-radius:10px; margin:18px 0 28px; padding:12px 16px; font-size:13px}
+  nav.toc a{color:var(--muted); text-decoration:none; margin-right:14px; white-space:nowrap; display:inline-block; padding:3px 0}
+  nav.toc a:hover{color:var(--accent)}
+  h2.sec{margin:46px 0 14px; font-size:22px; scroll-margin-top:20px; border-top:1px solid var(--line); padding-top:24px}
+  h2.sec .num{color:var(--accent); font-variant-numeric:tabular-nums; margin-right:8px}
+  h3{margin:24px 0 8px; font-size:17px}
+  p{margin:10px 0}
+  a{color:#5b4bd6} a:hover{text-decoration:underline}
+  strong{color:#000}
+  em{color:var(--accent2); font-style:normal}
+  ul,ol{margin:10px 0 10px 4px; padding-left:22px} li{margin:6px 0}
+  code{background:var(--panel2); border:1px solid var(--line); border-radius:5px; padding:1px 6px; font-size:13px; color:#3a3f4b}
+  pre{background:#0f1320; color:#e6e9f2; border-radius:10px; padding:14px 16px; overflow:auto; font-size:13px; line-height:1.5}
+  pre code{background:none; border:none; color:inherit; padding:0}
+  table{border-collapse:collapse; width:100%; margin:14px 0; font-size:13.5px}
+  th,td{border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top}
+  th{background:var(--panel2)}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 20px; margin:16px 0}
+  .callout{border-left:3px solid var(--accent); background:linear-gradient(90deg,rgba(91,75,214,.08),transparent); padding:12px 16px; border-radius:0 8px 8px 0; margin:14px 0}
+  .warn{border-left:3px solid var(--warn); background:linear-gradient(90deg,rgba(176,106,0,.09),transparent); padding:12px 16px; border-radius:0 8px 8px 0; margin:14px 0}
+  .ok{border-left:3px solid var(--accent2); background:linear-gradient(90deg,rgba(15,138,108,.09),transparent); padding:12px 16px; border-radius:0 8px 8px 0; margin:14px 0}
+  .red{border-left:3px solid var(--red); background:linear-gradient(90deg,rgba(210,59,59,.08),transparent); padding:12px 16px; border-radius:0 8px 8px 0; margin:14px 0}
+  .tag{display:inline-block; background:var(--panel2); border:1px solid var(--line); border-radius:999px; padding:2px 10px; font-size:12px; color:var(--muted); margin:3px 4px 3px 0}
+  .diagram{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px; margin:18px 0}
+  .step{display:flex; gap:12px; margin:10px 0}
+  .step .n{flex:0 0 26px; height:26px; border-radius:50%; background:var(--accent); color:#fff; font-weight:700; font-size:13px; display:flex; align-items:center; justify-content:center}
+  .step .b{flex:1}
+  .lead{font-size:17px; color:#2b303a}
+  @media print{ nav.toc{display:none} pre{white-space:pre-wrap} a::after{content:" (" attr(href) ")"; font-size:8pt; color:#888} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="kick">VenCura · Architecture Explainer</div>
+  <h1>Custodial Wallet API — system design</h1>
+  <div class="meta">Custodial wallet API · TypeScript / NestJS · Ethereum Sepolia · built <em>for concurrency</em></div>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <a href="#thesis">Thesis</a>
+  <a href="#diagram">System Diagram</a>
+  <a href="#components">Components</a>
+  <a href="#data">Data Model</a>
+  <a href="#custody">Custody &amp; Keys</a>
+  <a href="#flows">Operation Flows</a>
+  <a href="#concurrency">Concurrency</a>
+  <a href="#balances">Balances</a>
+  <a href="#policy">Policy Engine</a>
+  <a href="#security">Security</a>
+  <a href="#scale">Scale</a>
+  <a href="#stack">Stack &amp; Deploy</a>
+</nav>
+
+<p class="lead">VenCura is the "Venmo of wallets": a backend API that creates and operates <strong>custodial</strong>
+Ethereum wallets on users' behalf. Because the platform holds the keys, the architecture is really a study in
+<em>key custody, transaction correctness, and security</em> — which is what matters most for a custodial wallet platform. This document is the map: components, data model, the custody design, the per-operation flows, and the
+concurrency model that keeps transactions correct under load.</p>
+
+<h2 class="sec" id="thesis"><span class="num">1</span>Design thesis</h2>
+<p>Three principles drive every decision:</p>
+<ul>
+  <li><strong>The chain is the source of truth; the database is a derived, cached projection.</strong> Balances are
+  read from chain and cached for UX — never invented in the DB.</li>
+  <li><strong>The private key is the asset.</strong> It is generated server-side, <em>encrypted at rest (AES-256-GCM)</em>,
+  decrypted only transiently in memory at signing time, and never logged or returned. A pluggable <code>Signer</code>
+  lets us swap custody models (encrypted-key → Shamir split → MPC → non-custodial) behind one interface.</li>
+  <li><strong>Correctness under concurrency is a first-class requirement.</strong> Ethereum's sequential nonce means
+  concurrent sends on one wallet can collide; idempotency prevents double-broadcast. We design for this explicitly.</li>
+</ul>
+
+<h2 class="sec" id="diagram"><span class="num">2</span>System diagram</h2>
+<div class="diagram">
+<svg viewBox="0 0 880 470" xmlns="http://www.w3.org/2000/svg" width="100%" font-family="-apple-system,Segoe UI,Roboto,sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 z" fill="#7a8499"/>
+    </marker>
+    <style>
+      .box{fill:#ffffff;stroke:#c9d0de;stroke-width:1.5;rx:10}
+      .lbl{font-size:13px;font-weight:700;fill:#1a1d24}
+      .sub{font-size:11px;fill:#5a6472}
+      .grp{fill:#f3f1fe;stroke:#cdc4f5;stroke-width:1.5}
+      .ext{fill:#eefaf4;stroke:#bfe6d6;stroke-width:1.5}
+      .edge{stroke:#7a8499;stroke-width:1.6;fill:none;marker-end:url(#arrow)}
+      .edt{font-size:10.5px;fill:#5a6472}
+    </style>
+  </defs>
+
+  <!-- clients -->
+  <rect class="box" x="20" y="40" width="150" height="70" rx="10"/>
+  <text class="lbl" x="34" y="68">Admin UI (React/TS)</text>
+  <text class="sub" x="34" y="86">+ TS SDK</text>
+  <text class="sub" x="34" y="100">example scripts</text>
+
+  <!-- API group -->
+  <rect class="grp" x="250" y="20" width="330" height="300" rx="12"/>
+  <text class="lbl" x="266" y="42">VenCura API — NestJS</text>
+  <rect class="box" x="266" y="56" width="140" height="44" rx="8"/><text class="sub" x="278" y="76">Auth</text><text class="sub" x="278" y="90">JWT guard</text>
+  <rect class="box" x="424" y="56" width="140" height="44" rx="8"/><text class="sub" x="436" y="76">Wallets</text><text class="sub" x="436" y="90">create / list</text>
+  <rect class="box" x="266" y="112" width="140" height="44" rx="8"/><text class="sub" x="278" y="132">Transactions</text><text class="sub" x="278" y="146">sign / send</text>
+  <rect class="box" x="424" y="112" width="140" height="44" rx="8"/><text class="sub" x="436" y="132">Balances</text><text class="sub" x="436" y="146">cached + live</text>
+  <rect class="box" x="266" y="168" width="140" height="44" rx="8"/><text class="sub" x="278" y="188">Policy Engine</text><text class="sub" x="278" y="202">allowlist/limits</text>
+  <rect class="box" x="424" y="168" width="140" height="44" rx="8"/><text class="sub" x="436" y="188">Signer</text><text class="sub" x="436" y="202">EncKey / Shamir</text>
+  <rect class="box" x="266" y="224" width="298" height="74" rx="8"/>
+  <text class="lbl" x="280" y="247">Workers (BullMQ)</text>
+  <text class="sub" x="280" y="266">confirmation-watcher · balance-refresher</text>
+  <text class="sub" x="280" y="282">(async; idempotent; per-wallet nonce lock)</text>
+
+  <!-- stores / external -->
+  <rect class="box" x="650" y="30" width="210" height="52" rx="10"/><text class="lbl" x="664" y="52">Postgres (Prisma)</text><text class="sub" x="664" y="70">users · wallets · txs · balances</text>
+  <rect class="box" x="650" y="100" width="210" height="52" rx="10"/><text class="lbl" x="664" y="122">Redis</text><text class="sub" x="664" y="140">nonce locks · idempotency · queue</text>
+  <rect class="ext" x="650" y="170" width="210" height="52" rx="10"/><text class="lbl" x="664" y="192">Secret (env)</text><text class="sub" x="664" y="210">master encryption key</text>
+  <rect class="ext" x="650" y="240" width="210" height="64" rx="10"/><text class="lbl" x="664" y="262">Ethereum — Infura (Sepolia)</text><text class="sub" x="664" y="280">RPC reads · broadcast</text><text class="sub" x="664" y="294">ws: blocks / Transfer logs</text>
+
+  <!-- edges -->
+  <path class="edge" d="M170,75 L250,75"/>
+  <path class="edge" d="M580,55 L650,52"/><text class="edt" x="586" y="45">SQL</text>
+  <path class="edge" d="M580,130 L650,126"/><text class="edt" x="586" y="120">locks/queue</text>
+  <path class="edge" d="M580,190 L650,196"/><text class="edt" x="600" y="183">encrypt</text>
+  <path class="edge" d="M580,262 L650,268"/><text class="edt" x="592" y="255">JSON-RPC</text>
+  <path class="edge" d="M648,290 C600,330 560,320 565,300" stroke-dasharray="4 3"/><text class="edt" x="588" y="326">ws events</text>
+</svg>
+</div>
+<p class="sub" style="color:var(--muted);font-size:13px">Client → NestJS API (modules + async workers) → Postgres (durable state),
+Redis (ephemeral concurrency control + queue), an env master key for encryption, Ethereum/Infura (reads, broadcast, event subscriptions).</p>
+
+<h2 class="sec" id="components"><span class="num">3</span>Components</h2>
+<table>
+<tr><th>Component</th><th>Role</th></tr>
+<tr><td><strong>Admin UI + TS SDK</strong></td><td>React/TS admin to exercise the API; a typed SDK package + example scripts (example code + a framework-agnostic client).</td></tr>
+<tr><td><strong>NestJS API</strong></td><td>Modules: Auth (JWT), Wallets, Transactions, Balances, Policy, Signer. DI + guards/interceptors fit auth + policy cleanly; a clean, conventional Node/TS structure.</td></tr>
+<tr><td><strong>Postgres + Prisma</strong></td><td>Durable source of <em>derived</em> state: users, wallets (encrypted keys), transactions, cached balances, policies, shared-access grants, idempotency records.</td></tr>
+<tr><td><strong>Redis</strong></td><td><em>Ephemeral</em> concurrency control: per-wallet nonce locks, idempotency cache, and the BullMQ queue for async workers.</td></tr>
+<tr><td><strong>Key encryption</strong></td><td>Each wallet's private key is encrypted with AES-256-GCM using a master key from env/secret. No external KMS — kept deliberately simple.</td></tr>
+<tr><td><strong>Ethereum / Infura (Sepolia)</strong></td><td>JSON-RPC for balance/nonce/receipts, tx broadcast, and a websocket subscription (new blocks + ERC-20 <code>Transfer</code> logs) for event-driven refresh.</td></tr>
+</table>
+
+<h2 class="sec" id="data"><span class="num">4</span>Data model</h2>
+<pre><code>users          id, email, password_hash, created_at
+wallets        id, user_id, address, chain, label,
+               encrypted_private_key, key_version,        -- AES-256-GCM (iv + auth tag + ciphertext)
+               next_nonce,                                        -- nonce hint
+               created_at
+transactions   id, wallet_id, idempotency_key, tx_hash, nonce,
+               direction, to_address, from_address,
+               asset ('native' | token_addr), amount (bigint str),
+               status ('pending'|'confirmed'|'failed'),
+               block_number, gas_used, created_at
+wallet_balances wallet_id, asset, confirmed_balance (bigint str),
+               as_of_block, updated_at
+policies       wallet_id, allowlist[], max_amount, daily_limit, require_approval
+wallet_access  wallet_id, user_id, role ('owner'|'spender'|'viewer')   -- shared access
+audit_log      id, actor_user_id, wallet_id, action, metadata, created_at</code></pre>
+<div class="callout"><strong>Note the discipline:</strong> amounts are stored as <em>bigint strings</em> (wei / token base units),
+never JS floats. Balances are cached (with <code>as_of_block</code>), not authoritative. Key material lives only as
+ciphertext + a wrapped data key.</div>
+
+<h2 class="sec" id="custody"><span class="num">5</span>Custody &amp; key management</h2>
+<p>The heart of the project. A pluggable <code>Signer</code> interface decouples "how we hold the key" from the rest of
+the system:</p>
+<pre><code>interface Signer {
+  getAddress(walletId): Promise&lt;Address&gt;
+  signMessage(walletId, msg): Promise&lt;Hex&gt;
+  signTransaction(walletId, tx): Promise&lt;Hex&gt;
+}</code></pre>
+<table>
+<tr><th>Backend</th><th>How the key is held</th><th>Status</th></tr>
+<tr><td><code>EncryptedKeySigner</code></td><td><strong>AES-256-GCM:</strong> the private key is encrypted with a master key held in env/secret. Decrypted in memory only at sign time, then zeroized.</td><td>Default (built)</td></tr>
+<tr><td><code>ShamirSigner</code></td><td><strong>2-of-2 split:</strong> the key is reconstructed transiently from two shares (DB + separate store); the full key is never persisted. Demonstrates the "never store the whole key" idea.</td><td>Bonus (built)</td></tr>
+<tr><td><code>MpcSigner</code> / non-custodial</td><td>Threshold signatures (key never assembled) / user-held share.</td><td>Designed in writeup, not built</td></tr>
+</table>
+<div class="ok"><strong>Why this design:</strong> the same DB schema and API support every custody model
+behind one interface — exactly the spectrum (encrypted-key → Shamir → MPC → non-custodial) that defines their worldview.
+The signer is the only place key material is ever in plaintext, and only for microseconds.</div>
+
+<h2 class="sec" id="flows"><span class="num">6</span>Operation flows</h2>
+
+<h3>createWallet</h3>
+<div class="step"><div class="n">1</div><div class="b">Generate a fresh keypair server-side (<code>viem</code>/<code>generatePrivateKey</code>).</div></div>
+<div class="step"><div class="n">2</div><div class="b">Encrypt the private key with AES-256-GCM using the master key from env.</div></div>
+<div class="step"><div class="n">3</div><div class="b">Persist <code>address, encrypted_private_key</code>. Return the <strong>address only</strong> — the key never leaves the server.</div></div>
+
+<h3>getBalance</h3>
+<div class="step"><div class="n">1</div><div class="b">Return the <strong>cached</strong> confirmed balance instantly + the derived <em>available</em> balance (confirmed − pending outbound − gas reserve).</div></div>
+<div class="step"><div class="n">2</div><div class="b">Stale-while-revalidate: kick off an async refresh from chain; push the corrected value when it lands.</div></div>
+
+<h3>signMessage</h3>
+<div class="step"><div class="n">1</div><div class="b">Authorize (caller owns/has access to the wallet).</div></div>
+<div class="step"><div class="n">2</div><div class="b"><code>Signer.signMessage</code> decrypts the key in memory with the master key, signs (EIP-191), zeroizes. Return the signature.</div></div>
+
+<h3>sendTransaction (the interesting one)</h3>
+<div class="step"><div class="n">1</div><div class="b"><strong>Idempotency:</strong> if this <code>Idempotency-Key</code> was seen, return the stored result — don't broadcast twice.</div></div>
+<div class="step"><div class="n">2</div><div class="b"><strong>Policy check:</strong> destination allowlisted? under limits? approval required? (authoritative, before signing.)</div></div>
+<div class="step"><div class="n">3</div><div class="b"><strong>Acquire the per-wallet nonce lock</strong> (Redis). This serializes all sends for this wallet.</div></div>
+<div class="step"><div class="n">4</div><div class="b">Read the authoritative <strong>pending nonce + on-chain balance</strong> (never the cache) → build tx (native or ERC-20 <code>transfer</code>) → <code>Signer.signTransaction</code> → broadcast.</div></div>
+<div class="step"><div class="n">5</div><div class="b">Persist the tx as <code>pending</code> with its nonce; bump <code>next_nonce</code>; <strong>release the lock</strong>; return <code>transactionHash</code>.</div></div>
+<div class="step"><div class="n">6</div><div class="b">A <strong>confirmation-watcher</strong> worker later sees the receipt, flips status to <code>confirmed</code>/<code>failed</code>, and refreshes the balance cache.</div></div>
+
+<h2 class="sec" id="concurrency"><span class="num">7</span>Concurrency model <span style="color:var(--muted);font-size:14px;font-weight:400">(the part we deliberately built)</span></h2>
+<div class="warn"><strong>The core problem:</strong> Ethereum nonces are strictly sequential per address. Two concurrent
+<code>sendTransaction</code>s on the same wallet that both read nonce <code>N</code> will collide — one tx gets stuck or
+replaced. And a client retry can broadcast the same payment twice.</div>
+<ul>
+  <li><strong>Per-wallet nonce lock (Redis).</strong> A short-lived distributed lock keyed by wallet serializes the
+  read-nonce → sign → broadcast → persist critical section, so each send claims a unique, monotonic nonce. (Postgres
+  advisory lock is the zero-extra-infra alternative; we use Redis since we're already running it for the queue.)</li>
+  <li><strong>Idempotency keys.</strong> Clients send an <code>Idempotency-Key</code>; the first response is stored and
+  replayed on retries, so a network hiccup never double-spends.</li>
+  <li><strong>Async workers (BullMQ on Redis).</strong> A <em>confirmation-watcher</em> reconciles pending txs to
+  confirmed/failed; a <em>balance-refresher</em> updates the cache (event-driven via <code>Transfer</code> logs + new
+  blocks, with a periodic full reconcile as a safety net). Keeping these off the request path keeps the API fast.</li>
+  <li><strong>Authoritative checks on write.</strong> Sends validate against <em>live</em> chain state (nonce + balance),
+  never the cache — the cache is for display only.</li>
+</ul>
+<div class="callout"><strong>Right-sized, not over-built:</strong> this is the minimum needed to be <em>correct</em> under
+concurrent sends — a real requirement, not premature scaling. The further scale path (durable-nonce pools, multiple
+co-signers, provider webhooks) is documented in §10 but intentionally not built.</div>
+
+<h2 class="sec" id="balances"><span class="num">8</span>Balance model</h2>
+<p>Three numbers, like a bank account:</p>
+<ul>
+  <li><strong>Confirmed</strong> — last value read from chain (cached, with <code>as_of_block</code>).</li>
+  <li><strong>Pending</strong> — outbound txs broadcast but not yet mined (and detected incoming).</li>
+  <li><strong>Available</strong> = confirmed − pending outbound − gas reserve → what the UI shows as spendable.</li>
+</ul>
+<p>On send, we apply an <strong>optimistic</strong> pending debit immediately for snappy UX, then reconcile to the
+confirmed value when the watcher sees the receipt. Reads are <strong>stale-while-revalidate</strong>. <strong>Reorgs:</strong>
+a balance isn't treated as final until N confirmations.</p>
+
+<h2 class="sec" id="policy"><span class="num">9</span>Policy engine</h2>
+<p>A small policy layer enforced <em>before</em> signing: destination
+<strong>allowlists</strong>, per-tx and daily <strong>amount limits</strong>, and an optional <strong>approval</strong>
+gate. Because it sits in front of the <code>Signer</code>, no transaction can be signed that violates policy — the
+control is bound to the signing path, not just the UI.</p>
+
+<h2 class="sec" id="security"><span class="num">10</span>Security considerations</h2>
+<ul>
+  <li><strong>Keys:</strong> AES-256-GCM encryption at rest; decrypt in memory only; never logged, never returned by the API.</li>
+  <li><strong>Auth &amp; authz:</strong> JWT; every wallet action checks ownership/shared-access role.</li>
+  <li><strong>Transport &amp; secrets:</strong> TLS; the master encryption key + DB creds in env/secrets manager, never in code.</li>
+  <li><strong>Abuse:</strong> rate limiting; idempotency; audit log of every sensitive action.</li>
+  <li><strong>Chain correctness:</strong> authoritative nonce/balance checks; reorg-aware confirmations; amounts as bigints.</li>
+  <li><strong>Honest weaknesses (for the writeup):</strong> a fully custodial model is a honeypot — a compromised master key +
+  DB is catastrophic; the real mitigation is MPC/non-custodial, which is why the <code>Signer</code> abstraction matters.</li>
+</ul>
+
+<h2 class="sec" id="scale"><span class="num">11</span>How this scales <span style="color:var(--muted);font-size:14px;font-weight:400">(documented, not built)</span></h2>
+<p>Show the scale path without over-building this:</p>
+<ul>
+  <li><strong>Nonce throughput:</strong> per-wallet durable-nonce pools and pre-signed/preprocessed material to pipeline sends.</li>
+  <li><strong>Signing:</strong> multiple parallel co-signers; move to <strong>MPC/threshold signatures</strong> so keys are never assembled (the MPC/threshold-signature model).</li>
+  <li><strong>Refresh:</strong> provider webhooks (Alchemy Address Activity) instead of polling; horizontally scaled workers.</li>
+  <li><strong>Multi-chain:</strong> a chain-adapter interface (EVM today; Solana/others behind the same <code>Signer</code> + tx-builder seam).</li>
+</ul>
+
+<h2 class="sec" id="stack"><span class="num">12</span>Stack &amp; deployment</h2>
+<p>
+<span class="tag">TypeScript</span><span class="tag">NestJS</span><span class="tag">Prisma</span><span class="tag">Postgres</span>
+<span class="tag">Redis + BullMQ</span><span class="tag">Viem</span><span class="tag">Ethereum Sepolia (Infura)</span><span class="tag">AES-256-GCM key encryption</span>
+<span class="tag">React/TS admin</span><span class="tag">TS SDK</span><span class="tag">Vitest/Jest</span><span class="tag">pnpm + Turbo monorepo</span>
+</p>
+<p><strong>Deploy:</strong> Vercel (admin) · Railway/Render (API + worker) · Neon (Postgres) · Upstash (Redis) · Infura RPC.
+Monorepo packages: <code>api</code> · <code>sdk</code> · <code>client</code> · <code>contracts</code>(optional).</p>
+
+<div class="panel"><strong>Next step:</strong> turn this into the repo scaffold — <code>~/dev/git/vencura/</code> with
+<code>CLAUDE.md</code> (this architecture + conventions) and <code>tickets.md</code> (~20 core tickets + the nice-to-have
+tranche + the Shamir/policy bonus), ordered with dependencies, ready for <code>gh issue create</code>.</div>
+
+</div>
+</body>
+</html>
