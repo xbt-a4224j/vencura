@@ -166,6 +166,8 @@ no worktrees (deliberate, to save tokens/overhead). CI runs on every push to `ma
 Optional: a quick self-review (`crit`) on a gnarly ticket before committing — but no branch/PR ceremony.
 Use `subagent-driven-development` / parallel agents only for genuinely independent work (e.g. SDK while UI).
 
+**Anti-churn:** if a ticket isn't converging after ~2 honest attempts, **stop** — narrow its scope or ask the human. Don't grind. Over-thoroughness on a setup ticket is a §3.1 defect, same as over-engineering.
+
 ## 12. DEVLOG.md — required for every ticket
 The **last step of every ticket's Definition of Done** is to append a teaching entry to `DEVLOG.md`. Write it in
 **Markdown with clickable links** so it's followable in the IDE's Markdown preview in real time — link every file as
@@ -185,12 +187,16 @@ Append a short **block recap** at each block boundary (what shipped, the version
 APPEND-ONLY and is the user's real-time, own-with-full-knowledge record of the codebase — newest entry at the bottom,
 honest, legible, every reference clickable. The user follows it live by keeping the Markdown preview open.
 
+**Brevity (enforced):** each entry is **≤ ~120 words / ~8 lines** — a skimmable index, not an essay. Link to code instead of restating it; no code dumps; **do not add fields or subsections** beyond the template above. If an entry is growing long, you're explaining in the wrong place — put it in the live chat (§19), not here.
+
 ## 13. Testing strategy (how we TDD chain code)
 - **Unit (test-first):** pure logic — key-encryption round-trip (AES-GCM), `signMessage` determinism vs known EIP-191
   vectors, policy deny paths, **nonce serialization** (N concurrent sends vs a mocked provider → unique monotonic
   nonces), idempotency (same key → one broadcast).
 - **Integration:** provider mocked at the boundary; a couple of tests against a local node (anvil) or Sepolia.
 - **E2E:** one happy-path test (create → fund via faucet → balance → send → confirmed) in the final block.
+
+**Scope of TDD (read this — it prevents churn):** test-first applies to **behavioral/logic** code — signing, encryption, nonce/idempotency, policy, balance math, API handlers/services. **Scaffolding / config / schema / infra tickets** (monorepo setup, docker-compose, Prisma init + schema + migration, CI, deploy) have **no meaningful failing-test-first step** — the bar is a **smoke check**: it boots, the migration applies, `prisma generate` works, the endpoint returns 200. **Do not build a DB/integration test harness to 'test' configuration** — that is churn and a §3.1 violation.
 
 ## 14. Definition of Done (every ticket)
 Tests written first and green · lint + typecheck + build green · **UI surface** if user-facing · **logs** at
@@ -223,4 +229,4 @@ Some steps need *you* (the agent can't create accounts or fund wallets). Flag th
 While building, **over-explain**: narrate the reasoning behind each decision, define any unfamiliar concept inline
 (threshold/nonce mechanics, NestJS DI, AES-GCM, etc.), and after each ticket give a short plain-English "what I just
 built and why" beyond the DEVLOG entry. Err toward *more* explanation than usual — the author is learning the codebase
-to own it and will defend it later. This intentional verbosity overrides any general "be terse" default for this project.
+to own it and will defend it later. This intentional verbosity lives in the **live session output (chat)** — it is how you teach the author as you work. It does **NOT** go into committed files: `DEVLOG.md`, code comments, and commit messages stay lean (see §12). Explain verbally; record tersely.
