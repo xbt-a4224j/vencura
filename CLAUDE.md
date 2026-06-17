@@ -43,6 +43,20 @@ and security.** Our thesis:
 5. **Logs at demo-relevant points** (§9) and **real error handling** (§10) everywhere.
 6. **Own-with-full-knowledge:** every ticket appends a teaching entry to `DEVLOG.md` (§12).
 
+## 3.1 Simplicity & readability — operating rules (enforced, not aspirational)
+Checkable rules. Part of the per-ticket DoD (§14) and the block-end review (§11):
+- **Reuse over reinvention.** Use a well-known, maintained library for anything non-trivial (crypto, JWT, validation,
+  HTTP, bignum) — but add each dependency *deliberately* and note **why** in the DEVLOG. Never hand-roll crypto.
+- **YAGNI / no speculative generality.** Build only what the ticket needs. The **only** abstraction seam is `Signer`.
+  No config-driven frameworks, plugin systems, deep inheritance, or interfaces "for later."
+- **Small units, clear names.** Short functions/files; a reader infers intent from the name. If you need a comment to
+  explain *what* code does, rename/refactor instead — comments explain *why*, not *what*.
+- **Boring beats clever.** No metaprogramming or magic; obvious > concise. No one-liner that needs decoding.
+- **One way to do a thing.** Same error shape, DTO/validation style, and naming across modules — no parallel idioms.
+- **Delete > add.** No dead code, commented-out blocks, or TODOs without a linked issue.
+- **Readability gate (the check):** before committing, re-read the diff and ask *"would a new engineer understand this
+  file from its name + 30 seconds of reading?"* If no, simplify. Over-engineering is a defect, same as a failing test.
+
 ## 4. Architecture (condensed — full version in `docs/architecture.html`)
 - **Chain is the source of truth; Postgres is a derived, cached projection.** Balances are read from chain
   and cached; never invented in the DB.
@@ -146,7 +160,7 @@ no worktrees (deliberate, to save tokens/overhead). CI runs on every push to `ma
 2. **`test-driven-development`** — per ticket: failing test first, then implement to green. (Strategy in §13.)
 3. **`systematic-debugging`** — for any failure, diagnose root cause before patching (esp. crypto/nonce).
 4. **`verification-before-completion`** — before committing: run lint + typecheck + test + build (and exercise
-   the UI for user-facing tickets); paste the **real** output. No "should pass."
+   the UI for user-facing tickets); paste the **real** output. No "should pass." Then re-read the diff against the §3.1 gate and simplify before committing.
 5. **Commit directly to `main`** with a conventional-commit message, then append the `DEVLOG.md` entry (§12).
 6. **Block end:** confirm CI is green on `main`; semantic-release tags the version bump.
 Optional: a quick self-review (`crit`) on a gnarly ticket before committing — but no branch/PR ceremony.
@@ -180,7 +194,7 @@ honest, legible, every reference clickable. The user follows it live by keeping 
 
 ## 14. Definition of Done (every ticket)
 Tests written first and green · lint + typecheck + build green · **UI surface** if user-facing · **logs** at
-demo points · **errors** handled · **DEVLOG entry** appended · conventional-commit committed **directly to `main`** ·
+demo points · **errors** handled · **simplicity/readability gate (§3.1)** passed · **DEVLOG entry** appended · conventional-commit committed **directly to `main`** ·
 (block end) CI green on `main` + version bump.
 
 ## 15. CI (from Block 1)
