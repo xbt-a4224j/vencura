@@ -403,3 +403,5 @@ CI + the v0.1.0 release are on the GitHub Actions tab / Releases.
 
 **Notable calls:** smoke-checking schema instead of a DB test harness (T-003); making the Postgres host port
 overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first release is `v0.1.0` (T-005).
+
+> **Addendum (post-recap):** two `fix(ci)` commits that relaxed commitlint (body length, subject-case) landed after the v0.1.0 tag, so semantic-release correctly cut a patch — **Block 1 latest is `v0.1.1`**. Same scope, just a patch bump from CI-config fixes.
