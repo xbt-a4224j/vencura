@@ -5,7 +5,7 @@
 
 ---
 
-## v0.1.0 · Block 1 · T-001 Scaffold pnpm + Turbo monorepo &nbsp;([#1](https://github.com/xbt-a4224j/vencura/issues/1) · [commit](https://github.com/xbt-a4224j/vencura/commit/1910c4b9d09c29488759b451b968f9495a09108b))
+## v0.1.0 · Block 1 · T-001 Scaffold pnpm + Turbo monorepo &nbsp;([#1](https://github.com/xbt-a4224j/vencura/issues/1) · [commit](https://github.com/xbt-a4224j/vencura/commit/c521adf29abd24e3daf79682fd69b4fb110680a1))
 
 **What & why** — Stand up the monorepo skeleton that every later ticket builds on: four workspace
 packages (`api`, `sdk`, `web`, `shared`) plus one shared toolchain (TypeScript, ESLint, Prettier, Vitest)
