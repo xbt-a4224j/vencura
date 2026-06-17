@@ -357,3 +357,49 @@ message turns the `Commitlint` CI step red.
   clear ordering — over two parallel workflows racing.
 - **The CI failure was *good*:** commitlint did its job (caught a malformed body) and the gate stopped a release from
   a non-conformant push. I fixed forward rather than rewriting history on `main`.
+
+---
+
+## v0.1.0 · Block 1 · T-006 README skeleton + one-command bootstrap &nbsp;([#7](https://github.com/xbt-a4224j/vencura/issues/7) · [commit](https://github.com/xbt-a4224j/vencura/commit/c1dab2fc5b22cf097bb37792d1cf6d03c218a6b5))
+
+**What & why** — A front door for the repo: what VenCura is, the three-command quick start
+(`pnpm i && pnpm bootstrap && pnpm dev`), the monorepo map, and a CI badge. Skeleton by design — the Mermaid
+diagrams and the full security writeup are explicitly deferred to the final block (T-038/T-036).
+
+**How it works** — Plain docs. The bootstrap commands map to what earlier tickets built: `pnpm bootstrap`
+→ [scripts/bootstrap.sh](scripts/bootstrap.sh) (env → infra → migrate), `pnpm dev` → Turbo's `dev` task.
+
+**Files touched**
+- [README.md](README.md) → project intro, quick start, layout, scripts table, status, diagram/security placeholders.
+
+**Tests** — Docs ticket: verification is Prettier-clean formatting and that every linked path
+(`CLAUDE.md`, `docs/REQUIREMENTS.md`, `.env.example`, `tickets.md`, `DEVLOG.md`, `.nvmrc`) actually exists — checked.
+
+**Demo / verify** — Open [README.md](README.md) in the Markdown preview; the CI badge reflects `main`'s status.
+
+**Gotchas**
+- Kept it a **skeleton on purpose** (§ plan): the diagram + writeup belong in Block 8 so they describe the finished
+  system, not a half-built one. Placeholders name the ticket that fills them.
+
+### Decisions & narration
+> The explanatory reasoning emitted while building this ticket, captured here so it's followable later.
+- **Documented what exists, not aspirations:** the quick start, scripts table, and `/health` + `/docs` lines all
+  correspond to shipped behavior from T-002/T-003/T-003a — a README that overstates is worse than none.
+- **Diagrams deferred, not forgotten:** an explicit placeholder pointing at T-038 keeps the README honest now and
+  flags the work later, instead of hand-waving an architecture that's still being built.
+
+---
+
+### Block 1 recap — Foundation & CI → **v0.1.0** ✅
+
+**Shipped:** a real monorepo (pnpm + Turbo: `api`/`sdk`/`web`/`shared`) that lints, type-checks, tests, and
+builds green; a NestJS API with `GET /health` and Swagger at `/docs`; dockerized local infra
+(Postgres + Redis + anvil) behind `pnpm bootstrap`; the base Prisma schema + migration with the app booting
+DB-connected; GitHub Actions CI (commitlint → lint → typecheck → test → build) plus semantic-release, which cut
+**v0.1.0**. Seven issues (#1–#7) closed; `main` green.
+
+**How to demo:** `pnpm i && pnpm bootstrap && pnpm dev`, then `curl localhost:3000/health` and open `/docs`.
+CI + the v0.1.0 release are on the GitHub Actions tab / Releases.
+
+**Notable calls:** smoke-checking schema instead of a DB test harness (T-003); making the Postgres host port
+overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first release is `v0.1.0` (T-005).
