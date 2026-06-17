@@ -167,7 +167,7 @@ Then state the ticket's scope in one sentence and **do not exceed it** (no pre-b
 4. **`verification-before-completion`** — before committing: run lint + typecheck + test + build (and exercise
    the UI for user-facing tickets); paste the **real** output. No "should pass." Then re-read the diff against the §3.1 gate and simplify before committing.
 5. **Commit directly to `main`** with a conventional-commit message, then append the `DEVLOG.md` entry (§12).
-6. **Block end:** confirm CI is green on `main`; semantic-release tags the version bump.
+6. **Block end:** confirm CI is green on `main`; semantic-release tags the version bump; **generate the per-block study guide (§20)** and open it.
 Optional: a quick self-review (`crit`) on a gnarly ticket before committing — but no branch/PR ceremony.
 Use `subagent-driven-development` / parallel agents only for genuinely independent work (e.g. SDK while UI).
 
@@ -236,10 +236,25 @@ While building, **over-explain**: narrate the reasoning behind each decision, de
 built and why" beyond the DEVLOG entry. Err toward *more* explanation than usual — the author is learning the codebase
 to own it and will defend it later. This intentional verbosity lives in the **live session output (chat)** — it is how you teach the author as you work. It does **NOT** go into committed files: `DEVLOG.md`, code comments, and commit messages stay lean (see §12). Explain verbally; record tersely.
 
-## 20. Per-block study guide (learning aid)
-At each block boundary, generate a **self-contained, light-theme HTML study guide** for that block →
-`docs/study/block-N.html`, and open it in Chrome. It must teach the block with **diagrams** (inline SVG — no external
-JS), matching the visual style of `docs/architecture.html`: light mode, **non-sticky** table of contents, print-friendly.
-Cover: what shipped, the key concepts/flows with diagrams (structure, request/data flows, data model, and anything new
-the block introduced — e.g. AES-GCM, nonce locking), a short glossary, and 2–3 self-quiz questions. These are **local
-learning aids** — `docs/study/` is gitignored and is NOT part of the submission. Keep them genuinely educational, not padding.
+## 20. Per-block study guide (learning aid — REQUIRED at every block boundary; part of the DoD)
+At each block boundary, generate a **self-contained, light-theme HTML study guide** → `docs/study/block-N.html` and
+open it in Chrome. **Do not skip it.**
+
+**Purpose: make the author fluent in THIS codebase** — the actual files, types, and code that shipped this block, not
+generic concepts. Be **generous with length** (these are gitignored local aids, never in the submission, so depth is
+free) — target a thorough walkthrough, ~2× a normal explainer. This is the one place verbosity is wanted; the DEVLOG
+stays terse (§12), the study guide goes deep.
+
+Every guide MUST include:
+- **Diagrams** — inline SVG, no external JS, matching `docs/architecture.html`'s style: light mode, **non-sticky** TOC,
+  print-friendly. Structure, request/data flows, data model, and anything new the block introduced (AES-GCM, JWT flow,
+  nonce locking…).
+- **Annotated code snippets from the REAL shipped files** — for each key file, paste a focused excerpt (the signature /
+  core 5–20 lines, never the whole file) under **its filepath as a heading** (e.g. `packages/api/src/...`), then explain
+  *what it does and why it's written that way*, line-relevant. Quote real identifiers/types. This is the core of fluency —
+  the author should recognize the file when they open it.
+- **A "tour of the files" map** — every new/changed file this block, one line each on its role, so they know where things live.
+- **Control/data flow** — trace one real end-to-end path through the block's code (e.g. register → hash → store → JWT).
+- **Glossary** of new terms + **3–5 self-quiz questions**.
+
+Grounded in shipped code only — real identifiers, real filepaths, real types. `docs/study/` is gitignored (local), so it never bloats the submission.
