@@ -262,3 +262,43 @@ down a DB integration-test harness and corrected course.)
   shape of the entity, not speculation.
 - **`@Global` PrismaModule:** Prisma is infra consumed everywhere; making it global avoids repeating its import in
   every feature module. It's a Nest decorator, not a framework — within the "boring beats clever" line.
+
+---
+
+## v0.1.0 · Block 1 · T-004 CI pipeline (GitHub Actions) &nbsp;([#5](https://github.com/xbt-a4224j/vencura/issues/5) · [commit](https://github.com/xbt-a4224j/vencura/commit/ee7b6fa1fd984fc0cd83e1ab0f3ea6c9cc893ed4))
+
+**What & why** — Keep `main` green from day one: every push runs install → lint → typecheck → test → build.
+Because we commit directly to `main` (§11), a red `main` is the signal that blocks the next ticket.
+
+**How it works** — [.github/workflows/ci.yml](.github/workflows/ci.yml) defines one `verify` job on
+`ubuntu-latest`: checkout → `pnpm/action-setup` (reads `packageManager` from
+[package.json](package.json)) → `actions/setup-node` (Node from [.nvmrc](.nvmrc), pnpm store cached) →
+`pnpm install --frozen-lockfile` → the four quality steps as separate, named steps so a failure points at
+the exact stage. `concurrency` cancels superseded runs on the same ref.
+
+**Files touched**
+- [.github/workflows/ci.yml](.github/workflows/ci.yml) → the CI workflow.
+
+**Tests** — CI is config; verification is a real run on `main`. First run after this push:
+[run 27720826184](https://github.com/xbt-a4224j/vencura/actions/runs/27720826184) → **success in 53s**, every
+step (Install/Lint/Typecheck/Test/Build) green.
+
+**Demo / verify** — `gh run list` / `gh run watch` shows the run; or the Actions tab. Locally the same gate is
+`pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
+
+**Gotchas**
+- **No DB service in CI** — after T-003 dropped the integration harness, no test touches Postgres, so CI needs no
+  `services:` block. `prisma generate` (api `postinstall`) runs offline. Faster + simpler.
+- **`--frozen-lockfile`** makes CI fail if `pnpm-lock.yaml` drifts from the manifests — catches "forgot to commit the
+  lockfile" before it reaches a teammate.
+- Harmless annotation: GitHub is deprecating **Node 20 for action runtimes** (checkout/setup-node run on Node 24).
+  Unrelated to our app's Node 20 (`.nvmrc`), which is what runs our pnpm steps. Nothing to change now.
+
+### Decisions & narration
+> The explanatory reasoning emitted while building this ticket, captured here so it's followable later.
+- **One job, separate named steps** (not a single `pnpm verify` script): when CI fails, the red step name tells you
+  *which* gate broke without opening logs. Boring and legible over clever.
+- **CI runs on the push that introduces it:** GitHub evaluates workflows from the pushed commit, so the workflow
+  added in this commit ran for this very push — no extra trigger needed.
+- **semantic-release intentionally not here:** T-004 is the quality gate; releasing/tagging is its own concern (T-005),
+  so it gets its own workflow. Keeps each workflow single-purpose.
