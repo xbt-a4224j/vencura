@@ -438,3 +438,23 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Tests** — [wallets.service.spec.ts](packages/api/src/wallets/wallets.service.spec.ts) (no key leak, owner-scoped list) + [wallets.e2e.spec.ts](packages/api/src/wallets/wallets.e2e.spec.ts) (401 unauth, 201 returns id+address only). 17 green across the API.
 **Demo / verify** — `curl -XPOST localhost:3000/wallets -H "authorization: Bearer $TOKEN"` → `{"id":...,"address":"0x..."}`.
 **Gotchas** — e2e mocks a globally-`@Global()` `PrismaService`, so the test must `imports: [PrismaModule, …]` before `.overrideProvider` (override swaps an existing token, can't introduce one).
+
+---
+
+## v0.2.0 · Block 2 · T-010 Admin web shell + create-wallet UI    ([#11](https://github.com/xbt-a4224j/vencura/issues/11) · [commit](https://github.com/xbt-a4224j/vencura/commit/51c5b80))
+**What & why** — The load-bearing admin (§8): register/login + create-wallet + list, in the browser. Converts the `web` lib stub into a Vite + React SPA.
+**How it works** — A `/api` dev proxy ([vite.config.ts](packages/web/vite.config.ts)) points the SPA at Nest:3000 (same-origin, no CORS). [api.ts](packages/web/src/api.ts) is a thin typed `fetch` client that attaches `Authorization: Bearer` from a localStorage token; [auth-context.tsx](packages/web/src/auth-context.tsx) holds session state; [App.tsx](packages/web/src/App.tsx) renders the auth form → dashboard (create/list, with error + empty states).
+**Files touched** — [package.json](packages/web/package.json) (vite scripts) · [tsconfig.json](packages/web/tsconfig.json) (DOM/JSX/Bundler) · [index.html](packages/web/index.html) · `src/{main,App,auth-context}.tsx` · [api.ts](packages/web/src/api.ts).
+**Tests** — scaffold/UI ticket (§13): no test-first; bar is green lint/typecheck/build + a working flow.
+**Demo / verify** — live end-to-end against real Postgres: register→token, `POST /wallets`→`0xbF1D…54a5`, list returns both (owner-scoped), 401 unauth, 400 bad input; DB shows each key as distinct ciphertext (fresh IV/tag), **0 plaintext keys**. UI: `pnpm --filter @vencura/api dev` + `pnpm --filter @vencura/web dev` → http://localhost:5173.
+**Gotchas** — token in localStorage is a known XSS tradeoff, acceptable for the demo admin — revisit in the security writeup (T-036). web `test` stays `--passWithNoTests`.
+
+---
+
+### Block 2 recap — Auth & wallet creation (custody core) → **v0.2.0** ✅
+
+**Shipped:** JWT auth (argon2id, `passport-jwt` guard, no account enumeration); the pluggable `Signer` seam with `EncryptedKeySigner` (AES-256-GCM at rest, fresh IV + verified auth tag, key never logged/returned); `POST /wallets` minting custodial wallets that return **address only**; and a React/Vite admin driving all of it. Validation is one set of zod schemas in `shared` surfaced via `nestjs-zod` (also feeds Swagger). 17 API tests green; four issues (#8–#11) closed.
+
+**How to demo:** `pnpm --filter @vencura/api dev` + `pnpm --filter @vencura/web dev`, open http://localhost:5173 → register → **Create wallet** → a `0x…` address appears (and is stored only as ciphertext).
+
+**Notable calls:** `JwtModule.registerAsync` to dodge import-time env reads; `nestjs-zod@5`'s `cleanupOpenApiDoc` (the old `patchNestjsSwagger` is gone); `Signer.signMessage/signTransaction` declared but deferred to T-012/T-017 (seam visible, not pre-built).
