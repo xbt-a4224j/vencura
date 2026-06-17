@@ -416,3 +416,14 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Tests** — [auth.service.spec.ts](packages/api/src/auth/auth.service.spec.ts) (hash≠plaintext, 409 dup, 401 bad pass) + [auth.e2e.spec.ts](packages/api/src/auth/auth.e2e.spec.ts) (400 invalid input, guard 401→200). 6 green.
 **Demo / verify** — `curl -XPOST localhost:3000/auth/register -H 'content-type: application/json' -d '{"email":"a@b.com","password":"password123"}'` → `{accessToken,...}`.
 **Gotchas** — `JwtModule.register` reads env at *import* time (undefined before dotenv/in tests) → use `registerAsync`. `nestjs-zod@5` dropped `patchNestjsSwagger`; use `cleanupOpenApiDoc`. Global RFC-7807 filter deferred to T-019.
+
+---
+
+## v0.2.0 · Block 2 · T-008 Signer + EncryptedKeySigner    ([#9](https://github.com/xbt-a4224j/vencura/issues/9) · [commit](https://github.com/xbt-a4224j/vencura/commit/3731063))
+**What & why** — The custody centerpiece (§2): one pluggable `Signer` seam, default impl encrypts the private key with AES-256-GCM at rest.
+**How it works** — `aes-256-gcm.ts` wraps `node:crypto`: a fresh 12-byte IV per encrypt, GCM auth tag verified on decrypt (tamper/wrong-key → throws). `EncryptedKeySigner.createKey()` generates a viem keypair, encrypts the key, returns `{address, ...envelope}` for the caller to persist — the key never touches the DB here, is never logged (only the address), never returned by the API. The `SIGNER` symbol token lets ShamirSigner (T-035) drop in later.
+**Files touched** — [aes-256-gcm.ts](packages/api/src/signer/aes-256-gcm.ts) · [signer.ts](packages/api/src/signer/signer.ts) (interface + token) · [encrypted-key.signer.ts](packages/api/src/signer/encrypted-key.signer.ts) · [signer.module.ts](packages/api/src/signer/signer.module.ts).
+**Key code** — `encrypt(pt,key)→{encryptedPrivateKey,encryptionIv,encryptionAuthTag}` (matches the Wallet columns); master key from env, **fail-fast** if ≠32 bytes.
+**Tests** — [aes-256-gcm.spec.ts](packages/api/src/signer/aes-256-gcm.spec.ts) (round-trip, fresh-IV, tamper→throw, wrong-key→throw) + [encrypted-key.signer.spec.ts](packages/api/src/signer/encrypted-key.signer.spec.ts) (address derives from decrypted key; bad master key → throws). 7 green.
+**Demo / verify** — `pnpm --filter @vencura/api exec vitest run src/signer` → 7 passing.
+**Gotchas** — `decrypt` returns a `Buffer` (not string) so the sign-time caller (T-012) can zeroize it. `signMessage`/`signTransaction` throw until T-012/T-017 — the seam is declared, not pre-built. Nest instantiates providers eagerly at `compile()`, so the bad-key test asserts on the compile promise.
