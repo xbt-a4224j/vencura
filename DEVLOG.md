@@ -134,3 +134,63 @@ then passed once the module existed. No mocks — it exercises the actual HTTP s
   *only* for the Vitest transform. Two mechanisms, but each is the standard one for its job.
 - **Swagger mounted now, not deferred:** it's load-bearing for both demoability (§5) and the SDK generation (T-025),
   and it's near-free — the decorators that feed it are the same ones that define the routes.
+
+---
+
+## v0.1.0 · Block 1 · T-003a Dockerized local infra &nbsp;([#4](https://github.com/xbt-a4224j/vencura/issues/4) · [commit](https://github.com/xbt-a4224j/vencura/commit/7b1529b2ea819b0b277e3ae5e7decf96b29bb494))
+
+**What & why** — Give the project a one-command local backend: Postgres (the derived projection store),
+Redis (locks/idempotency/BullMQ), and **anvil** (a local Foundry chain so the wallet flow works offline,
+no Sepolia key required). `pnpm bootstrap` brings it all up and blocks until healthy.
+
+**How it works** — [docker-compose.yml](docker-compose.yml) defines the three services, each with a
+**healthcheck** (`pg_isready`, `redis-cli ping`, `cast block-number`). [scripts/bootstrap.sh](scripts/bootstrap.sh)
+seeds `.env` from `.env.example` on first run, then `docker compose up -d --wait` — the `--wait` flag is what
+makes "bootstrap" mean *"ready to use,"* not just *"containers created."* The DB migrate + seed steps get
+appended to this script in T-003.
+
+**Files touched**
+- [docker-compose.yml](docker-compose.yml) → the three-service local stack + healthchecks.
+- [.env.example](.env.example) → every secret/URL as a safe placeholder (the only env file committed).
+- [scripts/bootstrap.sh](scripts/bootstrap.sh) → env → `up -d --wait`.
+- [package.json](package.json) → `pnpm bootstrap` wired to the script.
+
+**Key code** — readiness over mere creation, and the overridable host port:
+```yaml
+# docker-compose.yml
+ports:
+  - '${POSTGRES_HOST_PORT:-5432}:5432'   # default 5432, override when taken
+healthcheck:
+  test: ['CMD-SHELL', 'pg_isready -U vencura -d vencura']
+```
+```bash
+docker compose up -d --wait   # blocks until every healthcheck passes
+```
+
+**Tests** — Infra tickets have no unit test; the verification *is* the stack reaching healthy. Real output:
+all three containers `(healthy)`; host probes returned anvil `eth_blockNumber → 0x0`, Postgres
+`accepting connections`, Redis `PONG`.
+
+**Demo / verify** — `pnpm bootstrap` → `docker compose ps` shows `vencura-postgres-1/redis-1/anvil-1` all
+`Up (healthy)`. Tear down with `docker compose down` (add `-v` to wipe the Postgres volume).
+
+**Gotchas**
+- **Port 5432 collisions are common** (every other Postgres dev stack wants it). Hit live during this ticket —
+  another project's container owned 5432. Fix: `POSTGRES_HOST_PORT` overrides the *host* port (container stays
+  5432); keep the port in `DATABASE_URL` in sync. Verified here by running Postgres on 5433.
+- **`.env` is gitignored** and created by bootstrap; only `.env.example` is committed. The committed
+  `MASTER_ENCRYPTION_KEY` placeholder is all-zeros — obviously not a real key (§18: never commit secrets).
+- anvil needs **no** Sepolia RPC key; the real Infura key (§17) only becomes necessary at T-017.
+
+### Decisions & narration
+> The explanatory reasoning emitted while building this ticket, captured here so it's followable later.
+- **Diagnosed before patching:** the bootstrap failed with `Bind for 0.0.0.0:5432 failed`. Rather than guess, I
+  inspected `docker ps`/`lsof` and found an unrelated `match-signal-engine-postgres` already on 5432. Root cause =
+  host clash, not a config bug — so I did *not* kill the user's other stack.
+- **Why parametrize the port at all (vs. hardcode 5432):** demoability is a design driver (§3). A hardcoded port
+  that clashes with the most common default is a live demo footgun — and I literally just hit it. The
+  `${VAR:-default}` idiom is near-free and evidence-driven, so it's justified.
+- **Why Postgres only, not redis/anvil too:** YAGNI. Only Postgres actually clashed; 6379/8545 were free. I
+  parametrize on observed need, not speculation — if redis clashes later, we parametrize then.
+- **The local 5433 value lives only in the gitignored `.env`;** the committed `.env.example` stays canonical at
+  5432, so the repo's default is the conventional one and this machine's quirk doesn't leak into source.
