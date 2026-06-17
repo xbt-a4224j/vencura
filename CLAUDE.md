@@ -161,7 +161,7 @@ no worktrees (deliberate, to save tokens/overhead). CI runs on every push to `ma
 **Before each ticket, declare its mode in one line** (this 10-second step is the main guard against T-003-style churn):
 `mode = logic` → TDD, test-first · or `mode = config/scaffold/schema/infra` → **smoke-check only, no test harness**.
 Infer from the issue label: `feat` with real behavior → **logic**; `chore` / `docs` / infra / schema / CI / deploy → **config**.
-Then state the ticket's scope in one sentence and **do not exceed it** (no pre-building later tickets). For each block, follow this loop:
+Then state the ticket's scope in one sentence and **do not exceed it** (no pre-building later tickets). **No committed design/spec/plan docs** — brainstorming is a brief in-chat step; the one-line mode declaration is the only pre-code artifact. Go straight to the failing test (`docs/specs/`, `docs/plans/` are gitignored). For each block, follow this loop:
 1. **`brainstorming`** — settle the block's design before code (light if specified, real if ambiguous).
 2. **`test-driven-development`** — per ticket: failing test first, then implement to green. (Strategy in §13.)
 3. **`systematic-debugging`** — for any failure, diagnose root cause before patching (esp. crypto/nonce).

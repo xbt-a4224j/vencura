@@ -21,3 +21,7 @@ prisma/dev.db*
 
 # Local per-block study guides (learning aids, not deliverables)
 docs/study/
+
+# Unrequested design/plan docs — brainstorming stays in chat, not committed
+docs/specs/
+docs/plans/

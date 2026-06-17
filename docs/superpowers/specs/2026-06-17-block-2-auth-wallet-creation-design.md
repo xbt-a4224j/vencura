@@ -1,4 +1,4 @@
-# Block 2 — Auth & wallet creation (custody core) → `v0.2.0`
+do # Block 2 — Auth & wallet creation (custody core) → `v0.2.0`
 
 **Status:** approved design (2026-06-17) · **Tickets:** T-007, T-008, T-009, T-010 · **Prereqs:** Block 1 (`v0.1.1`)
 
