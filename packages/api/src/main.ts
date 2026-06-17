@@ -1,8 +1,14 @@
 import 'reflect-metadata';
+import { resolve } from 'node:path';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { config as loadEnv } from 'dotenv';
 import { AppModule } from './app.module';
+
+// One root .env for the monorepo. Anchor to this file's compiled location (not cwd)
+// so it loads the same whether started via `nest start` or `node dist/main.js`.
+loadEnv({ path: resolve(__dirname, '../../../.env') });
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

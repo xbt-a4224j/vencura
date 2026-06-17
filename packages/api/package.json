@@ -9,14 +9,20 @@
     "lint": "eslint src",
     "test": "vitest run",
     "dev": "nest start --watch",
-    "start": "node dist/main.js"
+    "start": "node dist/main.js",
+    "db:generate": "prisma generate",
+    "db:migrate": "dotenv -e ../../.env -- prisma migrate deploy",
+    "db:migrate:dev": "dotenv -e ../../.env -- prisma migrate dev",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/swagger": "^11.0.0",
+    "@prisma/client": "^6.1.0",
     "@vencura/shared": "workspace:*",
+    "dotenv": "^16.4.7",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
@@ -26,6 +32,8 @@
     "@nestjs/testing": "^11.0.0",
     "@swc/core": "^1.10.0",
     "@types/supertest": "^6.0.2",
+    "dotenv-cli": "^8.0.0",
+    "prisma": "^6.1.0",
     "supertest": "^7.0.0",
     "unplugin-swc": "^1.5.1"
   }

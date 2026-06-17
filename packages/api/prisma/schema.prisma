@@ -1,0 +1,85 @@
+// VenCura base schema. The chain is the source of truth; Postgres is a derived,
+// cached projection (CLAUDE.md §4). Money is stored as bigint strings, never floats (§7).
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  wallets Wallet[]
+
+  @@map("users")
+}
+
+model Wallet {
+  id      String @id @default(uuid())
+  userId  String
+  address String @unique
+
+  // AES-256-GCM envelope for the private key, written by EncryptedKeySigner (T-008).
+  // The key is decrypted in memory only at sign time and is never returned by the API.
+  encryptedPrivateKey String
+  encryptionIv        String
+  encryptionAuthTag   String
+
+  // Next nonce to use; the per-wallet nonce lock serializes reads/increments (T-016).
+  nextNonce Int      @default(0)
+  createdAt DateTime @default(now())
+
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  balances     WalletBalance[]
+
+  @@index([userId])
+  @@map("wallets")
+}
+
+enum TransactionStatus {
+  pending
+  confirmed
+  failed
+}
+
+model Transaction {
+  id             String            @id @default(uuid())
+  walletId       String
+  idempotencyKey String?           @unique
+  nonce          Int?
+  status         TransactionStatus @default(pending)
+  asset          String // 'ETH' for native, or the ERC-20 contract address
+  amount         String // base units (wei / token decimals) as a bigint string — never a float
+  toAddress      String
+  fromAddress    String
+  txHash         String?           @unique
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId])
+  @@map("transactions")
+}
+
+model WalletBalance {
+  id        String   @id @default(uuid())
+  walletId  String
+  asset     String // 'ETH' or ERC-20 contract address
+  confirmed String // confirmed balance in base units, as a bigint string
+  asOfBlock Int?
+  updatedAt DateTime @updatedAt
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@unique([walletId, asset])
+  @@map("wallet_balances")
+}

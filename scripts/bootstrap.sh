@@ -11,4 +11,7 @@ fi
 echo "→ Starting local infra (Postgres + Redis + anvil)…"
 docker compose up -d --wait
 
-echo "✓ Infra is up and healthy."
+echo "→ Applying database migrations…"
+pnpm --filter @vencura/api db:migrate
+
+echo "✓ Infra is up, migrations applied. Run 'pnpm dev' to start the app."
