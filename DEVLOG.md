@@ -427,3 +427,14 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Tests** — [aes-256-gcm.spec.ts](packages/api/src/signer/aes-256-gcm.spec.ts) (round-trip, fresh-IV, tamper→throw, wrong-key→throw) + [encrypted-key.signer.spec.ts](packages/api/src/signer/encrypted-key.signer.spec.ts) (address derives from decrypted key; bad master key → throws). 7 green.
 **Demo / verify** — `pnpm --filter @vencura/api exec vitest run src/signer` → 7 passing.
 **Gotchas** — `decrypt` returns a `Buffer` (not string) so the sign-time caller (T-012) can zeroize it. `signMessage`/`signTransaction` throw until T-012/T-017 — the seam is declared, not pre-built. Nest instantiates providers eagerly at `compile()`, so the bad-key test asserts on the compile promise.
+
+---
+
+## v0.2.0 · Block 2 · T-009 Create-wallet endpoint    ([#10](https://github.com/xbt-a4224j/vencura/issues/10) · [commit](https://github.com/xbt-a4224j/vencura/commit/bd512b5))
+**What & why** — `POST /wallets` / `GET /wallets`: a logged-in user mints a custodial wallet and lists their own. First place auth (T-007) + Signer (T-008) meet.
+**How it works** — `@UseGuards(JwtAuthGuard)` + `@CurrentUser()` give the userId; the service calls `signer.createKey()`, persists `{userId, ...envelope}`, and returns **only `{id, address}`** — the encrypted key columns are written but never serialized back. List is `where: { userId }` (owner-scoped).
+**Files touched** — [wallets.service.ts](packages/api/src/wallets/wallets.service.ts) · [wallets.controller.ts](packages/api/src/wallets/wallets.controller.ts) · [wallets.module.ts](packages/api/src/wallets/wallets.module.ts) (imports AuthModule + SignerModule).
+**Key code** — `create(userId) → {id,address}`; `data: { userId, ...key }` spreads the column-shaped envelope straight in.
+**Tests** — [wallets.service.spec.ts](packages/api/src/wallets/wallets.service.spec.ts) (no key leak, owner-scoped list) + [wallets.e2e.spec.ts](packages/api/src/wallets/wallets.e2e.spec.ts) (401 unauth, 201 returns id+address only). 17 green across the API.
+**Demo / verify** — `curl -XPOST localhost:3000/wallets -H "authorization: Bearer $TOKEN"` → `{"id":...,"address":"0x..."}`.
+**Gotchas** — e2e mocks a globally-`@Global()` `PrismaService`, so the test must `imports: [PrismaModule, …]` before `.overrideProvider` (override swaps an existing token, can't introduce one).
