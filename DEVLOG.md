@@ -302,3 +302,58 @@ step (Install/Lint/Typecheck/Test/Build) green.
   added in this commit ran for this very push — no extra trigger needed.
 - **semantic-release intentionally not here:** T-004 is the quality gate; releasing/tagging is its own concern (T-005),
   so it gets its own workflow. Keeps each workflow single-purpose.
+
+---
+
+## v0.1.0 · Block 1 · T-005 Conventional commits + semantic-release &nbsp;([#6](https://github.com/xbt-a4224j/vencura/issues/6) · [commit](https://github.com/xbt-a4224j/vencura/commit/d4d6d2a579bce7b9c97850755dfe05e253387f96))
+
+**What & why** — Make releases automatic and the history machine-readable: commitlint enforces Conventional
+Commits, and semantic-release reads those commit types to compute the version, tag it, and publish a GitHub
+release. This is what mints **v0.1.0** at the end of Block 1.
+
+**How it works** — [commitlint.config.cjs](commitlint.config.cjs) extends `config-conventional`.
+[.releaserc.json](.releaserc.json) runs semantic-release on `main` with its **bundled** default plugins
+(commit-analyzer → release-notes-generator → github); no `@semantic-release/npm`, so it tags and releases
+without publishing the private packages. In [.github/workflows/ci.yml](.github/workflows/ci.yml) a `release`
+job `needs: verify` and runs only on push to `main`, so versions are only cut after the quality gate is green.
+
+**Files touched**
+- [commitlint.config.cjs](commitlint.config.cjs) → Conventional Commits rules (body/footer length caps off).
+- [.releaserc.json](.releaserc.json) → semantic-release branches + plugins.
+- [.github/workflows/ci.yml](.github/workflows/ci.yml) → `Commitlint` step + gated `release` job.
+
+**Key code** — first release forced to 0.1.0, not 1.0.0:
+```bash
+git tag v0.0.0 <root-commit> && git push origin v0.0.0   # base tag → feat bumps minor → v0.1.0
+```
+```jsonc
+// .releaserc.json — bundled plugins, no npm publish
+"plugins": ["@semantic-release/commit-analyzer", "@semantic-release/release-notes-generator", "@semantic-release/github"]
+```
+
+**Tests** — Verified on real CI. commitlint locally accepts `feat(api): …` and rejects a non-conventional
+message. On `main`, [run 27721147216](https://github.com/xbt-a4224j/vencura/actions/runs/27721147216) passed
+verify + release; semantic-release created tag **v0.1.0** and the GitHub release (`gh release list` → `v0.1.0  Latest`).
+
+**Demo / verify** — `git tag --list` → `v0.0.0`, `v0.1.0`; `gh release view v0.1.0`. A non-conventional commit
+message turns the `Commitlint` CI step red.
+
+**Gotchas**
+- **First release would be 1.0.0 without a base tag.** Seeding `v0.0.0` makes a `feat` resolve to `0.1.0`, which is
+  what the "minor-per-block → v1.0.0 at the end" plan wants.
+- **`body-max-line-length` bit us live.** The T-005 commit's prose body exceeded 100 chars and turned `Commitlint`
+  red (release correctly didn't run). Fix: disable the body/footer length caps — the header is what semantic-release
+  reads, and the teaching prose lives in DEVLOG anyway. The already-pushed commit isn't re-linted (the range moves
+  forward), so fixing forward cleared it.
+- **commitlint in CI, not a husky hook** — avoids git-hook interference in this build environment; the convention is
+  still enforced on `main`.
+
+### Decisions & narration
+> The explanatory reasoning emitted while building this ticket, captured here so it's followable later.
+- **Lean plugin set, rely on bundled:** semantic-release ships its default plugins as dependencies, so referencing
+  commit-analyzer/release-notes-generator/github needs no separate installs — and dodges version-mismatch between the
+  core and the plugins. Dropping the npm plugin is what stops it trying to publish private packages.
+- **Release gated on `verify` (`needs: verify`)** so a tag is never cut from a red tree. Single workflow, two jobs,
+  clear ordering — over two parallel workflows racing.
+- **The CI failure was *good*:** commitlint did its job (caught a malformed body) and the gate stopped a release from
+  a non-conformant push. I fixed forward rather than rewriting history on `main`.
