@@ -18,3 +18,6 @@ prisma/dev.db*
 # JetBrains / WebStorm
 .idea/
 *.iml
+
+# Local per-block study guides (learning aids, not deliverables)
+docs/study/

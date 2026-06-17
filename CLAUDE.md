@@ -235,3 +235,11 @@ While building, **over-explain**: narrate the reasoning behind each decision, de
 (threshold/nonce mechanics, NestJS DI, AES-GCM, etc.), and after each ticket give a short plain-English "what I just
 built and why" beyond the DEVLOG entry. Err toward *more* explanation than usual — the author is learning the codebase
 to own it and will defend it later. This intentional verbosity lives in the **live session output (chat)** — it is how you teach the author as you work. It does **NOT** go into committed files: `DEVLOG.md`, code comments, and commit messages stay lean (see §12). Explain verbally; record tersely.
+
+## 20. Per-block study guide (learning aid)
+At each block boundary, generate a **self-contained, light-theme HTML study guide** for that block →
+`docs/study/block-N.html`, and open it in Chrome. It must teach the block with **diagrams** (inline SVG — no external
+JS), matching the visual style of `docs/architecture.html`: light mode, **non-sticky** table of contents, print-friendly.
+Cover: what shipped, the key concepts/flows with diagrams (structure, request/data flows, data model, and anything new
+the block introduced — e.g. AES-GCM, nonce locking), a short glossary, and 2–3 self-quiz questions. These are **local
+learning aids** — `docs/study/` is gitignored and is NOT part of the submission. Keep them genuinely educational, not padding.
