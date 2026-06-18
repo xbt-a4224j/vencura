@@ -9,6 +9,7 @@ import {
   type Wallet,
 } from './api';
 import { AuthProvider, useAuth } from './auth-context';
+import { explorerAddress, explorerTx, FAUCET_URL } from './explorer';
 
 function AuthForm() {
   const { authenticate } = useAuth();
@@ -179,11 +180,16 @@ function TxList({ wallet, refreshKey }: { wallet: Wallet; refreshKey: number }) 
       {txs.map((t) => (
         <li key={t.id}>
           <strong>{t.status}</strong> · {t.amount} {t.asset === 'ETH' ? 'wei' : 'units'} →{' '}
-          <code>{t.toAddress}</code>
+          <a href={explorerAddress(t.toAddress)} target="_blank" rel="noreferrer">
+            <code>{t.toAddress}</code>
+          </a>
           {t.txHash && (
             <>
               {' '}
-              · tx <code>{t.txHash}</code>
+              · tx{' '}
+              <a href={explorerTx(t.txHash)} target="_blank" rel="noreferrer">
+                <code>{t.txHash}</code>
+              </a>
             </>
           )}
         </li>
@@ -413,6 +419,7 @@ function AdminTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => vo
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [adminKey, setAdminKey] = useState(adminKeyStore.get());
+  const [txLookup, setTxLookup] = useState('');
   const { logout } = useAuth();
 
   const seed = async () => {
@@ -483,11 +490,40 @@ function AdminTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => vo
         wallets.map((w) => <PolicyEditor key={w.id} wallet={w} />)
       )}
 
+      <h3>Chain inspector</h3>
+      <p>
+        <a href={FAUCET_URL} target="_blank" rel="noreferrer">
+          Sepolia faucet ↗
+        </a>{' '}
+        — fund a wallet address to enable live sends.{' '}
+        <button onClick={onChange} disabled={busy}>
+          Force balance refresh
+        </button>
+      </p>
+      <label>
+        Look up a tx hash on Etherscan{' '}
+        <input
+          value={txLookup}
+          placeholder="0x… tx hash"
+          onChange={(e) => setTxLookup(e.target.value)}
+        />
+      </label>{' '}
+      <a
+        href={txLookup ? explorerTx(txLookup) : undefined}
+        target="_blank"
+        rel="noreferrer"
+        aria-disabled={!txLookup}
+      >
+        Open ↗
+      </a>
+
       <h3>Wallet addresses</h3>
       <ul>
         {wallets.map((w) => (
           <li key={w.id}>
-            <code>{w.address}</code>
+            <a href={explorerAddress(w.address)} target="_blank" rel="noreferrer">
+              <code>{w.address}</code>
+            </a>
           </li>
         ))}
       </ul>
