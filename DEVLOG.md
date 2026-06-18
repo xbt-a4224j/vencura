@@ -510,3 +510,13 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **How to demo:** `pnpm --filter @vencura/api dev` + `pnpm --filter @vencura/web dev` → register → create wallet → **View balances** (reads anvil) → **Sign** a message → signature recovers to the wallet address.
 
 **Notable calls:** single `RPC_URL` (no fallback branch); `available == confirmed` until sends (Block 4); SWR keeps the request path off the RPC; no queue (poller is enough; Block 4 stays Postgres-only). Recurring e2e env-var setup (`JWT_SECRET`/`RPC_URL`/`MASTER_ENCRYPTION_KEY`) is a candidate for a Vitest setup file.
+
+---
+
+## v0.4.0 · Block 4 · T-015 Policy engine (pre-sign)    ([#16](https://github.com/xbt-a4224j/vencura/issues/16) · [commit](https://github.com/xbt-a4224j/vencura/commit/d08fe03))
+**What & why** — Enforce per-wallet rules *before* signing: allowlist + amount limits. First gate in the send path; the §4 policy seam.
+**How it works** — new `wallet_policies` table (1:1 with wallet). `PolicyEngine.assertAllowed` — missing row = unrestricted; a non-empty allowlist gates the recipient for **all** assets; per-tx + daily limits gate **native ETH** amounts (daily = today's native sends + this one). Violations → `ForbiddenException(reason)`. `GET`/`PUT /wallets/:id/policy` (owner-scoped) to view/edit.
+**Files touched** — [policy.engine.ts](packages/api/src/policy/policy.engine.ts) · [policy.controller.ts](packages/api/src/policy/policy.controller.ts) · [policy.module.ts](packages/api/src/policy/policy.module.ts) · [policy.schema.ts](packages/shared/src/policy.schema.ts) · schema/migration `wallet_policies`.
+**Tests** — [policy.engine.spec.ts](packages/api/src/policy/policy.engine.spec.ts): no-policy allows, allowlist deny, per-tx deny, daily deny, within-limits allow. 39 green.
+**Demo / verify** — `PUT /wallets/:id/policy {allowlist,perTxLimit,dailyLimit}` then a violating send → 403.
+**Gotchas** — Prisma numeric `_sum` can't aggregate the String `amount` column (typecheck error) → daily total uses `findMany` + BigInt reduce. Approval *workflow* deferred (deny-only this block); token amount-limits are a future extension.
