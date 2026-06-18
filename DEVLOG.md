@@ -540,3 +540,13 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Tests** — [transactions.service.spec.ts](packages/api/src/transactions/transactions.service.spec.ts): 5 concurrent sends → nonces `[0,1,2,3,4]`; sequential **and concurrent** same idempotency key → one broadcast. Plus chain write methods, signTransaction determinism, send e2e (201/403/401). Optional [pg-advisory-lock.int.spec.ts](packages/api/src/infra/lock/pg-advisory-lock.int.spec.ts) (skipped without `RUN_DB_TESTS`). 51 green (1 skipped).
 **Demo / verify** — `POST /wallets/:id/transactions {to,asset,amount}` (+ optional `Idempotency-Key`) → `{txHash,status:'pending',nonce}`.
 **Gotchas** — viem `prepareTransactionRequest` types demand `chain` when `account` is a bare address → pass `chain: null`. Chain-error friendly mapping is T-019 (here a broadcast failure throws `BadRequestException`). **Review catch:** the idempotency read had to move *inside* the lock — outside it, concurrent same-key requests double-broadcast before the unique constraint fires.
+
+---
+
+## v0.4.0 · Block 4 · T-018 Confirmation watcher    ([#19](https://github.com/xbt-a4224j/vencura/issues/19) · [commit](https://github.com/xbt-a4224j/vencura/commit/837846a))
+**What & why** — Move `pending` txs to `confirmed`/`failed` off the request path, and refresh balances once they land. Postgres-row-durable (no queue).
+**How it works** — `ConfirmationWatcher.reconcile()` (`@Interval(5s)`) scans `status='pending'` rows with a `txHash`, fetches each receipt, and — **reorg-aware** — only finalizes once `head − receipt.blockNumber ≥ CONFIRMATIONS`; maps `receipt.status` (`success`→`confirmed`, else `failed`), then best-effort `balances.refresh`. Restart-safe: the pending rows are the work list.
+**Files touched** — [confirmation-watcher.service.ts](packages/api/src/transactions/confirmation-watcher.service.ts) · [transactions.module.ts](packages/api/src/transactions/transactions.module.ts) (imports BalancesModule).
+**Tests** — [confirmation-watcher.service.spec.ts](packages/api/src/transactions/confirmation-watcher.service.spec.ts): confirmed (+refresh), failed, too-few-confs (no-op), null receipt (no-op). 55 green (1 skipped).
+**Demo / verify** — send a tx → it shows `pending` → within ~5s on anvil it flips `confirmed` and the balance updates.
+**Gotchas** — `CONFIRMATIONS=1` for anvil instant-mine; a public network raises it. The poll is O(pending) — fine for the demo.
