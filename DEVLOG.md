@@ -650,3 +650,12 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Tests** — docs ticket; smoke = valid Markdown + syntactically-correct `mermaid` blocks.
 **Demo / verify** — open [README.md](README.md) in the VS Code Markdown preview; all three diagrams render.
 **Gotchas** — `CONFIRMATIONS` is documented in [.env.example](.env.example) (added by VC4-06) with its code default `?? 1`; diagrams are grounded in the real §6.1 module map, not idealized.
+
+---
+
+## v0.6.0 · Block 6 · T-027 Live deploy — Railway API + Vercel /api proxy    ([#28](https://github.com/xbt-a4224j/vencura/issues/28) · [railway.json](https://github.com/xbt-a4224j/vencura/commit/ee7bd6e) · [proxy](https://github.com/xbt-a4224j/vencura/commit/d6aef38))
+**What & why** — Get the api actually running in prod. GitHub-connected Railway service builds [packages/api/Dockerfile](packages/api/Dockerfile) via [railway.json](railway.json); web reaches it through a Vercel rewrite.
+**How it works** — Railway builds on push to `main` (DOCKERFILE builder), boots `prisma migrate deploy` then `node main.js`. Env (DATABASE_URL=Neon **direct** host, RPC_URL=Sepolia, the 3 secrets) pushed via the Railway **GraphQL API** (`variableCollectionUpsert`) using a team token — the CLI rejects team tokens. Public domain points at port **8080** (Railway injects `PORT`). [vercel.json](vercel.json) rewrites `/api/:path*` → the Railway URL so the SPA's same-origin calls work in prod.
+**Files touched** — [railway.json](railway.json) → DOCKERFILE build · [vercel.json](vercel.json) → /api proxy.
+**Demo / verify** — `GET https://vencura-api-production-3c23.up.railway.app/health` → 200; `/docs` → Swagger. Logs show "Connected to Postgres" + all routes mapped.
+**Gotchas** — Railway builds `origin/main`, so **unpushed local commits = stale build** (it fell back to Railpack until the push). Neon **pooled** host + `channel_binding` breaks `migrate deploy` → use the **direct** host, `sslmode=require` only. Domain `targetPort` must match the app's actual listen port (8080), not 3000. **Remaining:** disable Vercel Deployment Protection + `vercel --prod` + README URLs.
