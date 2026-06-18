@@ -73,6 +73,7 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://vencura:vencura@localhost:5432/vencura?schema=public
+      RPC_URL: http://localhost:8545
       RUN_DB_TESTS: '1'
     steps:
       - uses: actions/checkout@v4
@@ -85,6 +86,13 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+
+      # Foundry provides `anvil` for the happy-path e2e (create → fund → send → confirmed).
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Start anvil
+        run: anvil --host 0.0.0.0 --chain-id 31337 &
 
       - name: Install
         run: pnpm install --frozen-lockfile
@@ -99,12 +107,13 @@ jobs:
         run: pnpm --filter @vencura/api exec prisma migrate deploy
 
       # --no-file-parallelism: the lock spec's ordering assertion is timing-sensitive, so the
-      # two DB specs must not run concurrently against the shared Postgres.
-      - name: DB integration tests
+      # DB specs must not run concurrently against the shared Postgres.
+      - name: DB integration + e2e tests
         run: >-
           pnpm --filter @vencura/api exec vitest run --no-file-parallelism
           src/infra/lock/pg-advisory-lock.int.spec.ts
           src/transactions/policy-race.int.spec.ts
+          src/transactions/happy-path.e2e.spec.ts
 
   release:
     needs: verify
