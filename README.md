@@ -11,6 +11,18 @@ message**, and **send a transaction** — for the native asset (**ETH**) and **E
 > `Signer`), **transaction correctness under concurrency** (per-wallet nonce lock + idempotency), and a clear
 > custodial → MPC → non-custodial story. See [`CLAUDE.md`](CLAUDE.md) and [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md).
 
+## Live deployment
+
+| What | URL |
+| --- | --- |
+| **Web admin UI** | [vencura-alpha.vercel.app](https://vencura-alpha.vercel.app) |
+| **API — Swagger / OpenAPI** | [/api/docs](https://vencura-alpha.vercel.app/api/docs) |
+| **API — health** | [/api/health](https://vencura-alpha.vercel.app/api/health) |
+
+Web on **Vercel**, API on **Railway** (Docker), Postgres on **Neon**, RPC on **Sepolia**. The web calls the API
+same-origin via a `/api/*` rewrite. Register an account to try it; live balance/send needs a Sepolia-funded
+wallet (faucet link in the admin). Per-IP rate limiting is enabled.
+
 ## Quick start
 
 **Prerequisites:** [Docker](https://www.docker.com/) (Compose v2), **Node 20** (see [`.nvmrc`](.nvmrc)), and
