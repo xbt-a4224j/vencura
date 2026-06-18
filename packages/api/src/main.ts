@@ -15,6 +15,11 @@ loadEnv({ path: resolve(__dirname, '../../../.env') });
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Behind Railway's edge (and the Vercel /api proxy), the client IP arrives in
+  // X-Forwarded-For. Trust the first proxy hop so req.ip — and thus the rate
+  // limiter's per-IP tracking — reflects the real caller, not the proxy.
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
   // Validate every request body/param against the zod schema on its DTO (nestjs-zod).
   // One schema is both the runtime validator and the OpenAPI definition (CLAUDE.md §3.1).
   app.useGlobalPipes(new ZodValidationPipe());
