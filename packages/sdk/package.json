@@ -11,6 +11,11 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@vencura/shared": "workspace:*"
+    "@vencura/shared": "workspace:*",
+    "viem": "^2.52.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "tsx": "^4.22.4"
   }
 }
