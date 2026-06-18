@@ -520,3 +520,13 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Tests** — [policy.engine.spec.ts](packages/api/src/policy/policy.engine.spec.ts): no-policy allows, allowlist deny, per-tx deny, daily deny, within-limits allow. 39 green.
 **Demo / verify** — `PUT /wallets/:id/policy {allowlist,perTxLimit,dailyLimit}` then a violating send → 403.
 **Gotchas** — Prisma numeric `_sum` can't aggregate the String `amount` column (typecheck error) → daily total uses `findMany` + BigInt reduce. Approval *workflow* deferred (deny-only this block); token amount-limits are a future extension.
+
+---
+
+## v0.4.0 · Block 4 · T-016 Per-wallet Postgres advisory lock seam    ([#17](https://github.com/xbt-a4224j/vencura/issues/17) · [commit](https://github.com/xbt-a4224j/vencura/commit/2f7d120))
+**What & why** — The concurrency primitive: serialize the per-wallet send critical section without Redis. A `Lock` seam (Redis impl = documented scale-path).
+**How it works** — `PgAdvisoryLock.withWalletLock(walletId, fn)` runs `fn` inside a Prisma interactive transaction that first takes `pg_advisory_xact_lock(advisoryKey(walletId))`. Transaction-scoped → auto-releases on commit/rollback (a crashed request can't strand it); `{ timeout: 30_000 }` so the lock can be held across the later broadcast. `advisoryKey` = sha256(walletId) → positive 60-bit bigint (fits signed 64-bit).
+**Files touched** — [lock.ts](packages/api/src/infra/lock/lock.ts) (LOCK token + interface) · [pg-advisory-lock.ts](packages/api/src/infra/lock/pg-advisory-lock.ts) · [advisory-key.ts](packages/api/src/infra/lock/advisory-key.ts) · [lock.module.ts](packages/api/src/infra/lock/lock.module.ts) (@Global).
+**Key code** — `SELECT pg_advisory_xact_lock(${key})` (parameter-bound bigint).
+**Tests** — [advisory-key.spec.ts](packages/api/src/infra/lock/advisory-key.spec.ts): deterministic, positive, < 2^63, per-wallet distinct. 41 green. (Idempotency + the N-concurrent-sends test land in T-017.)
+**Gotchas** — the lock holds a DB connection across the broadcast (the xact-lock tradeoff) — fine for the demo; session-lock/Redis is the scale path. Real PG serialization is covered by T-017's optional integration test (skipped without a DB; CI stays mock-based).
