@@ -33,8 +33,10 @@ function AuthForm() {
   };
 
   return (
-    <main>
-      <h1>VenCura Admin</h1>
+    <main className="app">
+      <header>
+        <h1>VenCura Admin</h1>
+      </header>
       <form onSubmit={submit}>
         <label htmlFor="email">Email</label>
         <input
@@ -181,7 +183,8 @@ function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: numb
       {items.map((it) =>
         it.kind === 'transaction' ? (
           <li key={it.id}>
-            <strong>{it.status}</strong> · sent {it.amount} {it.asset === 'ETH' ? 'wei' : 'units'} →{' '}
+            <span className={`pill ${it.status}`}>{it.status}</span> · sent {it.amount}{' '}
+            {it.asset === 'ETH' ? 'wei' : 'units'} →{' '}
             <a href={explorerAddress(it.to)} target="_blank" rel="noreferrer">
               <code>{it.to}</code>
             </a>
@@ -197,7 +200,8 @@ function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: numb
           </li>
         ) : (
           <li key={it.id}>
-            <strong>signed</strong> · “{it.message}” → <code>{it.signature.slice(0, 20)}…</code>
+            <span className="pill signed">signed</span> · “{it.message}” →{' '}
+            <code>{it.signature.slice(0, 20)}…</code>
           </li>
         ),
       )}
@@ -620,11 +624,13 @@ function Dashboard() {
   }, [refresh]);
 
   return (
-    <main>
+    <main className="app">
       <header>
-        <span>{email}</span> <button onClick={logout}>logout</button>
+        <h1>VenCura Admin</h1>
+        <span style={{ marginLeft: 'auto' }}>{email}</span>{' '}
+        <button onClick={logout}>logout</button>
       </header>
-      <nav>
+      <nav className="tabs">
         <button onClick={() => setTab('wallets')} disabled={tab === 'wallets'}>
           Wallets
         </button>
