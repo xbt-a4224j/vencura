@@ -413,6 +413,7 @@ function AdminTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => vo
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [adminKey, setAdminKey] = useState(adminKeyStore.get());
+  const { logout } = useAuth();
 
   const seed = async () => {
     setError('');
@@ -424,6 +425,23 @@ function AdminTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => vo
       setSeedMsg(
         `Seeded ${res.email} (password: ${res.password}) — ${res.wallets.length} wallets, ${funded} funded. Log in as the demo user to drive them.`,
       );
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startOver = async () => {
+    // Reset wipes ALL users, including the one we're logged in as — confirm, then log out.
+    if (!window.confirm('Wipe ALL data and re-seed the demo? This cannot be undone.')) return;
+    setError('');
+    setSeedMsg('');
+    setBusy(true);
+    try {
+      const res = await api.resetDemo();
+      logout();
+      window.alert(`Reset complete. Log in as ${res.email} / ${res.password}.`);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -451,6 +469,9 @@ function AdminTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => vo
       <h3>Demo data</h3>
       <button onClick={seed} disabled={busy}>
         {busy ? 'Seeding…' : 'Seed demo data'}
+      </button>{' '}
+      <button onClick={startOver} disabled={busy}>
+        {busy ? 'Working…' : 'Start over (reset all)'}
       </button>
       {seedMsg && <p>{seedMsg}</p>}
       {error && <p role="alert">{error}</p>}

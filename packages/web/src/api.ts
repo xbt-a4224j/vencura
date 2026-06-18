@@ -107,4 +107,5 @@ export const api = {
   setPolicy: (walletId: string, policy: Policy) =>
     call<Policy>(`/wallets/${walletId}/policy`, { method: 'PUT', body: policy, auth: true }),
   seedDemo: () => call<SeedResult>('/admin/seed', { method: 'POST', admin: true }),
+  resetDemo: () => call<SeedResult>('/admin/reset', { method: 'POST', admin: true }),
 };
