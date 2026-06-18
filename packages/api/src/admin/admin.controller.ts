@@ -1,11 +1,15 @@
-import { Controller, ForbiddenException, Logger, Post } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { Controller, Logger, Post, UseGuards } from '@nestjs/common';
+import { ApiHeader, ApiTags } from '@nestjs/swagger';
 import { PrismaService } from '../infra/prisma/prisma.service';
+import { AdminGuard } from './admin.guard';
 import { seedDemo } from './seed';
 
-// Dev/demo controls. Deliberately unguarded by JWT (it's a demo reset surface) but
-// hard-gated off in production. Future home of reset/inspector/concurrency-demo (T-021/22/24).
+// Dev/demo controls. Gated by AdminGuard (x-admin-key === ADMIN_API_KEY) in every
+// environment, so the deployed demo can still seed/reset but randoms can't.
+// Future home of reset/inspector/concurrency-demo (T-021/22/24).
 @ApiTags('admin')
+@ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
+@UseGuards(AdminGuard)
 @Controller('admin')
 export class AdminController {
   private readonly logger = new Logger(AdminController.name);
@@ -13,9 +17,6 @@ export class AdminController {
 
   @Post('seed')
   async seed() {
-    if (process.env.NODE_ENV === 'production') {
-      throw new ForbiddenException('seeding is disabled in production');
-    }
     this.logger.log('seeding demo data');
     const result = await seedDemo(this.prisma);
     this.logger.log(`seeded ${result.wallets.length} wallets for ${result.email}`);

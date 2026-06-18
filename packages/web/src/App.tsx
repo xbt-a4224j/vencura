@@ -1,6 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { parseEther } from 'viem';
 import {
+  adminKeyStore,
   api,
   type BalanceLine,
   type Policy,
@@ -411,6 +412,7 @@ function AdminTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => vo
   const [seedMsg, setSeedMsg] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [adminKey, setAdminKey] = useState(adminKeyStore.get());
 
   const seed = async () => {
     setError('');
@@ -431,6 +433,21 @@ function AdminTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => vo
 
   return (
     <section>
+      <h3>Admin key</h3>
+      <label>
+        x-admin-key (gates seed/reset — get it from the deploy env; locally{' '}
+        <code>dev-admin-key</code>)
+        <input
+          type="password"
+          value={adminKey}
+          placeholder="admin key"
+          onChange={(e) => {
+            setAdminKey(e.target.value);
+            adminKeyStore.set(e.target.value);
+          }}
+        />
+      </label>
+
       <h3>Demo data</h3>
       <button onClick={seed} disabled={busy}>
         {busy ? 'Seeding…' : 'Seed demo data'}

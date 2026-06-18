@@ -1,4 +1,5 @@
 const TOKEN_KEY = 'vencura.token';
+const ADMIN_KEY = 'vencura.adminKey';
 
 export const tokenStore = {
   get: () => localStorage.getItem(TOKEN_KEY),
@@ -6,12 +7,20 @@ export const tokenStore = {
   clear: () => localStorage.removeItem(TOKEN_KEY),
 };
 
+// The admin key gates /admin/*. It's operator-entered and kept in localStorage —
+// never baked into the bundle (a static SPA can't hold a secret).
+export const adminKeyStore = {
+  get: () => localStorage.getItem(ADMIN_KEY) ?? '',
+  set: (k: string) => localStorage.setItem(ADMIN_KEY, k),
+};
+
 async function call<T>(
   path: string,
-  options: { method?: string; body?: unknown; auth?: boolean } = {},
+  options: { method?: string; body?: unknown; auth?: boolean; admin?: boolean } = {},
 ): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (options.auth) headers.Authorization = `Bearer ${tokenStore.get() ?? ''}`;
+  if (options.admin) headers['x-admin-key'] = adminKeyStore.get();
   const res = await fetch(`/api${path}`, {
     method: options.method ?? 'GET',
     headers,
@@ -97,5 +106,5 @@ export const api = {
   getPolicy: (walletId: string) => call<Policy>(`/wallets/${walletId}/policy`, { auth: true }),
   setPolicy: (walletId: string, policy: Policy) =>
     call<Policy>(`/wallets/${walletId}/policy`, { method: 'PUT', body: policy, auth: true }),
-  seedDemo: () => call<SeedResult>('/admin/seed', { method: 'POST' }),
+  seedDemo: () => call<SeedResult>('/admin/seed', { method: 'POST', admin: true }),
 };
