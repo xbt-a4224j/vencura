@@ -255,6 +255,6 @@ Every guide MUST include:
   the author should recognize the file when they open it.
 - **A "tour of the files" map** — every new/changed file this block, one line each on its role, so they know where things live.
 - **Control/data flow** — trace one real end-to-end path through the block's code (e.g. register → hash → store → JWT).
-- **Glossary** of new terms + a **20-question self-quiz WITH answers** — render each as a collapsible `<details>` (question in the `<summary>`, answer inside) so the reader can self-test then reveal. Questions should probe the real mechanisms the block introduced, not trivia.
+- **Glossary** of new terms + a **20-question self-quiz with answers**. **Answers are always visible (no click-to-reveal)** and each is a full teaching explanation — a short paragraph (≈3–5 sentences) covering the mechanism *and the why*, not one line. Questions probe the real mechanisms the block introduced, not trivia.
 
 Grounded in shipped code only — real identifiers, real filepaths, real types. `docs/study/` is gitignored (local), so it never bloats the submission.
