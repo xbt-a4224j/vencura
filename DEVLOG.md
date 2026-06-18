@@ -668,3 +668,12 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Files touched** — [app.module.ts](packages/api/src/app.module.ts) → module + guard · [auth.controller.ts](packages/api/src/auth/auth.controller.ts) → tighter @Throttle · [main.ts](packages/api/src/main.ts) → trust proxy.
 **Tests** — config/wiring → smoke-check (§13): 77 green, typecheck + build clean; existing e2e flows stay under the limit (no false 429s).
 **Gotchas** — without `trust proxy`, all users share one bucket behind the proxy and throttle each other. Global guard is now live in any test that builds the full AppModule — bursty auth tests would 429.
+
+---
+
+## v0.6.0 · Block 6 · Rate-limit IP keying behind Railway + Vercel    ([fix](https://github.com/xbt-a4224j/vencura/commit/907dcd7))
+**What & why** — The throttler shipped active but limited nothing: `x-ratelimit-remaining` reset to 9 every request. Behind the proxies, `trust proxy`-derived `req.ip` rotates per request → a fresh bucket each time.
+**How it works** — A `ProxyThrottlerGuard` overrides `getTracker` to use a real client IP via [client-ip.ts](packages/api/src/common/client-ip.ts): prefer **`x-vercel-forwarded-for`** (Vercel overwrites `x-forwarded-for`/`x-real-ip` with its rotating edge IP and stashes the true client here), else leftmost `x-forwarded-for` (direct Railway), else `req.ip`. Found the right header by **logging the actual headers in prod** rather than guessing.
+**Files touched** — [client-ip.ts](packages/api/src/common/client-ip.ts) + [client-ip.spec.ts](packages/api/src/common/client-ip.spec.ts) (5 tests, TDD) · [proxy-throttler.guard.ts](packages/api/src/common/proxy-throttler.guard.ts).
+**Demo / verify** — 12 rapid logins via `vencura-alpha.vercel.app/api/auth/login` → `401×10` then **`429`**; direct Railway URL same. 82 green.
+**Gotchas** — these headers are client-spoofable (set at a trusted edge) — fine for abuse control, not a security boundary. `x-forwarded-for` leftmost is NOT the client through a Vercel rewrite.
