@@ -12,3 +12,4 @@ export const NATIVE_ASSET = 'ETH' as const;
 export type NativeAsset = typeof NATIVE_ASSET;
 
 export * from './auth.schema';
+export * from './message.schema';

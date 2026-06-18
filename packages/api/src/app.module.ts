@@ -5,6 +5,7 @@ import { HealthModule } from './health/health.module';
 import { ChainModule } from './infra/chain/chain.module';
 import { PrismaModule } from './infra/prisma/prisma.module';
 import { SignerModule } from './signer/signer.module';
+import { TransactionsModule } from './transactions/transactions.module';
 import { WalletsModule } from './wallets/wallets.module';
 
 // Composition root. Feature modules (auth, wallets, transactions, …) are imported
@@ -17,6 +18,7 @@ import { WalletsModule } from './wallets/wallets.module';
     SignerModule,
     WalletsModule,
     BalancesModule,
+    TransactionsModule,
     HealthModule,
   ],
 })

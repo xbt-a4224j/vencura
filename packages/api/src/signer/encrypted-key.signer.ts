@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { generatePrivateKey, privateKeyToAddress } from 'viem/accounts';
+import { generatePrivateKey, privateKeyToAccount, privateKeyToAddress } from 'viem/accounts';
+import type { Hex } from '@vencura/shared';
 import { PrismaService } from '../infra/prisma/prisma.service';
-import { encrypt } from './aes-256-gcm';
+import { decrypt, encrypt } from './aes-256-gcm';
 import type { NewKey, Signer } from './signer';
 
 /** Default custody model: the private key is AES-256-GCM-encrypted with the env
@@ -36,8 +37,19 @@ export class EncryptedKeySigner implements Signer {
     return wallet.address;
   }
 
-  async signMessage(): Promise<string> {
-    throw new Error('signMessage is implemented in T-012');
+  async signMessage(walletId: string, message: string): Promise<string> {
+    const envelope = await this.prisma.wallet.findUniqueOrThrow({
+      where: { id: walletId },
+      select: { encryptedPrivateKey: true, encryptionIv: true, encryptionAuthTag: true },
+    });
+    const keyBuf = decrypt(envelope, this.masterKey);
+    try {
+      const account = privateKeyToAccount(keyBuf.toString('utf8') as Hex);
+      this.logger.log(`message signed: ${walletId}`);
+      return await account.signMessage({ message });
+    } finally {
+      keyBuf.fill(0); // zeroize the decrypted key buffer after signing
+    }
   }
 
   async signTransaction(): Promise<string> {
