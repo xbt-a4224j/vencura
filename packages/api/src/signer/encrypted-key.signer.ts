@@ -52,7 +52,19 @@ export class EncryptedKeySigner implements Signer {
     }
   }
 
-  async signTransaction(): Promise<string> {
-    throw new Error('signTransaction is implemented in T-017');
+  async signTransaction(walletId: string, request: unknown): Promise<string> {
+    const envelope = await this.prisma.wallet.findUniqueOrThrow({
+      where: { id: walletId },
+      select: { encryptedPrivateKey: true, encryptionIv: true, encryptionAuthTag: true },
+    });
+    const keyBuf = decrypt(envelope, this.masterKey);
+    try {
+      const account = privateKeyToAccount(keyBuf.toString('utf8') as Hex);
+      // request is a prepared viem transaction request
+      this.logger.log(`transaction signed: ${walletId}`);
+      return await account.signTransaction(request as Parameters<typeof account.signTransaction>[0]);
+    } finally {
+      keyBuf.fill(0); // zeroize the decrypted key buffer after signing
+    }
   }
 }

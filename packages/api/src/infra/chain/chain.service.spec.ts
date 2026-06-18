@@ -3,7 +3,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChainService } from './chain.service';
 import { ERC20_ABI, PUBLIC_CLIENT } from './chain.constants';
 
-const clientMock = { getBlockNumber: vi.fn(), getBalance: vi.fn(), readContract: vi.fn() };
+const clientMock = {
+  getBlockNumber: vi.fn(),
+  getBalance: vi.fn(),
+  readContract: vi.fn(),
+  getTransactionCount: vi.fn(),
+  prepareTransactionRequest: vi.fn(),
+  sendRawTransaction: vi.fn(),
+  getTransactionReceipt: vi.fn(),
+};
 
 describe('ChainService', () => {
   let service: ChainService;
@@ -30,5 +38,22 @@ describe('ChainService', () => {
       functionName: 'balanceOf',
       args: ['0xabc'],
     });
+  });
+
+  it('reads the pending nonce via getTransactionCount with blockTag pending', async () => {
+    clientMock.getTransactionCount.mockResolvedValue(7);
+    await expect(service.getPendingNonce('0xabc')).resolves.toBe(7);
+    expect(clientMock.getTransactionCount).toHaveBeenCalledWith({ address: '0xabc', blockTag: 'pending' });
+  });
+
+  it('sendRawTransaction passes the serialized tx through', async () => {
+    clientMock.sendRawTransaction.mockResolvedValue('0xhash');
+    await expect(service.sendRawTransaction('0xraw')).resolves.toBe('0xhash');
+    expect(clientMock.sendRawTransaction).toHaveBeenCalledWith({ serializedTransaction: '0xraw' });
+  });
+
+  it('getTransactionReceipt returns null when the client throws (not mined yet)', async () => {
+    clientMock.getTransactionReceipt.mockRejectedValue(new Error('not found'));
+    await expect(service.getTransactionReceipt('0xhash')).resolves.toBeNull();
   });
 });

@@ -11,7 +11,7 @@ export interface Signer {
   createKey(): Promise<NewKey>;
   getAddress(walletId: string): Promise<string>;
   signMessage(walletId: string, message: string): Promise<string>;
-  signTransaction(walletId: string, tx: unknown): Promise<string>;
+  signTransaction(walletId: string, request: unknown): Promise<string>;
 }
 
 /** DI token — `interface` can't be injected by type, so consumers use `@Inject(SIGNER)`. */

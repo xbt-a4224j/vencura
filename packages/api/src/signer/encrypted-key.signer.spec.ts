@@ -69,4 +69,30 @@ describe('EncryptedKeySigner', () => {
       expect(a).toBe(b);
     });
   });
+
+  describe('signTransaction', () => {
+    // A fully-prepared EIP-1559 request (the shape ChainService.prepareTransactionRequest returns).
+    const request = {
+      type: 'eip1559',
+      chainId: 11155111,
+      to: KNOWN_ADDR,
+      value: 1n,
+      nonce: 0,
+      gas: 21000n,
+      maxFeePerGas: 2_000_000_000n,
+      maxPriorityFeePerGas: 1_000_000_000n,
+    };
+
+    beforeEach(() => {
+      const envelope = encrypt(KNOWN_PK, Buffer.from(MASTER, 'hex'));
+      prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(envelope);
+    });
+
+    it('returns a deterministic 0x-serialized signed transaction', async () => {
+      const a = await signer.signTransaction('w1', request);
+      const b = await signer.signTransaction('w1', request);
+      expect(a).toMatch(/^0x[0-9a-fA-F]+$/);
+      expect(a).toBe(b);
+    });
+  });
 });

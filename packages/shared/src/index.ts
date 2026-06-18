@@ -14,3 +14,4 @@ export type NativeAsset = typeof NATIVE_ASSET;
 export * from './auth.schema';
 export * from './message.schema';
 export * from './policy.schema';
+export * from './send.schema';

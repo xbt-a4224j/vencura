@@ -24,4 +24,34 @@ export class ChainService {
       args: [address],
     });
   }
+
+  getPendingNonce(address: Hex): Promise<number> {
+    return this.client.getTransactionCount({ address, blockTag: 'pending' });
+  }
+
+  prepareTransaction(params: {
+    from: Hex;
+    to: Hex;
+    value?: bigint;
+    data?: Hex;
+    nonce: number;
+  }): Promise<Record<string, unknown>> {
+    const { from, ...rest } = params;
+    // `chain: null` = use the client's chain (none configured → viem fetches eth_chainId).
+    return this.client.prepareTransactionRequest({ account: from, chain: null, ...rest }) as Promise<
+      Record<string, unknown>
+    >;
+  }
+
+  sendRawTransaction(serializedTransaction: Hex): Promise<Hex> {
+    return this.client.sendRawTransaction({ serializedTransaction });
+  }
+
+  async getTransactionReceipt(hash: Hex) {
+    try {
+      return await this.client.getTransactionReceipt({ hash });
+    } catch {
+      return null; // not mined yet
+    }
+  }
 }

@@ -6,20 +6,28 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PrismaModule } from '../infra/prisma/prisma.module';
 import { PrismaService } from '../infra/prisma/prisma.service';
+import { ChainModule } from '../infra/chain/chain.module';
+import { ChainService } from '../infra/chain/chain.service';
+import { LockModule } from '../infra/lock/lock.module';
 import { SIGNER } from '../signer/signer';
 import { TransactionsModule } from './transactions.module';
 
 const prismaMock = { wallet: { findFirst: vi.fn() } };
 const signerMock = { signMessage: vi.fn().mockResolvedValue('0xsig') };
+const chainMock = {};
 
 describe('Messages HTTP', () => {
   let app: INestApplication;
   let token: string;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [PrismaModule, TransactionsModule] })
+    const moduleRef = await Test.createTestingModule({
+      imports: [PrismaModule, ChainModule, LockModule, TransactionsModule],
+    })
       .overrideProvider(PrismaService)
       .useValue(prismaMock)
+      .overrideProvider(ChainService)
+      .useValue(chainMock)
       .overrideProvider(SIGNER)
       .useValue(signerMock)
       .compile();
