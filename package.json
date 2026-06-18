@@ -12,6 +12,8 @@
     "test": "turbo run test",
     "dev": "turbo run dev",
     "bootstrap": "bash scripts/bootstrap.sh",
+    "standup": "bash scripts/standup.sh",
+    "e2e": "node scripts/e2e.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "release": "semantic-release"

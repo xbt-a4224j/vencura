@@ -26,3 +26,6 @@ docs/study/
 docs/specs/
 docs/plans/
 docs/superpowers/
+
+# Local app-standup runtime (pids + logs)
+.standup/
