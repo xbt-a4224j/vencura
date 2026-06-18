@@ -32,9 +32,11 @@ export class PolicyEngine {
         start.setHours(0, 0, 0, 0);
         // amount is a String column, so Prisma's numeric _sum can't aggregate it;
         // pull today's native sends and reduce with BigInt instead.
+        // Exclude failed txs (VC4-04): a reverted send didn't move value, so it must not
+        // count toward the daily cap and wrongly throttle the wallet.
         const sent = await this.prisma.transaction.findMany({
           select: { amount: true },
-          where: { walletId, asset: NATIVE_ASSET, createdAt: { gte: start } },
+          where: { walletId, asset: NATIVE_ASSET, status: { not: 'failed' }, createdAt: { gte: start } },
         });
         const today = sent.reduce((sum, t) => sum + BigInt(t.amount), 0n);
         if (today + amount > BigInt(policy.dailyLimit)) {

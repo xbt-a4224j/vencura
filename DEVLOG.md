@@ -600,3 +600,13 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Tests** — new real-DB race spec [policy-race.int.spec.ts](packages/api/src/transactions/policy-race.int.spec.ts) (gated `RUN_DB_TESTS`): two concurrent 0.6 ETH sends → exactly one succeeds, one denied. **Red** on old code (both broadcast), **green** after.
 **Demo / verify** — `RUN_DB_TESTS=1 dotenv -e ../../.env -- vitest run src/transactions/policy-race.int.spec.ts` → 1 passed; logs show `policy deny: amount exceeds daily limit` on the second send.
 **Gotchas** — the fix works *because* the advisory lock wraps the enclosing `$transaction`; under READ COMMITTED the second txn wouldn't see the first's uncommitted row, but it blocks on the lock until commit, so the re-read sees it.
+
+---
+
+## Block 4 · VC4-04 Daily-limit sum counted failed txs    (audit fold-in)
+**What & why** — Audit MED: the daily-spend `findMany` had no status filter, so `failed` (reverted) sends counted toward the cap and wrongly throttled a wallet. Over-counting only ever *denies* more (safe-but-wrong).
+**How it works** — Added `status: { not: 'failed' }` to the daily-sum `where`. A reverted send moved no value, so it's excluded from the running total.
+**Files touched** — [policy.engine.ts](packages/api/src/policy/policy.engine.ts) → one-line `where` filter.
+**Tests** — extended [policy.engine.spec.ts](packages/api/src/policy/policy.engine.spec.ts): asserts the query carries `status:{not:'failed'}` so failed rows never reach the sum. **Red** (no filter) → **green**.
+**Demo / verify** — `vitest run src/policy/policy.engine.spec.ts` → 6 passed.
+**Gotchas** — `findMany`+BigInt-reduce stays (the `amount` String column can't use Prisma numeric `_sum`); only the `where` changed.

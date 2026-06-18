@@ -47,4 +47,14 @@ describe('PolicyEngine', () => {
     prismaMock.walletPolicy.findUnique.mockResolvedValue({ allowlist: ['0xRecipient'], perTxLimit: '2000', dailyLimit: '5000' });
     await expect(engine.assertAllowed('w1', send)).resolves.toBeUndefined();
   });
+
+  it('excludes failed txs from the daily total (status != failed)', async () => {
+    // dailyLimit 1500; a failed 1000 send must NOT count, so this 1000 send is allowed.
+    prismaMock.walletPolicy.findUnique.mockResolvedValue({ allowlist: [], perTxLimit: null, dailyLimit: '1500' });
+    await expect(engine.assertAllowed('w1', send)).resolves.toBeUndefined();
+    // The query must filter out failed rows so they never reach the sum.
+    expect(prismaMock.transaction.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ status: { not: 'failed' } }) }),
+    );
+  });
 });
