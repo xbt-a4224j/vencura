@@ -550,3 +550,13 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Tests** — [confirmation-watcher.service.spec.ts](packages/api/src/transactions/confirmation-watcher.service.spec.ts): confirmed (+refresh), failed, too-few-confs (no-op), null receipt (no-op). 55 green (1 skipped).
 **Demo / verify** — send a tx → it shows `pending` → within ~5s on anvil it flips `confirmed` and the balance updates.
 **Gotchas** — `CONFIRMATIONS=1` for anvil instant-mine; a public network raises it. The poll is O(pending) — fine for the demo.
+
+---
+
+## v0.4.0 · Block 4 · T-019 Global error filter + chain-error mapping    ([#20](https://github.com/xbt-a4224j/vencura/issues/20) · [commit](https://github.com/xbt-a4224j/vencura/commit/af659ed))
+**What & why** — The deferred global filter (flagged since Block 2): one consistent RFC-7807-ish JSON error shape for the whole API, plus friendly mapping of chain/viem failures.
+**How it works** — `AllExceptionsFilter` (`@Catch()`, registered in `main.ts`) renders `{ type, title, status, detail }`. `HttpException`s keep their status + message (so 401/403/404 pass through); recognized chain errors go through `mapChainError` (insufficient-funds→400, nonce-too-low/replacement→409, RPC-down→503); anything else is a generic 500 with the full message logged **server-side only** — no stack traces or secrets in the client body.
+**Files touched** — [all-exceptions.filter.ts](packages/api/src/common/all-exceptions.filter.ts) · [chain-error.ts](packages/api/src/common/chain-error.ts) · [main.ts](packages/api/src/main.ts).
+**Tests** — [chain-error.spec.ts](packages/api/src/common/chain-error.spec.ts) (9: each mapping + null) + [all-exceptions.filter.spec.ts](packages/api/src/common/all-exceptions.filter.spec.ts) (4: shape, 403/404 pass-through, 500 hides secret). 68 green (1 skipped).
+**Demo / verify** — an over-balance send surfaces `{status:400, detail:"Insufficient funds for amount + gas."}` instead of a raw viem dump.
+**Gotchas** — used a local `JsonResponse` structural interface (no `express` type dep). `title` is the `HttpStatus` enum name (e.g. `NOT_FOUND`) — fine for the -ish shape. e2e specs build their own app (pipe only), so filter pass-through is unit-tested directly.
