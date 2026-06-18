@@ -1,0 +1,11 @@
+# Keep the Docker build context lean and host-binary-free.
+# node_modules carry macOS-native binaries — let the Linux image reinstall them.
+**/node_modules
+**/dist
+.git
+.env
+.env.*
+!.env.example
+.vercel
+docs/study
+*.log
