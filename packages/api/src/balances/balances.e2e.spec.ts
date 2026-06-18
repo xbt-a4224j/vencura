@@ -24,9 +24,6 @@ describe('Balances HTTP', () => {
   let token: string;
 
   beforeAll(async () => {
-    process.env.JWT_SECRET = 'test-secret';
-    process.env.RPC_URL = 'http://localhost:8545'; // ChainModule's PUBLIC_CLIENT factory needs it (no network call at creation)
-    process.env.MASTER_ENCRYPTION_KEY = 'a'.repeat(64); // WalletsModule→SignerModule instantiates EncryptedKeySigner (unused here)
     const moduleRef = await Test.createTestingModule({
       imports: [PrismaModule, ChainModule, BalancesModule],
     })

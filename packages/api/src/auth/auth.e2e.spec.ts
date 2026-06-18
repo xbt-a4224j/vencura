@@ -25,7 +25,6 @@ describe('Auth HTTP', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    process.env.JWT_SECRET = 'test-secret';
     const moduleRef = await Test.createTestingModule({
       imports: [PrismaModule, AuthModule],
       controllers: [ProbeController],

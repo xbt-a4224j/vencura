@@ -17,8 +17,6 @@ describe('Messages HTTP', () => {
   let token: string;
 
   beforeAll(async () => {
-    process.env.JWT_SECRET = 'test-secret';
-    process.env.MASTER_ENCRYPTION_KEY = 'a'.repeat(64); // SignerModule instantiates EncryptedKeySigner (overridden below)
     const moduleRef = await Test.createTestingModule({ imports: [PrismaModule, TransactionsModule] })
       .overrideProvider(PrismaService)
       .useValue(prismaMock)

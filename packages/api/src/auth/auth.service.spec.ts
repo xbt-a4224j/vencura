@@ -2,7 +2,7 @@ import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import * as argon2 from 'argon2';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '../infra/prisma/prisma.service';
 import { AuthService } from './auth.service';
 
@@ -16,10 +16,6 @@ const prismaMock = {
 describe('AuthService', () => {
   let service: AuthService;
   let jwt: JwtService;
-
-  beforeAll(() => {
-    process.env.JWT_SECRET = 'test-secret';
-  });
 
   beforeEach(async () => {
     vi.clearAllMocks();

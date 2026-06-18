@@ -23,7 +23,6 @@ describe('Wallets HTTP', () => {
   let token: string;
 
   beforeAll(async () => {
-    process.env.JWT_SECRET = 'test-secret';
     const moduleRef = await Test.createTestingModule({ imports: [PrismaModule, WalletsModule] })
       .overrideProvider(PrismaService)
       .useValue(prismaMock)

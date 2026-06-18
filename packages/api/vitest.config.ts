@@ -9,6 +9,7 @@ export default defineConfig({
   test: {
     include: ['src/**/*.{test,spec}.ts'],
     environment: 'node',
+    setupFiles: ['./vitest.setup.ts'],
   },
   plugins: [
     swc.vite({

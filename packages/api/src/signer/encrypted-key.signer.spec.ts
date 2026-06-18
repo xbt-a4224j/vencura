@@ -1,19 +1,20 @@
 import { Test } from '@nestjs/testing';
+import { verifyMessage } from 'viem';
 import { privateKeyToAddress } from 'viem/accounts';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '../infra/prisma/prisma.service';
-import { decrypt } from './aes-256-gcm';
+import { decrypt, encrypt } from './aes-256-gcm';
 import { EncryptedKeySigner } from './encrypted-key.signer';
+
+// Well-known Foundry/Hardhat account #0 — a stable EIP-191 vector.
+const KNOWN_PK = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+const KNOWN_ADDR = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
 
 const prismaMock = { wallet: { findUniqueOrThrow: vi.fn() } };
 const MASTER = 'a'.repeat(64); // 32 bytes hex
 
 describe('EncryptedKeySigner', () => {
   let signer: EncryptedKeySigner;
-
-  beforeAll(() => {
-    process.env.MASTER_ENCRYPTION_KEY = MASTER;
-  });
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -46,5 +47,26 @@ describe('EncryptedKeySigner', () => {
       }).compile(),
     ).rejects.toThrow();
     process.env.MASTER_ENCRYPTION_KEY = MASTER;
+  });
+
+  describe('signMessage', () => {
+    beforeEach(() => {
+      // store the known key as the wallet's encrypted envelope
+      const envelope = encrypt(KNOWN_PK, Buffer.from(MASTER, 'hex'));
+      prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(envelope);
+    });
+
+    it('produces an EIP-191 signature that recovers to the wallet address', async () => {
+      const signature = await signer.signMessage('w1', 'hello vencura');
+      expect(
+        await verifyMessage({ address: KNOWN_ADDR, message: 'hello vencura', signature: signature as `0x${string}` }),
+      ).toBe(true);
+    });
+
+    it('is deterministic for the same key + message', async () => {
+      const a = await signer.signMessage('w1', 'hello vencura');
+      const b = await signer.signMessage('w1', 'hello vencura');
+      expect(a).toBe(b);
+    });
   });
 });
