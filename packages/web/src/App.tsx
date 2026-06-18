@@ -205,6 +205,66 @@ function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: numb
   );
 }
 
+// Fires N sends at one wallet simultaneously to demonstrate the per-wallet nonce lock:
+// despite racing, every send gets a unique, consecutive nonce (no collisions, no gaps).
+function ConcurrencyDemo({ wallet, recipient }: { wallet: Wallet; recipient?: string }) {
+  const [n, setN] = useState(5);
+  const [results, setResults] = useState<{ nonce: number | null; error?: string }[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  const fire = async () => {
+    if (!recipient) return;
+    setBusy(true);
+    setResults([]);
+    const sends = Array.from({ length: n }, () =>
+      api
+        .send(wallet.id, { to: recipient, asset: 'ETH', amount: '1' })
+        .then((tx) => ({ nonce: tx.nonce }))
+        .catch((e) => ({ nonce: null, error: (e as Error).message })),
+    );
+    setResults(await Promise.all(sends));
+    setBusy(false);
+  };
+
+  const nonces = results.map((r) => r.nonce).filter((x): x is number => x != null);
+  const sorted = [...nonces].sort((a, b) => a - b);
+  const unique = new Set(nonces).size === nonces.length;
+  const monotonic = sorted.every((v, i) => i === 0 || v === sorted[i - 1] + 1);
+  const errors = results.filter((r) => r.error);
+
+  return (
+    <details>
+      <summary>Concurrency demo (nonce lock)</summary>
+      {!recipient ? (
+        <p>Needs a recipient — add one to the policy allowlist or create another wallet.</p>
+      ) : (
+        <>
+          <label>
+            N concurrent sends{' '}
+            <input
+              type="number"
+              min={2}
+              max={20}
+              value={n}
+              onChange={(e) => setN(Number(e.target.value))}
+            />
+          </label>{' '}
+          <button onClick={fire} disabled={busy}>
+            {busy ? 'Firing…' : `Fire ${n} concurrent sends`}
+          </button>
+          {nonces.length > 0 && (
+            <p>
+              nonces: <code>{sorted.join(', ')}</code> ·{' '}
+              <strong>{unique && monotonic ? '✓ unique + consecutive' : '✗ collision!'}</strong>
+            </p>
+          )}
+          {errors.length > 0 && <p role="alert">{errors.length} failed: {errors[0].error}</p>}
+        </>
+      )}
+    </details>
+  );
+}
+
 function WalletItem({ wallet, otherWallets }: { wallet: Wallet; otherWallets: Wallet[] }) {
   const [balances, setBalances] = useState<BalanceLine[] | null>(null);
   const [policy, setPolicy] = useState<Policy | null>(null);
@@ -291,6 +351,8 @@ function WalletItem({ wallet, otherWallets }: { wallet: Wallet; otherWallets: Wa
         recipients={recipientOptions}
         onSent={onSent}
       />
+
+      <ConcurrencyDemo wallet={wallet} recipient={recipientOptions[0]?.value} />
 
       <h4>Activity (on-chain + signatures)</h4>
       <ActivityFeed wallet={wallet} refreshKey={refreshKey} />
