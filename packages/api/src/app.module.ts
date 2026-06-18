@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AdminModule } from './admin/admin.module';
+import { ProxyThrottlerGuard } from './common/proxy-throttler.guard';
 import { AuthModule } from './auth/auth.module';
 import { BalancesModule } from './balances/balances.module';
 import { HealthModule } from './health/health.module';
@@ -34,6 +35,6 @@ import { WalletsModule } from './wallets/wallets.module';
     AdminModule,
     HealthModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [{ provide: APP_GUARD, useClass: ProxyThrottlerGuard }],
 })
 export class AppModule {}
