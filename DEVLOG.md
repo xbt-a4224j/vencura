@@ -640,3 +640,13 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Tests** — n/a (config). Verified read-only that [chain.module.ts](packages/api/src/infra/chain/chain.module.ts#L13) reads `RPC_URL` and [confirmation-watcher.service.ts](packages/api/src/transactions/confirmation-watcher.service.ts#L10) reads `CONFIRMATIONS` — neither touched.
 **Demo / verify** — `node dist/main.js` against local anvil → "Nest application successfully started", zero Sepolia/Infura calls.
 **Gotchas** — `.env.example` is the local-anvil default, so the Sepolia values stay commented; deploy supplies its own `.env`.
+
+---
+
+## Block 8 · T-038 README: run/demo + Mermaid diagrams    ([#39](https://github.com/xbt-a4224j/vencura/issues/39))
+**What & why** — Complete the README so a reviewer can clone, run, and understand the system without reading CLAUDE.md (final-block req, §15).
+**How it works** — Added an env-var table, a reset/demo-cycle section, a one-line security-writeup stub (T-036 stays human-gated), and three Mermaid diagrams: system architecture (modules + infra + chain-as-source-of-truth), the `sendTransaction` sequence (policy → `pg_advisory_xact_lock` critical section → live nonce → sign → broadcast → persist → ConfirmationWatcher), and the AES-256-GCM key-custody flow.
+**Files touched** — [README.md](README.md) → run/demo, env vars, security stub, 3 Mermaid diagrams.
+**Tests** — docs ticket; smoke = valid Markdown + syntactically-correct `mermaid` blocks.
+**Demo / verify** — open [README.md](README.md) in the VS Code Markdown preview; all three diagrams render.
+**Gotchas** — `CONFIRMATIONS` is documented in [.env.example](.env.example) (added by VC4-06) with its code default `?? 1`; diagrams are grounded in the real §6.1 module map, not idealized.
