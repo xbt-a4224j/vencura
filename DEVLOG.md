@@ -659,3 +659,12 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Files touched** — [railway.json](railway.json) → DOCKERFILE build · [vercel.json](vercel.json) → /api proxy.
 **Demo / verify** — `GET https://vencura-api-production-3c23.up.railway.app/health` → 200; `/docs` → Swagger. Logs show "Connected to Postgres" + all routes mapped.
 **Gotchas** — Railway builds `origin/main`, so **unpushed local commits = stale build** (it fell back to Railpack until the push). Neon **pooled** host + `channel_binding` breaks `migrate deploy` → use the **direct** host, `sslmode=require` only. Domain `targetPort` must match the app's actual listen port (8080), not 3000. **Remaining:** disable Vercel Deployment Protection + `vercel --prod` + README URLs.
+
+---
+
+## v0.6.0 · Block 6 · Rate limiting (abuse control for a shared app)    ([commit](https://github.com/xbt-a4224j/vencura/commit/ee51023))
+**What & why** — The app is meant to be shared (open registration), so add per-IP abuse control without locking anyone out. Security model stays: per-user JWT isolation + AES-GCM custody + Sepolia; this just caps request volume.
+**How it works** — `@nestjs/throttler` global guard (`APP_GUARD`) at 100 req/60s; `/auth/*` tightened to 10/60s via `@Throttle` to slow credential-stuffing. In-memory (no Redis — matches the lock's Postgres-only stance; Redis storage is the documented multi-node path). `trust proxy=1` in [main.ts](packages/api/src/main.ts) so the limiter keys on the real client IP from X-Forwarded-For, not Railway/Vercel's edge.
+**Files touched** — [app.module.ts](packages/api/src/app.module.ts) → module + guard · [auth.controller.ts](packages/api/src/auth/auth.controller.ts) → tighter @Throttle · [main.ts](packages/api/src/main.ts) → trust proxy.
+**Tests** — config/wiring → smoke-check (§13): 77 green, typecheck + build clean; existing e2e flows stay under the limit (no false 429s).
+**Gotchas** — without `trust proxy`, all users share one bucket behind the proxy and throttle each other. Global guard is now live in any test that builds the full AppModule — bursty auth tests would 429.
