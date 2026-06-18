@@ -26,6 +26,22 @@ pnpm dev         # run api + web against the local stack
 is taken, set `POSTGRES_HOST_PORT` (and the port in `DATABASE_URL`) to a free port. Tear down with
 `docker compose down` (add `-v` to wipe the database volume).
 
+## Open the app
+
+Once `pnpm dev` is up, click straight in:
+
+| What | URL |
+| --- | --- |
+| **Web admin UI** | [localhost:5173](http://localhost:5173) |
+| **API — Swagger UI / OpenAPI** | [localhost:3000/docs](http://localhost:3000/docs) |
+| **API — health check** | [localhost:3000/health](http://localhost:3000/health) |
+
+The web app proxies `/api` → the API on port `3000`, so the SPA and API share an origin (no CORS in dev).
+
+**Logging in:** use the seeded demo account — **`demo@vencura.local`** / **`demo-password`** — or register a
+new user. No demo data yet? Run `pnpm --filter @vencura/api db:seed` (or click **Seed demo data** in the
+Admin tab) to create the demo user plus three pre-funded wallets on the local anvil chain.
+
 ## Monorepo layout
 
 ```
@@ -52,15 +68,16 @@ tickets.md  the plan (GitHub issues)
 
 ## API & docs
 
-Once running, the API serves:
+With the stack running, the API serves:
 
-- `GET /health` — liveness
-- Swagger UI at **`/docs`** (OpenAPI; the source for the generated SDK)
+- [`GET /health`](http://localhost:3000/health) — liveness
+- [Swagger UI at `/docs`](http://localhost:3000/docs) — interactive OpenAPI (and the source for the generated SDK)
 
 ## Status
 
-Built block-by-block; releases are tagged by semantic-release on `main`. Current: **v0.1.0** (Block 1 —
-foundation & CI). The full plan lives in [`tickets.md`](tickets.md).
+Built block-by-block; releases are tagged by semantic-release on `main`. Current: **v0.4.0** (Block 4 —
+sendTransaction + concurrency; the four core wallet actions all work end-to-end). The full plan lives in
+[`tickets.md`](tickets.md).
 
 ## Architecture diagrams
 

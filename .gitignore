@@ -19,6 +19,9 @@ prisma/dev.db*
 .idea/
 *.iml
 
+# Vercel link artifact (org/project ids) — never commit
+.vercel/
+
 # Local per-block study guides (learning aids, not deliverables)
 docs/study/
 
@@ -29,3 +32,4 @@ docs/superpowers/
 
 # Local app-standup runtime (pids + logs)
 .standup/
+.vercel
