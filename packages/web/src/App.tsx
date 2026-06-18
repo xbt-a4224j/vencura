@@ -1,11 +1,11 @@
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { parseEther } from 'viem';
 import {
+  type ActivityItem,
   adminKeyStore,
   api,
   type BalanceLine,
   type Policy,
-  type Transaction,
   type Wallet,
 } from './api';
 import { AuthProvider, useAuth } from './auth-context';
@@ -156,15 +156,16 @@ function SendForm({
 }
 
 /** Polls the wallet's recent transactions and shows status + hash. */
-function TxList({ wallet, refreshKey }: { wallet: Wallet; refreshKey: number }) {
-  const [txs, setTxs] = useState<Transaction[]>([]);
+// Unified on/off-chain history: on-chain sends + off-chain signatures, newest-first.
+function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: number }) {
+  const [items, setItems] = useState<ActivityItem[]>([]);
 
   useEffect(() => {
     let active = true;
     const load = () =>
       api
-        .listTransactions(wallet.id)
-        .then((rows) => active && setTxs(rows))
+        .listActivity(wallet.id)
+        .then((rows) => active && setItems(rows))
         .catch(() => undefined);
     load();
     const timer = setInterval(load, 4000); // poll pending → confirmed/failed
@@ -174,26 +175,32 @@ function TxList({ wallet, refreshKey }: { wallet: Wallet; refreshKey: number }) 
     };
   }, [wallet.id, refreshKey]);
 
-  if (txs.length === 0) return <p>No transactions yet.</p>;
+  if (items.length === 0) return <p>No activity yet.</p>;
   return (
     <ul>
-      {txs.map((t) => (
-        <li key={t.id}>
-          <strong>{t.status}</strong> · {t.amount} {t.asset === 'ETH' ? 'wei' : 'units'} →{' '}
-          <a href={explorerAddress(t.toAddress)} target="_blank" rel="noreferrer">
-            <code>{t.toAddress}</code>
-          </a>
-          {t.txHash && (
-            <>
-              {' '}
-              · tx{' '}
-              <a href={explorerTx(t.txHash)} target="_blank" rel="noreferrer">
-                <code>{t.txHash}</code>
-              </a>
-            </>
-          )}
-        </li>
-      ))}
+      {items.map((it) =>
+        it.kind === 'transaction' ? (
+          <li key={it.id}>
+            <strong>{it.status}</strong> · sent {it.amount} {it.asset === 'ETH' ? 'wei' : 'units'} →{' '}
+            <a href={explorerAddress(it.to)} target="_blank" rel="noreferrer">
+              <code>{it.to}</code>
+            </a>
+            {it.txHash && (
+              <>
+                {' '}
+                · tx{' '}
+                <a href={explorerTx(it.txHash)} target="_blank" rel="noreferrer">
+                  <code>{it.txHash}</code>
+                </a>
+              </>
+            )}
+          </li>
+        ) : (
+          <li key={it.id}>
+            <strong>signed</strong> · “{it.message}” → <code>{it.signature.slice(0, 20)}…</code>
+          </li>
+        ),
+      )}
     </ul>
   );
 }
@@ -285,8 +292,8 @@ function WalletItem({ wallet, otherWallets }: { wallet: Wallet; otherWallets: Wa
         onSent={onSent}
       />
 
-      <h4>Transactions</h4>
-      <TxList wallet={wallet} refreshKey={refreshKey} />
+      <h4>Activity (on-chain + signatures)</h4>
+      <ActivityFeed wallet={wallet} refreshKey={refreshKey} />
 
       <details>
         <summary>Sign a message</summary>

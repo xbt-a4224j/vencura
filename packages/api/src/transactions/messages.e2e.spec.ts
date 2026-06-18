@@ -12,7 +12,10 @@ import { LockModule } from '../infra/lock/lock.module';
 import { SIGNER } from '../signer/signer';
 import { TransactionsModule } from './transactions.module';
 
-const prismaMock = { wallet: { findFirst: vi.fn() } };
+const prismaMock = {
+  wallet: { findFirst: vi.fn() },
+  signedMessage: { create: vi.fn().mockResolvedValue({}) },
+};
 const signerMock = { signMessage: vi.fn().mockResolvedValue('0xsig') };
 const chainMock = {};
 

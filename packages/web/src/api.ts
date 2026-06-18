@@ -64,6 +64,20 @@ export interface Transaction {
   nonce: number | null;
   createdAt: string;
 }
+// Unified on/off-chain activity item (GET /wallets/:id/activity).
+export type ActivityItem =
+  | {
+      kind: 'transaction';
+      id: string;
+      status: string;
+      asset: string;
+      amount: string;
+      to: string;
+      txHash: string | null;
+      createdAt: string;
+    }
+  | { kind: 'signature'; id: string; message: string; signature: string; createdAt: string };
+
 export interface Policy {
   walletId?: string;
   allowlist: string[];
@@ -103,6 +117,8 @@ export const api = {
     }),
   listTransactions: (walletId: string) =>
     call<Transaction[]>(`/wallets/${walletId}/transactions`, { auth: true }),
+  listActivity: (walletId: string) =>
+    call<ActivityItem[]>(`/wallets/${walletId}/activity`, { auth: true }),
   getPolicy: (walletId: string) => call<Policy>(`/wallets/${walletId}/policy`, { auth: true }),
   setPolicy: (walletId: string, policy: Policy) =>
     call<Policy>(`/wallets/${walletId}/policy`, { method: 'PUT', body: policy, auth: true }),

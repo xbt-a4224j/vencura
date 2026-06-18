@@ -2,6 +2,7 @@ import { Body, Controller, Inject, Param, Post, UseGuards } from '@nestjs/common
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PrismaService } from '../infra/prisma/prisma.service';
 import { SIGNER, type Signer } from '../signer/signer';
 import { WalletsService } from '../wallets/wallets.service';
 import { SignMessageDto } from './dto';
@@ -13,6 +14,7 @@ import { SignMessageDto } from './dto';
 export class MessagesController {
   constructor(
     private readonly wallets: WalletsService,
+    private readonly prisma: PrismaService,
     @Inject(SIGNER) private readonly signer: Signer,
   ) {}
 
@@ -24,6 +26,8 @@ export class MessagesController {
   ) {
     await this.wallets.findOwnedOrThrow(walletId, user.id); // authz before touching the key
     const signature = await this.signer.signMessage(walletId, dto.message);
+    // Persist the off-chain action so it appears in the on/off-chain activity history.
+    await this.prisma.signedMessage.create({ data: { walletId, message: dto.message, signature } });
     return { signature };
   }
 }

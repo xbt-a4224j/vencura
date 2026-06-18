@@ -36,13 +36,29 @@ model Wallet {
   nextNonce Int      @default(0)
   createdAt DateTime @default(now())
 
-  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactions Transaction[]
-  balances     WalletBalance[]
-  policy       WalletPolicy?
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions   Transaction[]
+  signedMessages SignedMessage[]
+  balances       WalletBalance[]
+  policy         WalletPolicy?
 
   @@index([userId])
   @@map("wallets")
+}
+
+// Off-chain activity: persisted signMessage results (the on-chain half lives in
+// `transactions`). Together they back the unified on/off-chain history (T-023).
+model SignedMessage {
+  id        String   @id @default(uuid())
+  walletId  String
+  message   String
+  signature String
+  createdAt DateTime @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId])
+  @@map("signed_messages")
 }
 
 model WalletPolicy {
