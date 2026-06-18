@@ -91,7 +91,7 @@
 *Goal: everything is demoable and resettable from the browser.*
 
 - **T-021 — DB reset / re-seed** · `feat/api` `feat/web`
-  `POST /admin/reset` (dev-gated + confirm) + "Start over" button; seed data. Deps: T-003
+  `POST /admin/reset` (dev-gated + confirm) + "Start over" button; seed data — **seed the policy onto an obvious wallet (the list is newest-first, so make the policy wallet identifiable in the demo).** Deps: T-003
 - **T-022 — Blockchain inspector** · `feat/web` `area:chain`
   Etherscan/Sepolia deep-links for addresses & tx hashes, tx-hash lookup, faucet link, force balance-refresh. Deps: T-011, T-017
 - **T-023 — Audit log + log/observability view** · `feat/api` `feat/web`
@@ -111,7 +111,7 @@
   Runnable examples: create wallet, get balance, sign, send (native + token). Deps: T-025
 - **T-027 — Deploy (+ Dockerfiles)** · `chore/infra`
   **Dockerfile for `api`** (pollers run in-process, no separate worker); Vercel (web) + Railway/Render (api) + Neon (pg);
-  env docs; Swagger UI public. Deps: T-004
+  env docs; Swagger UI public. **Harden `/admin/*` (incl. `/admin/seed`) for deploy — currently `NODE_ENV`-gated but unauthenticated → require admin auth or disable in prod.** Deps: T-004
 **Block DoD:** commit directly to `main`, CI green, **`v0.6.0`**, deployed URL in README.
 
 ---
