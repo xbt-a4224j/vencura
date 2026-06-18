@@ -1,9 +1,6 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerModule } from '@nestjs/throttler';
 import { AdminModule } from './admin/admin.module';
-import { ProxyThrottlerGuard } from './common/proxy-throttler.guard';
 import { AuthModule } from './auth/auth.module';
 import { BalancesModule } from './balances/balances.module';
 import { HealthModule } from './health/health.module';
@@ -19,9 +16,6 @@ import { WalletsModule } from './wallets/wallets.module';
 // here as they land — one module per box in the architecture diagram (CLAUDE.md §6.1).
 @Module({
   imports: [
-    // Global rate limit (per-IP) — abuse control for a shared, openly-registerable app.
-    // 100 req / 60s default; auth routes tighten this via @Throttle (see auth.controller).
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     ScheduleModule.forRoot(),
     PrismaModule,
     ChainModule,
@@ -35,6 +29,5 @@ import { WalletsModule } from './wallets/wallets.module';
     AdminModule,
     HealthModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ProxyThrottlerGuard }],
 })
 export class AppModule {}
