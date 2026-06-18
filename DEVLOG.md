@@ -829,3 +829,31 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Demo / verify** — `docker compose up -d` (Postgres + anvil) then `RUN_DB_TESTS=1 pnpm --filter @vencura/api exec dotenv -e ../../.env -- vitest run src/transactions/happy-path.e2e.spec.ts`. Manual Sepolia variant: point `RPC_URL` at Sepolia and fund the wallet from a faucet instead of `setBalance`.
 
 **Gotchas** — (1) the tx isn't always mined the instant `sendRawTransaction` returns, so a single `reconcile()` left it `pending`; the bounded retry loop absorbs that latency deterministically. (2) `CONFIRMATIONS` must be set to 1 for anvil (on-demand mining → head == block), else the tx never reaches the confirmation threshold. (3) booting the full `AppModule` also starts the 5s interval watcher; harmless (idempotent), but the manual `reconcile()` is what makes the test deterministic.
+
+---
+
+## v0.7.0 · Block 7 · T-040 Institutional UI theme    ([#41](https://github.com/xbt-a4224j/vencura/issues/41) · [commit](https://github.com/xbt-a4224j/vencura/commit/1e35f88))
+**What & why.** A presentation pass — the admin was functional but entirely unstyled (zero CSS, zero classNames). For a custody reviewer the *first impression* matters, so this gives it an institutional dark theme: deep-ink surfaces, a restrained accent, and — the highest-signal detail — chain data (addresses, hashes, amounts) in **monospace tabular**, which reads "financial infrastructure." Strictly a presentation change: no API, no behavior, no new dependency.
+
+**How it works (mechanism + the key decision).** The deliberate choice was **plain global CSS + design tokens, no component library** (Tailwind/MUI would be over-engineering for a handful of screens — §3.1). The strategy minimizes churn: style the *bare elements* (`body`, `button`, `input`, `code`, `h2–h4`, `ul/li`, `a`, `details`) globally so most of the institutional look lands with **no markup change at all**, then add only a few targeted classes where semantics need them — `.app` (layout container), `.tabs` (the Wallets/Admin nav), and `.pill` (status). Design tokens live in `:root` CSS variables (`--bg`, `--panel`, `--accent`, `--ok/--pending/--fail`, `--mono`), so the palette is swappable in one place. `code` gets `font-variant-numeric: tabular-nums` + `user-select: all` so hashes line up and click-copy cleanly. Status pills colour by class (`.pill.confirmed/.pending/.failed/.signed`) using `color-mix` for translucent tinted backgrounds.
+
+**Accessibility (part of the AC).** AA contrast on the dark palette (muted text `#8c98a9` on `#0b0e14` ≈ 7:1), a visible `:focus-visible` outline (2px accent), and a `prefers-reduced-motion` block that kills all transitions/animations. Semantic HTML was preserved (real `<header>`, `<nav>`, `<form>`, `<label>`), so the theme is presentational only.
+
+**Files touched** — [packages/web/src/index.css](packages/web/src/index.css) (new — the whole theme) · [main.tsx](packages/web/src/main.tsx) (`import './index.css'`) · [App.tsx](packages/web/src/App.tsx) (added `.app`/`.tabs`/`.pill` classes + a title in the dashboard header; ~5 small edits).
+
+**Tests / verify.** Mode = presentation → no tests (a §13 config/presentation change; there's no behavior to test-drive). 4/4 web turbo tasks green (typecheck/lint/test/build). Auto-deploys to Vercel on push — viewable live.
+
+**Gotchas** — (1) styling bare elements globally is powerful but blunt: it themes everything including the login screen for free, but means the few structural classes have to be specific enough not to fight the element rules. (2) `color-mix(in srgb, …)` for pill tints is well-supported in current browsers; a flat rgba fallback would be the conservative move if older browser support mattered. (3) `user-select: all` on `code` makes a single click select the whole hash — intentional for copy-paste, but worth knowing it changes default text-selection behavior there.
+
+---
+
+## v0.7.0 · Block 7 · T-034 Smart-wallet design spike (exploration)    ([#35](https://github.com/xbt-a4224j/vencura/issues/35) · [commit](https://github.com/xbt-a4224j/vencura/commit/0e4a6bd))
+**What & why.** A design note + small spike — explicitly *not* a build — on where VenCura could go beyond externally-owned accounts (EOAs). It's forward-vision signal: account abstraction is the modern custody conversation, and the doc reasons about it *from this codebase's vantage point* (custodial EOAs behind the `Signer` seam), not in the abstract.
+
+**How it works (the content).** [docs/smart-wallet-design.md](docs/smart-wallet-design.md) lays out: (1) where we are — dumb EOAs with off-chain policy; (2) what a smart account buys (on-chain policy, recovery, gas sponsorship/paymasters, batching, session keys); (3) the two live paths — **ERC-4337** (per-user account contract + UserOps + bundler + EntryPoint + paymaster; richest but real infra) and **EIP-7702** (an EOA temporarily adopts contract code via a signed authorization; keeps the existing address, lighter, incremental); (4) how either slots into the **`Signer` seam** as a new `SmartAccountSigner` that reuses the *current* signer for the inner signature — additive, not a rewrite — with pseudocode; (5) a recommendation: not now, and if pursued, start with 7702 because it keeps our already-custodied EOA addresses.
+
+**Files touched** — [docs/smart-wallet-design.md](docs/smart-wallet-design.md) (new).
+
+**Verify.** Docs/spike — no test. The through-line ties back to the architecture: both AA paths reuse the `Signer` seam for the inner signature, the same pluggability the ShamirSigner bonus demonstrated — so "smart wallet" would be another signer alongside the others, not a migration.
+
+**Gotchas** — kept honest about maturity (7702 is post-Pectra and newer) and scope (4337 needs audited account code + bundler/paymaster infra, out of scope for the brief). The spike pseudocode is illustrative, not runnable.
