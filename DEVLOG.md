@@ -590,3 +590,13 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Tests** — [admin.guard.spec.ts](packages/api/src/admin/admin.guard.spec.ts) (4: allow/missing/wrong/unset-env, red→green). 75 green (1 skipped).
 **Demo / verify** — `docker build -f packages/api/Dockerfile -t vencura-api .` boots → P1001 at fake DB (chain loads). `vercel deploy` → preview URL, no more `public/` error. Seed without the key → 403.
 **Gotchas** — Vercel link sat at repo root (no Root Directory), hence the `public/` miss. Vercel CLI auth never persists in the agent shell → deploys/Railway run by the human or via token. Image is 1.32GB (carries devDeps; slim path = `pnpm deploy --prod`). **Deferred:** Railway api deploy + `/api`→Railway rewrite + prod secrets push (awaiting auth).
+
+---
+
+## Block 4 · CC-1 Policy daily-limit TOCTOU — move the check inside the wallet lock    (audit fold-in)
+**What & why** — Audit HIGH: `assertAllowed` ran *before* `withWalletLock`, so two concurrent same-wallet 0.6 ETH sends vs a 1.0 ETH `dailyLimit` each read today=0 and both broadcast — cap blown.
+**How it works** — Moved `assertAllowed` *inside* the lock callback (alongside the existing in-lock idempotency check). The Postgres advisory lock serializes the whole critical section, so the second caller blocks until the first commits its row, then re-reads the daily sum and sees it → denied.
+**Files touched** — [transactions.service.ts](packages/api/src/transactions/transactions.service.ts) → policy check now in-lock.
+**Tests** — new real-DB race spec [policy-race.int.spec.ts](packages/api/src/transactions/policy-race.int.spec.ts) (gated `RUN_DB_TESTS`): two concurrent 0.6 ETH sends → exactly one succeeds, one denied. **Red** on old code (both broadcast), **green** after.
+**Demo / verify** — `RUN_DB_TESTS=1 dotenv -e ../../.env -- vitest run src/transactions/policy-race.int.spec.ts` → 1 passed; logs show `policy deny: amount exceeds daily limit` on the second send.
+**Gotchas** — the fix works *because* the advisory lock wraps the enclosing `$transaction`; under READ COMMITTED the second txn wouldn't see the first's uncommitted row, but it blocks on the lock until commit, so the re-read sees it.

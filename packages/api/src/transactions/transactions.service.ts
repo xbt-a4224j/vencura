@@ -22,9 +22,13 @@ export class TransactionsService {
 
   async send(walletId: string, userId: string, dto: SendTransactionInput, idempotencyKey?: string) {
     const wallet = await this.wallets.findOwnedOrThrow(walletId, userId);
-    await this.policy.assertAllowed(walletId, dto);
 
     return this.lock.withWalletLock(walletId, async () => {
+      // Policy check INSIDE the lock (CC-1): the daily-limit sum reads committed rows, and a
+      // concurrent send's row is only created below — so checking outside the lock is a TOCTOU
+      // (two same-wallet sends each read today=0 and both pass). The advisory lock serializes
+      // the whole critical section, so the second caller blocks, re-reads, and sees the first row.
+      await this.policy.assertAllowed(walletId, dto);
       // Idempotency check INSIDE the lock: serialized with the create below, so two
       // concurrent requests with the same key can't both broadcast (the second sees
       // the first's row and returns it). The @unique constraint is the backstop.
