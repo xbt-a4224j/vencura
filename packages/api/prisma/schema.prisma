@@ -39,9 +39,20 @@ model Wallet {
   user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions Transaction[]
   balances     WalletBalance[]
+  policy       WalletPolicy?
 
   @@index([userId])
   @@map("wallets")
+}
+
+model WalletPolicy {
+  walletId   String   @id
+  allowlist  String[] @default([])
+  perTxLimit String?
+  dailyLimit String?
+  wallet     Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@map("wallet_policies")
 }
 
 enum TransactionStatus {
