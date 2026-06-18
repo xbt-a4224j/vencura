@@ -458,3 +458,14 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **How to demo:** `pnpm --filter @vencura/api dev` + `pnpm --filter @vencura/web dev`, open http://localhost:5173 → register → **Create wallet** → a `0x…` address appears (and is stored only as ciphertext).
 
 **Notable calls:** `JwtModule.registerAsync` to dodge import-time env reads; `nestjs-zod@5`'s `cleanupOpenApiDoc` (the old `patchNestjsSwagger` is gone); `Signer.signMessage/signTransaction` declared but deferred to T-012/T-017 (seam visible, not pre-built).
+
+---
+
+## v0.3.0 · Block 3 · T-011 Balance read + Postgres cache    ([#12](https://github.com/xbt-a4224j/vencura/issues/12) · [commit](https://github.com/xbt-a4224j/vencura/commit/4da9b8a))
+**What & why** — `GET /wallets/:id/balance` (native + tracked ERC-20s), served stale-while-revalidate from the cache so the request path never depends on the RPC being up (§4). First chain-talking code.
+**How it works** — new `infra/chain/ChainModule` wraps a viem `publicClient` behind a `PUBLIC_CLIENT` DI token (mockable; no test hits the network). `BalancesService` serves cached rows; on a stale hit it revalidates in the background, on a cold miss it awaits one refresh, on a cold miss + RPC-down it 503s. `refresh()` upserts `confirmed`+`asOfBlock`. `available == confirmed` until sends (Block 4).
+**Files touched** — [chain.service.ts](packages/api/src/infra/chain/chain.service.ts) · [chain.module.ts](packages/api/src/infra/chain/chain.module.ts) · [balances.service.ts](packages/api/src/balances/balances.service.ts) · [balances.controller.ts](packages/api/src/balances/balances.controller.ts) · [wallets.service.ts](packages/api/src/wallets/wallets.service.ts) (`findOwnedOrThrow` authz seam).
+**Key code** — `findOwnedOrThrow(walletId,userId)` → 404 (no enumeration), reused by T-012; balances as **bigint strings**.
+**Tests** — [balances.service.spec.ts](packages/api/src/balances/balances.service.spec.ts) (hit/miss/404/503) + [balances.e2e.spec.ts](packages/api/src/balances/balances.e2e.spec.ts) + [chain.service.spec.ts](packages/api/src/infra/chain/chain.service.spec.ts). 26 green.
+**Demo / verify** — `curl localhost:3000/wallets/$ID/balance -H "authorization: Bearer $TOKEN"` → `{balances:[{asset:"ETH",confirmed:"0",available:"0",asOfBlock:N}]}`.
+**Gotchas** — single `RPC_URL`, fail-fast (no fallback branch). e2e imports real modules → must set `JWT_SECRET`/`RPC_URL`/`MASTER_ENCRYPTION_KEY` env (candidate for a Vitest setup file). ERC-20 symbol/decimals from config so a token-less anvil degrades to native-only.
