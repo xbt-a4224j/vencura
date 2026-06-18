@@ -490,3 +490,23 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Tests** — [balance-refresher.service.spec.ts](packages/api/src/balances/balance-refresher.service.spec.ts): refreshes each wallet; keeps going when one fails. 34 green.
 **Demo / verify** — boot the API; the cache rows' `asOfBlock`/`updatedAt` advance every ~30s without any request.
 **Gotchas** — poll-all-wallets is O(wallets) per tick — fine for a demo; the scale path (per-wallet queued jobs) is noted for the writeup, not built (§3.1 no over-engineering).
+
+---
+
+## v0.3.0 · Block 3 · T-014 Wallet dashboard — balances + sign    ([#15](https://github.com/xbt-a4224j/vencura/issues/15) · [commit](https://github.com/xbt-a4224j/vencura/commit/9b4231a))
+**What & why** — The load-bearing UI for Block 3 (§8): each wallet can show balances and sign a message in the browser. Also consolidates RPC config to a single `RPC_URL`.
+**How it works** — a `WalletItem` component owns its own balances/sign state; `api.ts` gains `getBalance`/`signMessage`. `.env`/`.env.example` drop `ANVIL_RPC_URL` for one `RPC_URL` (anvil locally, overlay-overridden on deploy) — config via env, not code branching.
+**Files touched** — [App.tsx](packages/web/src/App.tsx) (`WalletItem`) · [api.ts](packages/web/src/api.ts) · [.env.example](.env.example).
+**Tests** — scaffold/UI ticket (§13): green lint/typecheck/build + a live flow.
+**Demo / verify** — live against anvil: balance → `{ETH confirmed/available "0", asOfBlock 0}`; sign `"gm vencura"` → signature that `verifyMessage` **recovers to the wallet's own address (true)**; 404 on an unowned wallet. UI: `pnpm dev` → http://localhost:5173.
+**Gotchas** — token in localStorage (XSS tradeoff, revisit T-036). Fresh anvil wallet is 0 ETH until funded.
+
+---
+
+### Block 3 recap — Read & sign → **v0.3.0** ✅
+
+**Shipped:** the first chain-talking layer — `ChainModule` (viem `publicClient` behind a mockable `PUBLIC_CLIENT` token), `GET /wallets/:id/balance` (native + tracked ERC-20s) served **stale-while-revalidate** from a Postgres cache, a `@nestjs/schedule` poller keeping it warm, and `POST /wallets/:id/messages` producing **real EIP-191 signatures** (decrypt→sign→zeroize). Ownership centralized in `WalletsService.findOwnedOrThrow` (404, no enumeration). 34 API tests green; issues #12–#15 closed.
+
+**How to demo:** `pnpm --filter @vencura/api dev` + `pnpm --filter @vencura/web dev` → register → create wallet → **View balances** (reads anvil) → **Sign** a message → signature recovers to the wallet address.
+
+**Notable calls:** single `RPC_URL` (no fallback branch); `available == confirmed` until sends (Block 4); SWR keeps the request path off the RPC; no BullMQ yet (poller is enough). Recurring e2e env-var setup (`JWT_SECRET`/`RPC_URL`/`MASTER_ENCRYPTION_KEY`) is a candidate for a Vitest setup file.
