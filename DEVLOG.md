@@ -620,3 +620,13 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Tests** — [idempotency-backstop.spec.ts](packages/api/src/transactions/idempotency-backstop.spec.ts): `create()` throws P2002 → service returns the existing row, not a throw. **Red** (P2002 propagated) → **green**.
 **Demo / verify** — `vitest run src/transactions/idempotency-backstop.spec.ts` → 1 passed.
 **Gotchas** — the P2002 path is narrow (the in-lock `findUnique` catches same-wallet same-key retries); it only fires on a cross-wallet same-key race. Makes the `@unique`-is-the-backstop comment actually true.
+
+---
+
+## Block 4 · CC-6 Run the gated DB integration tests in CI    (audit fold-in)
+**What & why** — Audit HIGH: the headline concurrency guarantee was only verified by `RUN_DB_TESTS`-gated specs that never ran in CI (no Postgres service), so a regression in the real advisory lock would stay green. Mode = config (smoke).
+**How it works** — New `db-tests` job in [ci.yml](.github/workflows/ci.yml) spins a `postgres:16-alpine` service, sets `DATABASE_URL` + `RUN_DB_TESTS=1`, runs `prisma migrate deploy`, then the two gated specs (pg-advisory-lock + the new CC-1 policy race) with `--no-file-parallelism`. The existing mock-based `verify` job is untouched.
+**Files touched** — [.github/workflows/ci.yml](.github/workflows/ci.yml) → added `db-tests` job.
+**Tests** — n/a (config). Smoke: YAML parses (js-yaml); both gated specs pass locally with `RUN_DB_TESTS=1` against Postgres on 5433.
+**Demo / verify** — `RUN_DB_TESTS=1 DATABASE_URL=… pnpm --filter @vencura/api exec vitest run --no-file-parallelism src/infra/lock/pg-advisory-lock.int.spec.ts src/transactions/policy-race.int.spec.ts` → 2 passed.
+**Gotchas** — `--no-file-parallelism` is load-bearing: the lock's ordering assertion is timing-sensitive, so the two DB specs can't contend on the shared connection.
