@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { BalancesModule } from './balances/balances.module';
 import { HealthModule } from './health/health.module';
@@ -12,6 +13,7 @@ import { WalletsModule } from './wallets/wallets.module';
 // here as they land — one module per box in the architecture diagram (CLAUDE.md §6.1).
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     PrismaModule,
     ChainModule,
     AuthModule,
