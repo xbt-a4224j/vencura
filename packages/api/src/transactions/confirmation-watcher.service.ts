@@ -5,7 +5,9 @@ import { ChainService } from '../infra/chain/chain.service';
 import { PrismaService } from '../infra/prisma/prisma.service';
 import { BalancesService } from '../balances/balances.service';
 
-const CONFIRMATIONS = 1; // anvil instant-mine; raise for a public network
+// Confirmations required before finalizing. Default 1 (anvil instant-mine = confirm once
+// the tx is in a block); a public network raises it via the CONFIRMATIONS env var.
+const requiredConfirmations = (): bigint => BigInt(process.env.CONFIRMATIONS ?? 1);
 
 @Injectable()
 export class ConfirmationWatcher {
@@ -26,7 +28,11 @@ export class ConfirmationWatcher {
     for (const tx of pending) {
       const receipt = await this.chain.getTransactionReceipt(tx.txHash as Hex);
       if (!receipt) continue;
-      if (head - receipt.blockNumber < BigInt(CONFIRMATIONS)) continue; // reorg-aware
+      // A tx in the head block already has 1 confirmation (count = head − block + 1),
+      // so confirm once `head − block + 1 >= CONFIRMATIONS`. Without the +1, an
+      // on-demand-mining node (anvil) leaves head == block and the tx never confirms.
+      const confirmations = head - receipt.blockNumber + 1n;
+      if (confirmations < requiredConfirmations()) continue; // reorg-aware
       const status = receipt.status === 'success' ? 'confirmed' : 'failed';
       await this.prisma.transaction.update({ where: { id: tx.id }, data: { status } });
       this.logger.log(`tx ${tx.txHash} → ${status}`);

@@ -54,12 +54,27 @@ describe('ConfirmationWatcher', () => {
     });
   });
 
-  it('does not update when there are too few confirmations', async () => {
+  it('does not update when there are too few confirmations (reorg-aware)', async () => {
+    process.env.CONFIRMATIONS = '3'; // require 3; tx is in the head block → only 1 confirmation
+    chainMock.getBlockNumber.mockResolvedValue(10n);
+    chainMock.getTransactionReceipt.mockResolvedValue({ status: 'success', blockNumber: 10n });
+    try {
+      await watcher.reconcile();
+      expect(prismaMock.transaction.update).not.toHaveBeenCalled();
+      expect(balancesMock.refresh).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.CONFIRMATIONS;
+    }
+  });
+
+  it('confirms a tx in the head block by default (1 confirmation = mined)', async () => {
     chainMock.getBlockNumber.mockResolvedValue(10n);
     chainMock.getTransactionReceipt.mockResolvedValue({ status: 'success', blockNumber: 10n });
     await watcher.reconcile();
-    expect(prismaMock.transaction.update).not.toHaveBeenCalled();
-    expect(balancesMock.refresh).not.toHaveBeenCalled();
+    expect(prismaMock.transaction.update).toHaveBeenCalledWith({
+      where: { id: pendingTx.id },
+      data: { status: 'confirmed' },
+    });
   });
 
   it('does not update when the receipt is null (not mined)', async () => {

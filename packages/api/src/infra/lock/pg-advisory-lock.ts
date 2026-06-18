@@ -13,7 +13,10 @@ export class PgAdvisoryLock implements Lock {
     const key = advisoryKey(walletId);
     return this.prisma.$transaction(
       async (tx) => {
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(${key})`;
+        // $executeRaw (not $queryRaw): pg_advisory_xact_lock returns void, which $queryRaw
+        // can't deserialize ("Failed to deserialize column of type 'void'"). executeRaw
+        // runs the statement and returns an affected-row count — no result-set decoding.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${key})`;
         return fn();
       },
       { timeout: 30_000, maxWait: 30_000 },
