@@ -560,3 +560,23 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Tests** — [chain-error.spec.ts](packages/api/src/common/chain-error.spec.ts) (9: each mapping + null) + [all-exceptions.filter.spec.ts](packages/api/src/common/all-exceptions.filter.spec.ts) (4: shape, 403/404 pass-through, 500 hides secret). 68 green (1 skipped).
 **Demo / verify** — an over-balance send surfaces `{status:400, detail:"Insufficient funds for amount + gas."}` instead of a raw viem dump.
 **Gotchas** — used a local `JsonResponse` structural interface (no `express` type dep). `title` is the `HttpStatus` enum name (e.g. `NOT_FOUND`) — fine for the -ish shape. e2e specs build their own app (pipe only), so filter pass-through is unit-tested directly.
+
+---
+
+## v0.4.0 · Block 4 · T-020 Send + tx-status UI, Admin tab, demo seed    ([#21](https://github.com/xbt-a4224j/vencura/issues/21) · [commit](https://github.com/xbt-a4224j/vencura/commit/d890694) · [fixes](https://github.com/xbt-a4224j/vencura/commit/09a0aae))
+**What & why** — Make the whole send path demoable: a friendly UI, pre-seeded funded wallets, and the completed `available` math. UX is first-class for the live demo.
+**How it works** — `available = confirmed − pending(outgoing, same asset) − GAS_RESERVE_WEI(0.001 ETH, native only)`, clamped ≥ 0 (optimistic debit). Demo seed (`seedDemo`, shared by `pnpm db:seed` + dev-gated `POST /admin/seed`) creates a user + 3 wallets, a sample policy on the first (allowlist + 5/8 ETH limits), and funds them on anvil via `anvil_setBalance`. Web: a tabbed shell (**Wallets** / **Admin**) with a `SendForm` (asset + recipient dropdowns, ETH→wei via `parseEther`), a polling `TxList`, and an Admin `PolicyEditor` + seed button.
+**Files touched** — [balances.service.ts](packages/api/src/balances/balances.service.ts) (available math) · [admin/seed.ts](packages/api/src/admin/seed.ts) · [admin.controller.ts](packages/api/src/admin/admin.controller.ts) · [App.tsx](packages/web/src/App.tsx) · [api.ts](packages/web/src/api.ts).
+**Tests** — balances available-math (reserve, pending debit, clamp). 70 green (1 skipped). Plus a **live capstone** against anvil (below).
+**Demo / verify** — `pnpm db:seed` → log in `demo@vencura.local`/`demo-password`; send 2 ETH between seeded wallets → `pending`→`confirmed`; non-allowlisted/over-limit sends → 403 with the RFC-7807 detail; same `Idempotency-Key` → one tx.
+**Gotchas (two bugs the live capstone caught — fix `09a0aae`)** — (1) `PgAdvisoryLock` used `$queryRaw` for `pg_advisory_xact_lock`, which returns **void** → "Failed to deserialize column of type 'void'"; switched to `$executeRaw`. (2) confirmation **off-by-one**: a tx in the head block has 1 confirmation (`head−block+1`), but anvil on-demand-mines so `head==block` and it never confirmed; fixed + made `CONFIRMATIONS` env-configurable. Both were invisible to the mock-based unit suite — only the real-DB + real-anvil run exposed them.
+
+---
+
+### Block 4 recap — sendTransaction + concurrency → **v0.4.0** ✅
+
+**Shipped:** the send path — `POST /wallets/:id/transactions` (native + ERC-20) serialized per wallet by a **Postgres advisory lock** (`pg_advisory_xact_lock` behind a `Lock` seam, no Redis), idempotent via the `@unique` key (check **inside** the lock), gated by a per-wallet **PolicyEngine** (allowlist + limits, deny pre-sign), with a **confirmation watcher** (`@nestjs/schedule`, reorg-aware) flipping `pending→confirmed/failed`, all errors rendered through a **global RFC-7807 filter** with chain-error mapping. `available = confirmed − pending − gas reserve`. A demo-grade UI (send dropdowns, tabbed Wallets/Admin, pre-seeded funded wallets) makes it all live-demoable. 70 API tests + a real-DB lock integration test (gated) + a live anvil capstone. Issues #15–#21 closed.
+
+**How to demo:** `pnpm --filter @vencura/api db:seed` → `pnpm dev` → log in as `demo@vencura.local` / `demo-password` → Wallets tab: pick the policy wallet, send 2 ETH to an allowlisted wallet (watch it go pending→confirmed, `available` drop then settle); try a non-allowlisted recipient or >5 ETH → denied with a clear message. Admin tab: edit policy, re-seed.
+
+**Notable calls:** built subagent-driven (one implementer per ticket, controller verify + review + commit); the idempotency-inside-lock, `$executeRaw`, and confirmation-off-by-one fixes were all caught in controller review / the live capstone — the mock suite alone was green throughout. `CONFIRMATIONS` is now env-tunable (1 for anvil, higher for a public net).
