@@ -610,3 +610,13 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Tests** — extended [policy.engine.spec.ts](packages/api/src/policy/policy.engine.spec.ts): asserts the query carries `status:{not:'failed'}` so failed rows never reach the sum. **Red** (no filter) → **green**.
 **Demo / verify** — `vitest run src/policy/policy.engine.spec.ts` → 6 passed.
 **Gotchas** — `findMany`+BigInt-reduce stays (the `amount` String column can't use Prisma numeric `_sum`); only the `where` changed.
+
+---
+
+## Block 4 · CC-3 Idempotency P2002 backstop surfaced as a 500    (audit fold-in)
+**What & why** — Audit MED: `transaction.create()` had no try/catch, so a unique-key (`P2002`) conflict — the documented "insert-or-conflict" backstop — fell through to a generic 500 instead of an idempotent replay.
+**How it works** — Wrap the create; a `Prisma.PrismaClientKnownRequestError` with `code==='P2002'` re-reads the winning row by `idempotencyKey` and returns it shaped (`onUniqueConflict`). Non-P2002 errors and keyless conflicts re-throw unchanged. The early return skips the nonce bump (the winner already did it).
+**Files touched** — [transactions.service.ts](packages/api/src/transactions/transactions.service.ts) → P2002 catch + `onUniqueConflict` helper.
+**Tests** — [idempotency-backstop.spec.ts](packages/api/src/transactions/idempotency-backstop.spec.ts): `create()` throws P2002 → service returns the existing row, not a throw. **Red** (P2002 propagated) → **green**.
+**Demo / verify** — `vitest run src/transactions/idempotency-backstop.spec.ts` → 1 passed.
+**Gotchas** — the P2002 path is narrow (the in-lock `findUnique` catches same-wallet same-key retries); it only fires on a cross-wallet same-key race. Makes the `@unique`-is-the-backstop comment actually true.
