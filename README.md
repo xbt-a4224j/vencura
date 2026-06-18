@@ -18,8 +18,8 @@ message**, and **send a transaction** — for the native asset (**ETH**) and **E
 
 ```bash
 pnpm i           # install the workspace
-pnpm bootstrap   # .env from .env.example → docker compose up -d (postgres+redis+anvil) → db migrate
-pnpm dev         # run api + worker + web against the local stack
+pnpm bootstrap   # .env from .env.example → docker compose up -d (postgres+anvil) → db migrate
+pnpm dev         # run api + web against the local stack
 ```
 
 `pnpm bootstrap` creates a local `.env` (gitignored) from [`.env.example`](.env.example). If host port `5432`
@@ -70,5 +70,5 @@ final block (T-038)._
 ## Security & custody
 
 A dedicated security writeup (threat model, custody spectrum, honest weaknesses, scale path) lands in
-[`docs/`](docs/) in the final block. Secrets (`MASTER_ENCRYPTION_KEY`, `JWT_SECRET`, DB/Redis URLs, RPC key)
+[`docs/`](docs/) in the final block. Secrets (`MASTER_ENCRYPTION_KEY`, `JWT_SECRET`, DB URL, RPC key)
 come from the environment and are never committed — only [`.env.example`](.env.example) is.

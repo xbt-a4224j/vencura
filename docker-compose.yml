@@ -1,5 +1,5 @@
 # Local dev infra for VenCura. Brought up by `pnpm bootstrap` (docker compose up -d --wait).
-# Postgres = derived projection store · Redis = locks/idempotency/BullMQ · anvil = local chain.
+# Postgres = derived store + concurrency (advisory locks, unique-key idempotency, pending-tx poller) · anvil = local chain.
 services:
   postgres:
     image: postgres:16-alpine
@@ -14,16 +14,6 @@ services:
       - vencura_pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U vencura -d vencura']
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - '6379:6379'
-    healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 3s
       retries: 10

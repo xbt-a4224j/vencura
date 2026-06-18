@@ -125,13 +125,13 @@ concurrency model that keeps transactions correct under load.</p>
   <rect class="box" x="266" y="168" width="140" height="44" rx="8"/><text class="sub" x="278" y="188">Policy Engine</text><text class="sub" x="278" y="202">allowlist/limits</text>
   <rect class="box" x="424" y="168" width="140" height="44" rx="8"/><text class="sub" x="436" y="188">Signer</text><text class="sub" x="436" y="202">EncKey / Shamir</text>
   <rect class="box" x="266" y="224" width="298" height="74" rx="8"/>
-  <text class="lbl" x="280" y="247">Workers (BullMQ)</text>
+  <text class="lbl" x="280" y="247">Workers (scheduled)</text>
   <text class="sub" x="280" y="266">confirmation-watcher · balance-refresher</text>
   <text class="sub" x="280" y="282">(async; idempotent; per-wallet nonce lock)</text>
 
   <!-- stores / external -->
   <rect class="box" x="650" y="30" width="210" height="52" rx="10"/><text class="lbl" x="664" y="52">Postgres (Prisma)</text><text class="sub" x="664" y="70">users · wallets · txs · balances</text>
-  <rect class="box" x="650" y="100" width="210" height="52" rx="10"/><text class="lbl" x="664" y="122">Redis</text><text class="sub" x="664" y="140">nonce locks · idempotency · queue</text>
+  <rect class="box" x="650" y="100" width="210" height="52" rx="10"/><text class="lbl" x="664" y="122">Concurrency</text><text class="sub" x="664" y="140">PG advisory lock · unique-key · poller</text>
   <rect class="ext" x="650" y="170" width="210" height="52" rx="10"/><text class="lbl" x="664" y="192">Secret (env)</text><text class="sub" x="664" y="210">master encryption key</text>
   <rect class="ext" x="650" y="240" width="210" height="64" rx="10"/><text class="lbl" x="664" y="262">Ethereum — Infura (Sepolia)</text><text class="sub" x="664" y="280">RPC reads · broadcast</text><text class="sub" x="664" y="294">ws: blocks / Transfer logs</text>
 
@@ -145,7 +145,7 @@ concurrency model that keeps transactions correct under load.</p>
 </svg>
 </div>
 <p class="sub" style="color:var(--muted);font-size:13px">Client → NestJS API (modules + async workers) → Postgres (durable state),
-Redis (ephemeral concurrency control + queue), an env master key for encryption, Ethereum/Infura (reads, broadcast, event subscriptions).</p>
+Postgres advisory locks + a unique-key constraint + scheduled pollers (no Redis), an env master key for encryption, Ethereum/Infura (reads, broadcast, event subscriptions).</p>
 
 <h2 class="sec" id="components"><span class="num">3</span>Components</h2>
 <table>
@@ -153,7 +153,7 @@ Redis (ephemeral concurrency control + queue), an env master key for encryption,
 <tr><td><strong>Admin UI + TS SDK</strong></td><td>React/TS admin to exercise the API; a typed SDK package + example scripts (example code + a framework-agnostic client).</td></tr>
 <tr><td><strong>NestJS API</strong></td><td>Modules: Auth (JWT), Wallets, Transactions, Balances, Policy, Signer. DI + guards/interceptors fit auth + policy cleanly; a clean, conventional Node/TS structure.</td></tr>
 <tr><td><strong>Postgres + Prisma</strong></td><td>Durable source of <em>derived</em> state: users, wallets (encrypted keys), transactions, cached balances, policies, shared-access grants, idempotency records.</td></tr>
-<tr><td><strong>Redis</strong></td><td><em>Ephemeral</em> concurrency control: per-wallet nonce locks, idempotency cache, and the BullMQ queue for async workers.</td></tr>
+<tr><td><strong>Concurrency (Postgres)</strong></td><td>Per-wallet nonce serialization via <code>pg_advisory_xact_lock</code> (behind a <code>Lock</code> interface), idempotency via a unique constraint, and <code>@nestjs/schedule</code> pollers over pending rows — no Redis/queue.</td></tr>
 <tr><td><strong>Key encryption</strong></td><td>Each wallet's private key is encrypted with AES-256-GCM using a master key from env/secret. No external KMS — kept deliberately simple.</td></tr>
 <tr><td><strong>Ethereum / Infura (Sepolia)</strong></td><td>JSON-RPC for balance/nonce/receipts, tx broadcast, and a websocket subscription (new blocks + ERC-20 <code>Transfer</code> logs) for event-driven refresh.</td></tr>
 </table>
@@ -214,22 +214,22 @@ The signer is the only place key material is ever in plaintext, and only for mic
 <h3>sendTransaction (the interesting one)</h3>
 <div class="step"><div class="n">1</div><div class="b"><strong>Idempotency:</strong> if this <code>Idempotency-Key</code> was seen, return the stored result — don't broadcast twice.</div></div>
 <div class="step"><div class="n">2</div><div class="b"><strong>Policy check:</strong> destination allowlisted? under limits? approval required? (authoritative, before signing.)</div></div>
-<div class="step"><div class="n">3</div><div class="b"><strong>Acquire the per-wallet nonce lock</strong> (Redis). This serializes all sends for this wallet.</div></div>
+<div class="step"><div class="n">3</div><div class="b"><strong>Acquire the per-wallet nonce lock</strong> (Postgres advisory lock). This serializes all sends for this wallet.</div></div>
 <div class="step"><div class="n">4</div><div class="b">Read the authoritative <strong>pending nonce + on-chain balance</strong> (never the cache) → build tx (native or ERC-20 <code>transfer</code>) → <code>Signer.signTransaction</code> → broadcast.</div></div>
 <div class="step"><div class="n">5</div><div class="b">Persist the tx as <code>pending</code> with its nonce; bump <code>next_nonce</code>; <strong>release the lock</strong>; return <code>transactionHash</code>.</div></div>
-<div class="step"><div class="n">6</div><div class="b">A <strong>confirmation-watcher</strong> worker later sees the receipt, flips status to <code>confirmed</code>/<code>failed</code>, and refreshes the balance cache.</div></div>
+<div class="step"><div class="n">6</div><div class="b">A <strong>confirmation-watcher</strong> poller later sees the receipt, flips status to <code>confirmed</code>/<code>failed</code>, and refreshes the balance cache.</div></div>
 
 <h2 class="sec" id="concurrency"><span class="num">7</span>Concurrency model <span style="color:var(--muted);font-size:14px;font-weight:400">(the part we deliberately built)</span></h2>
 <div class="warn"><strong>The core problem:</strong> Ethereum nonces are strictly sequential per address. Two concurrent
 <code>sendTransaction</code>s on the same wallet that both read nonce <code>N</code> will collide — one tx gets stuck or
 replaced. And a client retry can broadcast the same payment twice.</div>
 <ul>
-  <li><strong>Per-wallet nonce lock (Redis).</strong> A short-lived distributed lock keyed by wallet serializes the
+  <li><strong>Per-wallet nonce lock (Postgres advisory lock).</strong> A short-lived distributed lock keyed by wallet serializes the
   read-nonce → sign → broadcast → persist critical section, so each send claims a unique, monotonic nonce. (Postgres
-  advisory lock is the zero-extra-infra alternative; we use Redis since we're already running it for the queue.)</li>
+  advisory lock is the zero-extra-infra alternative; a Redis lock is the documented multi-node scale path.)</li>
   <li><strong>Idempotency keys.</strong> Clients send an <code>Idempotency-Key</code>; the first response is stored and
   replayed on retries, so a network hiccup never double-spends.</li>
-  <li><strong>Async workers (BullMQ on Redis).</strong> A <em>confirmation-watcher</em> reconciles pending txs to
+  <li><strong>Async workers (@nestjs/schedule pollers).</strong> A <em>confirmation-watcher</em> reconciles pending txs to
   confirmed/failed; a <em>balance-refresher</em> updates the cache (event-driven via <code>Transfer</code> logs + new
   blocks, with a periodic full reconcile as a safety net). Keeping these off the request path keeps the API fast.</li>
   <li><strong>Authoritative checks on write.</strong> Sends validate against <em>live</em> chain state (nonce + balance),
@@ -279,10 +279,10 @@ control is bound to the signing path, not just the UI.</p>
 <h2 class="sec" id="stack"><span class="num">12</span>Stack &amp; deployment</h2>
 <p>
 <span class="tag">TypeScript</span><span class="tag">NestJS</span><span class="tag">Prisma</span><span class="tag">Postgres</span>
-<span class="tag">Redis + BullMQ</span><span class="tag">Viem</span><span class="tag">Ethereum Sepolia (Infura)</span><span class="tag">AES-256-GCM key encryption</span>
+<span class="tag">Postgres advisory lock + @nestjs/schedule</span><span class="tag">Viem</span><span class="tag">Ethereum Sepolia (Infura)</span><span class="tag">AES-256-GCM key encryption</span>
 <span class="tag">React/TS admin</span><span class="tag">TS SDK</span><span class="tag">Vitest/Jest</span><span class="tag">pnpm + Turbo monorepo</span>
 </p>
-<p><strong>Deploy:</strong> Vercel (admin) · Railway/Render (API + worker) · Neon (Postgres) · Upstash (Redis) · Infura RPC.
+<p><strong>Deploy:</strong> Vercel (admin) · Railway/Render (API) · Neon (Postgres) · Infura RPC.
 Monorepo packages: <code>api</code> · <code>sdk</code> · <code>client</code> · <code>contracts</code>(optional).</p>
 
 <div class="panel"><strong>Next step:</strong> turn this into the repo scaffold — <code>~/dev/git/vencura/</code> with

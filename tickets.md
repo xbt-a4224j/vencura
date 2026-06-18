@@ -21,7 +21,7 @@
 - **T-003 — Postgres + Prisma init + base schema migration** · `feat/api`
   `users`, `wallets`, `transactions`, `wallet_balances` per `CLAUDE.md` §4; `pnpm bootstrap` runs migrate. Deps: T-001, T-003a
 - **T-003a — Dockerized local infra (`docker-compose`)** · `chore/infra`
-  `docker-compose.yml` with Postgres + Redis + **anvil**; `pnpm bootstrap` runs `docker compose up -d` → migrate → seed;
+  `docker-compose.yml` with Postgres + **anvil**; `pnpm bootstrap` runs `docker compose up -d` → migrate → seed;
   master encryption key via env (`MASTER_ENCRYPTION_KEY`). Deps: T-001
 - **T-004 — CI pipeline (GitHub Actions)** · `chore/infra`
   install → lint → typecheck → test → build on every push to `main` (direct commits; no PR gate). Deps: T-001
@@ -69,14 +69,16 @@
 
 - **T-015 — Policy engine (pre-sign)** · `feat/api`
   Allowlist + per-tx/daily limits + optional approval; enforced before signing; deny paths tested. Deps: T-009
-- **T-016 — Nonce lock + idempotency** · `feat/api` `area:chain`
-  Per-wallet Redis lock (PG advisory-lock fallback documented); `Idempotency-Key` dedupe. Tests: N concurrent
-  sends → unique monotonic nonces; same key → one broadcast. Deps: T-003
+- **T-016 — Nonce lock + idempotency (Postgres)** · `feat/api` `area:chain`
+  Per-wallet **Postgres advisory lock** (`pg_advisory_xact_lock`) behind a `Lock` interface (Redis impl = documented
+  scale path); idempotency via the `transactions.idempotencyKey @unique` constraint (insert-or-conflict). Tests:
+  N concurrent sends → unique monotonic nonces; same key → one broadcast. Deps: T-003
 - **T-017 — `sendTransaction` (native + ERC-20)** · `feat/api` `area:chain`
   `POST /wallets/:id/transactions`; authoritative live nonce/balance read; build → sign → broadcast; persist
   `pending`; return hash. Deps: T-015, T-016
-- **T-018 — Confirmation watcher (BullMQ worker)** · `feat/api`
-  pending → confirmed/failed; triggers balance refresh; optimistic pending debit. Deps: T-017
+- **T-018 — Confirmation watcher (`@nestjs/schedule` poller)** · `feat/api`
+  Polls `transactions` where `status='pending'`, checks receipts, sets confirmed/failed, triggers balance refresh +
+  optimistic pending debit. Durable via Postgres rows (no queue). Deps: T-017
 - **T-019 — Global error handling + chain-error mapping** · `feat/api`
   Exception filter + consistent JSON; map insufficient-funds/nonce/RPC errors; surfaced in UI. Deps: T-017
 - **T-020 — Send + tx-status UI** · `feat/web`
@@ -108,7 +110,7 @@
 - **T-026 — Example scripts** · `docs` `feat/sdk`
   Runnable examples: create wallet, get balance, sign, send (native + token). Deps: T-025
 - **T-027 — Deploy (+ Dockerfiles)** · `chore/infra`
-  **Dockerfiles for `api` + `worker`**; Vercel (web) + Railway/Render (api + worker) + Neon (pg) + Upstash (redis);
+  **Dockerfile for `api`** (pollers run in-process, no separate worker); Vercel (web) + Railway/Render (api) + Neon (pg);
   env docs; Swagger UI public. Deps: T-004
 **Block DoD:** commit directly to `main`, CI green, **`v0.6.0`**, deployed URL in README.
 

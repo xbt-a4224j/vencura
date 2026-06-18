@@ -67,10 +67,12 @@ Checkable rules. Part of the per-ticket DoD (§14) and the block-end review (§1
     never logged, never returned by the API.
   - `ShamirSigner` (**bonus**): 2-of-2 key split, reconstructed transiently — the full key is never persisted.
   - `MpcSigner` / non-custodial: **designed in the writeup, not built.**
-- **Concurrency model** (built): per-wallet **nonce lock** (Redis; Postgres advisory lock is the no-extra-infra
-  fallback) serializes the read-nonce→sign→broadcast→persist critical section; **idempotency keys** prevent
-  double-broadcast; **BullMQ workers** (`ConfirmationWatcher`, `BalanceRefresher`) run async off the request path.
-  Sends validate against **live** chain state (nonce + balance), never the cache.
+- **Concurrency model** (built, **Postgres-only — no Redis**): per-wallet **nonce lock** via a Postgres advisory
+  lock (`pg_advisory_xact_lock`) behind a small `Lock` interface (a Redis lock is the documented multi-node scale
+  path) serializes the read-nonce→sign→broadcast→persist critical section; **idempotency** via the
+  `transactions.idempotencyKey @unique` constraint (insert-or-conflict); **`@nestjs/schedule` pollers**
+  (`ConfirmationWatcher` over `status='pending'` rows, `BalanceRefresher`) run async off the request path — durable
+  because the work lives in Postgres. Sends validate against **live** chain state (nonce + balance), never the cache.
 - **Balance model:** confirmed (cached, `as_of_block`) + pending (from txs) → **available** = confirmed −
   pending − gas reserve. Stale-while-revalidate reads; optimistic pending debit on send; reorg-aware (N confs).
 - **Policy engine:** allowlist + amount/daily limits + optional approval, enforced **before** signing.
@@ -80,15 +82,14 @@ Checkable rules. Part of the per-ticket DoD (§14) and the block-end review (§1
 ## 5. Tech stack
 - **Language:** TypeScript end-to-end.
 - **API:** **NestJS**, **REST + OpenAPI/Swagger** (auto Swagger UI for demoability + a generated SDK). *Not GraphQL* — overkill for command-shaped ops, cuts against simplicity.
-- **DB:** Postgres + **Prisma**. **Redis** + **BullMQ** (locks, idempotency, async workers).
+- **DB:** Postgres + **Prisma** — also the concurrency substrate: advisory locks, a unique constraint for idempotency, and `@nestjs/schedule` pollers over pending rows. **No Redis/BullMQ** (see §4).
 - **Chain:** **Viem** (Ethers is the conservative fallback), Ethereum **Sepolia** via Infura.
 - **Key encryption:** AES-256-GCM with a master key from env/secret (`MASTER_ENCRYPTION_KEY`) — no external KMS, kept simple.
 - **Client:** **React/TS admin** + a typed **TS SDK** package + example scripts.
 - **Monorepo:** pnpm + Turbo → `packages/api`, `packages/sdk`, `packages/web`, `packages/shared`.
 - **Tests:** Vitest/Jest + supertest; a local node (anvil) or Sepolia for integration.
-- **Local infra: Dockerized via `docker-compose`** — Postgres + Redis + **anvil** (local Foundry node). The master encryption key comes from env (no KMS). App (`api`/`worker`/`web`) runs via `pnpm dev` against the containers. `api`/`worker`
-  get Dockerfiles for deploy.
-- **Deploy:** Vercel (web) · Railway/Render (api + worker) · Neon (Postgres) · Upstash (Redis) · Infura (RPC).
+- **Local infra: Dockerized via `docker-compose`** — Postgres + **anvil** (local Foundry node). The master encryption key comes from env (no KMS). App (`api`/`web`) runs via `pnpm dev` against the containers; `api` gets a Dockerfile for deploy. The scheduled pollers run in-process in `api` (no separate worker).
+- **Deploy:** Vercel (web) · Railway/Render (api) · Neon (Postgres) · Infura (RPC).
 
 ## 6. Repo layout
 ```
@@ -104,7 +105,7 @@ tickets.md  the plan → GitHub issues
 
 ## 6.1 Module map (`packages/api/src`)
 One **feature module per box** in the architecture diagram; the four required operations live in obvious places.
-The diagram's outer edges (Postgres/Redis/Ethereum) are **infra modules** injected where needed, not features.
+The diagram's outer edges (Postgres/Ethereum) are **infra modules** injected where needed, not features.
 ```
 auth/          AuthModule          JWT guard, register/login
 wallets/       WalletsModule       POST /wallets, GET /wallets            ← createWallet
@@ -118,13 +119,13 @@ policy/        PolicyModule        exports PolicyEngine (consumed by transaction
 signer/        SignerModule        exports Signer (EncryptedKeySigner / ShamirSigner)
 admin/         AdminModule         reset/seed, chain inspector, concurrency-demo
 infra/prisma/  PrismaModule        Postgres            infra/chain/  ChainModule  Viem client / RPC
-infra/redis/   RedisModule         locks · idempotency · BullMQ
+infra/lock/    LockModule          Postgres advisory lock (Lock interface; Redis = documented scale path)
 (key encryption is a small AES-256-GCM helper in signer/, using MASTER_ENCRYPTION_KEY from env — no separate KMS module)
 ```
 **Coupling is intentional and minimal:** `SignerModule` is consumed by Wallets (generate+store key) and Transactions
-(sign); `PolicyModule` by Transactions (pre-sign check). BullMQ processors are **co-located with the domain they serve**
-(confirmation-watcher → transactions, balance-refresher → balances), sharing queue wiring from `RedisModule` — not a
-separate "workers" feature. Keep modules small and domain-named; a reader should infer a module's job from its name.
+(sign); `PolicyModule` by Transactions (pre-sign check). Scheduled pollers (`@nestjs/schedule`) are **co-located with
+the domain they serve** (confirmation-watcher → transactions, balance-refresher → balances) — not a separate "workers"
+feature. Keep modules small and domain-named; a reader should infer a module's job from its name.
 
 ## 7. Conventions
 - **REST, resource-oriented:** `POST /wallets`, `GET /wallets/:id/balance`, `POST /wallets/:id/messages`
@@ -132,7 +133,7 @@ separate "workers" feature. Keep modules small and domain-named; a reader should
 - **Money is never a float.** Amounts are **bigint strings** (wei / token base units) end-to-end.
 - **Validation: Zod is the single source of truth.** Schemas live in `packages/shared`; they validate API input via `nestjs-zod` (which also feeds the `ValidationPipe` + Swagger) **and** type the SDK and the web forms — one schema, no drift. Do **not** also use class-validator; one validation system, not two (§3.1).
 - **Errors:** one consistent JSON error shape (RFC-7807-ish), thrown via typed exceptions, mapped by a global filter.
-- **Secrets** (`MASTER_ENCRYPTION_KEY`, DB/Redis creds) come from env / secrets manager — never committed.
+- **Secrets** (`MASTER_ENCRYPTION_KEY`, DB creds) come from env / secrets manager — never committed.
 - **Commits:** **Conventional Commits** (`feat:`, `fix:`, `chore:`, `test:`, …) — they drive semver.
   **Reference the GitHub issue number so it auto-closes** — e.g. `feat(api): create-wallet endpoint (#10)` or a `Closes #10` footer (use the `#N`, not the `T-###` id).
   **Do NOT add `Co-Authored-By` lines** (per user's global rule; git config handles authorship).
@@ -216,16 +217,16 @@ a red `main` blocks the next ticket. semantic-release runs on `main` to tag vers
 with **Mermaid system diagrams**.
 
 ## 16. Run / demo
-`pnpm i && pnpm bootstrap` (one command: `docker compose up -d` for Postgres/Redis/anvil → env → migrate → seed) →
-`pnpm dev` (api + worker + web). Reset via the
+`pnpm i && pnpm bootstrap` (one command: `docker compose up -d` for Postgres/anvil → env → migrate → seed) →
+`pnpm dev` (api + web). Reset via the
 admin "Start over" button or `POST /admin/reset` (dev-gated). Fund wallets via the faucet link in the admin.
 
 ## 17. Human-in-the-loop (external accounts & secrets)
 Some steps need *you* (the agent can't create accounts or fund wallets). Flag these in the relevant tickets:
 - **RPC endpoint** — an Ethereum Sepolia RPC URL (Infura/Alchemy). A throwaway one may be provided; get your own key for the deployed env. → set `RPC_URL`. (T-003a / T-017)
 - **Sepolia test ETH** — fund a demo wallet from a faucet so `sendTransaction` works in the demo (human action). (T-022 surfaces the faucet link.)
-- **Deploy accounts + tokens** — Vercel (web), Railway/Render (api+worker), Neon (Postgres), Upstash (Redis): create accounts, add the projects, set deploy secrets. (T-027)
-- **Generated secrets** — `MASTER_ENCRYPTION_KEY` (32-byte random), `JWT_SECRET`, DB/Redis URLs. `.env.example` lists them all; never commit real values.
+- **Deploy accounts + tokens** — Vercel (web), Railway/Render (api), Neon (Postgres): create accounts, add the projects, set deploy secrets. (T-027)
+- **Generated secrets** — `MASTER_ENCRYPTION_KEY` (32-byte random), `JWT_SECRET`, DB URL. `.env.example` lists them all; never commit real values.
 
 ## 18. Repository & privacy (opsec)
 - **This repo is PRIVATE.** Create it with `gh repo create vencura --private` (never public). To submit, **invite the reviewer as a collaborator** on the private repo — do not flip it public.

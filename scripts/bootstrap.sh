@@ -8,7 +8,7 @@ if [ ! -f .env ]; then
   echo "→ Created .env from .env.example. Fill in RPC_URL and rotate secrets before non-local use."
 fi
 
-echo "→ Starting local infra (Postgres + Redis + anvil)…"
+echo "→ Starting local infra (Postgres + anvil)…"
 docker compose up -d --wait
 
 echo "→ Applying database migrations…"

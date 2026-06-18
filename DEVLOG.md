@@ -140,11 +140,11 @@ then passed once the module existed. No mocks — it exercises the actual HTTP s
 ## v0.1.0 · Block 1 · T-003a Dockerized local infra &nbsp;([#4](https://github.com/xbt-a4224j/vencura/issues/4) · [commit](https://github.com/xbt-a4224j/vencura/commit/7b1529b2ea819b0b277e3ae5e7decf96b29bb494))
 
 **What & why** — Give the project a one-command local backend: Postgres (the derived projection store),
-Redis (locks/idempotency/BullMQ), and **anvil** (a local Foundry chain so the wallet flow works offline,
+and **anvil** (a local Foundry chain so the wallet flow works offline,
 no Sepolia key required). `pnpm bootstrap` brings it all up and blocks until healthy.
 
 **How it works** — [docker-compose.yml](docker-compose.yml) defines the three services, each with a
-**healthcheck** (`pg_isready`, `redis-cli ping`, `cast block-number`). [scripts/bootstrap.sh](scripts/bootstrap.sh)
+**healthcheck** (`pg_isready`, `cast block-number`). [scripts/bootstrap.sh](scripts/bootstrap.sh)
 seeds `.env` from `.env.example` on first run, then `docker compose up -d --wait` — the `--wait` flag is what
 makes "bootstrap" mean *"ready to use,"* not just *"containers created."* The DB migrate + seed steps get
 appended to this script in T-003.
@@ -169,9 +169,9 @@ docker compose up -d --wait   # blocks until every healthcheck passes
 
 **Tests** — Infra tickets have no unit test; the verification *is* the stack reaching healthy. Real output:
 all three containers `(healthy)`; host probes returned anvil `eth_blockNumber → 0x0`, Postgres
-`accepting connections`, Redis `PONG`.
+`accepting connections`.
 
-**Demo / verify** — `pnpm bootstrap` → `docker compose ps` shows `vencura-postgres-1/redis-1/anvil-1` all
+**Demo / verify** — `pnpm bootstrap` → `docker compose ps` shows `vencura-postgres-1/anvil-1` all
 `Up (healthy)`. Tear down with `docker compose down` (add `-v` to wipe the Postgres volume).
 
 **Gotchas**
@@ -190,8 +190,8 @@ all three containers `(healthy)`; host probes returned anvil `eth_blockNumber �
 - **Why parametrize the port at all (vs. hardcode 5432):** demoability is a design driver (§3). A hardcoded port
   that clashes with the most common default is a live demo footgun — and I literally just hit it. The
   `${VAR:-default}` idiom is near-free and evidence-driven, so it's justified.
-- **Why Postgres only, not redis/anvil too:** YAGNI. Only Postgres actually clashed; 6379/8545 were free. I
-  parametrize on observed need, not speculation — if redis clashes later, we parametrize then.
+- **Why parametrize only Postgres' port:** YAGNI. Only Postgres actually clashed; 8545 was free. I
+  parametrize on observed need, not speculation — if anvil clashes later, we parametrize then.
 - **The local 5433 value lives only in the gitignored `.env`;** the committed `.env.example` stays canonical at
   5432, so the repo's default is the conventional one and this machine's quirk doesn't leak into source.
 
@@ -394,7 +394,7 @@ diagrams and the full security writeup are explicitly deferred to the final bloc
 
 **Shipped:** a real monorepo (pnpm + Turbo: `api`/`sdk`/`web`/`shared`) that lints, type-checks, tests, and
 builds green; a NestJS API with `GET /health` and Swagger at `/docs`; dockerized local infra
-(Postgres + Redis + anvil) behind `pnpm bootstrap`; the base Prisma schema + migration with the app booting
+(Postgres + anvil) behind `pnpm bootstrap`; the base Prisma schema + migration with the app booting
 DB-connected; GitHub Actions CI (commitlint → lint → typecheck → test → build) plus semantic-release, which cut
 **v0.1.0**. Seven issues (#1–#7) closed; `main` green.
 
@@ -484,7 +484,7 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 ---
 
 ## v0.3.0 · Block 3 · T-013 Balance-refresh poller    ([#14](https://github.com/xbt-a4224j/vencura/issues/14) · [commit](https://github.com/xbt-a4224j/vencura/commit/aa056e3))
-**What & why** — Keep the balance cache warm proactively, not just on read. A light `@nestjs/schedule` interval — no Redis/BullMQ yet (deferred to Block 4's ConfirmationWatcher where a durable queue is warranted).
+**What & why** — Keep the balance cache warm proactively, not just on read. A light `@nestjs/schedule` interval — no queue infra (Block 4's ConfirmationWatcher is also a Postgres poller; Redis dropped).
 **How it works** — `BalanceRefresher.refreshAll()` (`@Interval(30s)`) lists all wallets and calls `BalancesService.refresh(id, address)` for each, swallowing per-wallet failures so one bad RPC read doesn't stop the sweep. `ScheduleModule.forRoot()` registers it.
 **Files touched** — [balance-refresher.service.ts](packages/api/src/balances/balance-refresher.service.ts) · [balances.module.ts](packages/api/src/balances/balances.module.ts) · [app.module.ts](packages/api/src/app.module.ts).
 **Tests** — [balance-refresher.service.spec.ts](packages/api/src/balances/balance-refresher.service.spec.ts): refreshes each wallet; keeps going when one fails. 34 green.
@@ -509,4 +509,4 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 
 **How to demo:** `pnpm --filter @vencura/api dev` + `pnpm --filter @vencura/web dev` → register → create wallet → **View balances** (reads anvil) → **Sign** a message → signature recovers to the wallet address.
 
-**Notable calls:** single `RPC_URL` (no fallback branch); `available == confirmed` until sends (Block 4); SWR keeps the request path off the RPC; no BullMQ yet (poller is enough). Recurring e2e env-var setup (`JWT_SECRET`/`RPC_URL`/`MASTER_ENCRYPTION_KEY`) is a candidate for a Vitest setup file.
+**Notable calls:** single `RPC_URL` (no fallback branch); `available == confirmed` until sends (Block 4); SWR keeps the request path off the RPC; no queue (poller is enough; Block 4 stays Postgres-only). Recurring e2e env-var setup (`JWT_SECRET`/`RPC_URL`/`MASTER_ENCRYPTION_KEY`) is a candidate for a Vitest setup file.
