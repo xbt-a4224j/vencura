@@ -92,6 +92,9 @@ importers:
       rxjs:
         specifier: ^7.8.1
         version: 7.8.2
+      shamirs-secret-sharing:
+        specifier: ^2.0.1
+        version: 2.0.1
       viem:
         specifier: ^2.52.2
         version: 2.52.2(typescript@5.9.3)(zod@3.25.76)
@@ -3798,6 +3801,9 @@ packages:
 
   setprototypeof@1.2.0:
     resolution: {integrity: sha512-E5LDX7Wrp85Kil5bhZv46j8jOeboKq5JMmYM3gVGdGH8xFpPWXUMsNrlODCrkoxMEeNi/XZIwuRvY4XNwYMJpw==}
+
+  shamirs-secret-sharing@2.0.1:
+    resolution: {integrity: sha512-gB2iE9Wb7BXfO+ExUU+i7/fdjOK7h4+Mtp9ZGRjmdGSeUq3czN+f/gX2KsKJdebXwG09D3SCRH0aqHmEuR2P6A==}
 
   shebang-command@2.0.0:
     resolution: {integrity: sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA==}
@@ -7993,6 +7999,8 @@ snapshots:
       - supports-color
 
   setprototypeof@1.2.0: {}
+
+  shamirs-secret-sharing@2.0.1: {}
 
   shebang-command@2.0.0:
     dependencies:
