@@ -134,6 +134,7 @@ separate "workers" feature. Keep modules small and domain-named; a reader should
 - **Errors:** one consistent JSON error shape (RFC-7807-ish), thrown via typed exceptions, mapped by a global filter.
 - **Secrets** (`MASTER_ENCRYPTION_KEY`, DB/Redis creds) come from env / secrets manager — never committed.
 - **Commits:** **Conventional Commits** (`feat:`, `fix:`, `chore:`, `test:`, …) — they drive semver.
+  **Reference the GitHub issue number so it auto-closes** — e.g. `feat(api): create-wallet endpoint (#10)` or a `Closes #10` footer (use the `#N`, not the `T-###` id).
   **Do NOT add `Co-Authored-By` lines** (per user's global rule; git config handles authorship).
 - **Versioning:** **semantic-release** from Block 1. Each block ships a minor bump (v0.1.0 → … → v1.0.0 at the end).
 
@@ -257,4 +258,4 @@ Every guide MUST include:
 - **Control/data flow** — trace one real end-to-end path through the block's code (e.g. register → hash → store → JWT).
 - **Glossary** of new terms + a **20-question self-quiz with answers**. **Answers are always visible (no click-to-reveal)** and each is a full teaching explanation — a short paragraph (≈3–5 sentences) covering the mechanism *and the why*, not one line. Questions probe the real mechanisms the block introduced, not trivia.
 
-Grounded in shipped code only — real identifiers, real filepaths, real types. `docs/study/` is gitignored (local), so it never bloats the submission.
+**Sources (weave them seamlessly):** start from the block's **tickets** (what was planned) and its **`DEVLOG.md` entries** (what was built + the per-ticket *why*) as the outline and narrative, then **ground every detail in the actual shipped code** — annotated snippets with real filepaths/identifiers/types. Where the DEVLOG and the code differ, the **code is the authority**. `docs/study/` is gitignored (local), so it never bloats the submission.
