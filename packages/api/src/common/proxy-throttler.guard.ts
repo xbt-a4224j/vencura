@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { clientIp } from './client-ip';
 
@@ -9,7 +9,13 @@ import { clientIp } from './client-ip';
  */
 @Injectable()
 export class ProxyThrottlerGuard extends ThrottlerGuard {
+  private readonly debug = new Logger(ProxyThrottlerGuard.name);
   protected getTracker(req: { headers: Record<string, unknown>; ip?: string }): Promise<string> {
-    return Promise.resolve(clientIp(req));
+    const tracker = clientIp(req);
+    // TEMP diagnostic: see which header carries a stable client IP through Vercel→Railway.
+    this.debug.log(
+      `tracker=${tracker} xff=${req.headers['x-forwarded-for']} x-real-ip=${req.headers['x-real-ip']} x-vercel-fwd=${req.headers['x-vercel-forwarded-for']}`,
+    );
+    return Promise.resolve(tracker);
   }
 }
