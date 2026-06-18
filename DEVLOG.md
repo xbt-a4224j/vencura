@@ -480,3 +480,13 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Tests** — [encrypted-key.signer.spec.ts](packages/api/src/signer/encrypted-key.signer.spec.ts): signature **recovers to the wallet address** (viem `verifyMessage`, Foundry acct #0 vector) + deterministic; [messages.e2e.spec.ts](packages/api/src/transactions/messages.e2e.spec.ts): 201/404/400/401. 32 green.
 **Demo / verify** — `curl -XPOST localhost:3000/wallets/$ID/messages -H "authorization: Bearer $TOKEN" -d '{"message":"gm"}'` → `{signature:"0x…"}`.
 **Gotchas** — known-vector test proves real EIP-191 (recovery), not just byte-determinism. The string copy of the key isn't zeroizable; best-effort zeroizes the Buffer.
+
+---
+
+## v0.3.0 · Block 3 · T-013 Balance-refresh poller    ([#14](https://github.com/xbt-a4224j/vencura/issues/14) · [commit](https://github.com/xbt-a4224j/vencura/commit/aa056e3))
+**What & why** — Keep the balance cache warm proactively, not just on read. A light `@nestjs/schedule` interval — no Redis/BullMQ yet (deferred to Block 4's ConfirmationWatcher where a durable queue is warranted).
+**How it works** — `BalanceRefresher.refreshAll()` (`@Interval(30s)`) lists all wallets and calls `BalancesService.refresh(id, address)` for each, swallowing per-wallet failures so one bad RPC read doesn't stop the sweep. `ScheduleModule.forRoot()` registers it.
+**Files touched** — [balance-refresher.service.ts](packages/api/src/balances/balance-refresher.service.ts) · [balances.module.ts](packages/api/src/balances/balances.module.ts) · [app.module.ts](packages/api/src/app.module.ts).
+**Tests** — [balance-refresher.service.spec.ts](packages/api/src/balances/balance-refresher.service.spec.ts): refreshes each wallet; keeps going when one fails. 34 green.
+**Demo / verify** — boot the API; the cache rows' `asOfBlock`/`updatedAt` advance every ~30s without any request.
+**Gotchas** — poll-all-wallets is O(wallets) per tick — fine for a demo; the scale path (per-wallet queued jobs) is noted for the writeup, not built (§3.1 no over-engineering).
