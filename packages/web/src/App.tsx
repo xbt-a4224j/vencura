@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react';
-import { api, type Wallet } from './api';
+import { api, type BalanceLine, type Wallet } from './api';
 import { AuthProvider, useAuth } from './auth-context';
 
 function AuthForm() {
@@ -55,6 +55,69 @@ function AuthForm() {
   );
 }
 
+function WalletItem({ wallet }: { wallet: Wallet }) {
+  const [balances, setBalances] = useState<BalanceLine[] | null>(null);
+  const [message, setMessage] = useState('');
+  const [signature, setSignature] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const guard = async (fn: () => Promise<void>) => {
+    setError('');
+    setBusy(true);
+    try {
+      await fn();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const viewBalances = () => guard(async () => setBalances((await api.getBalance(wallet.id)).balances));
+  const sign = (e: FormEvent) => {
+    e.preventDefault();
+    return guard(async () => setSignature((await api.signMessage(wallet.id, message)).signature));
+  };
+
+  return (
+    <li>
+      <code>{wallet.address}</code>
+      <div>
+        <button onClick={viewBalances} disabled={busy}>
+          View balances
+        </button>
+        {balances && (
+          <ul>
+            {balances.map((b) => (
+              <li key={b.asset}>
+                {b.symbol}: {b.available} (confirmed {b.confirmed}, block {b.asOfBlock ?? '—'})
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <form onSubmit={sign}>
+        <label htmlFor={`msg-${wallet.id}`}>Message to sign</label>
+        <textarea
+          id={`msg-${wallet.id}`}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+        />
+        <button type="submit" disabled={busy || message.length === 0}>
+          Sign
+        </button>
+        {signature && (
+          <p>
+            signature: <code>{signature}</code>
+          </p>
+        )}
+      </form>
+      {error && <p role="alert">{error}</p>}
+    </li>
+  );
+}
+
 function Dashboard() {
   const { email, logout } = useAuth();
   const [wallets, setWallets] = useState<Wallet[]>([]);
@@ -93,9 +156,7 @@ function Dashboard() {
       ) : (
         <ul>
           {wallets.map((w) => (
-            <li key={w.id}>
-              <code>{w.address}</code>
-            </li>
+            <WalletItem key={w.id} wallet={w} />
           ))}
         </ul>
       )}

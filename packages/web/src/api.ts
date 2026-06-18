@@ -33,6 +33,17 @@ export interface Wallet {
   address: string;
   createdAt?: string;
 }
+export interface BalanceLine {
+  asset: string;
+  symbol: string;
+  confirmed: string;
+  available: string;
+  asOfBlock: number | null;
+}
+export interface BalanceView {
+  walletId: string;
+  balances: BalanceLine[];
+}
 
 export const api = {
   register: (email: string, password: string) =>
@@ -41,4 +52,11 @@ export const api = {
     call<AuthResult>('/auth/login', { method: 'POST', body: { email, password } }),
   createWallet: () => call<Wallet>('/wallets', { method: 'POST', auth: true }),
   listWallets: () => call<Wallet[]>('/wallets', { auth: true }),
+  getBalance: (walletId: string) => call<BalanceView>(`/wallets/${walletId}/balance`, { auth: true }),
+  signMessage: (walletId: string, message: string) =>
+    call<{ signature: string }>(`/wallets/${walletId}/messages`, {
+      method: 'POST',
+      body: { message },
+      auth: true,
+    }),
 };
