@@ -111,9 +111,9 @@ jobs:
       - name: DB integration + e2e tests
         run: >-
           pnpm --filter @vencura/api exec vitest run --no-file-parallelism
-          src/infra/lock/pg-advisory-lock.int.spec.ts
-          src/transactions/policy-race.int.spec.ts
-          src/transactions/happy-path.e2e.spec.ts
+          test/infra/lock/pg-advisory-lock.int.spec.ts
+          test/transactions/policy-race.int.spec.ts
+          test/transactions/happy-path.e2e.spec.ts
 
   release:
     needs: verify

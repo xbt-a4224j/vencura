@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src",
+    "lint": "eslint src test",
     "test": "vitest run",
     "dev": "nest start --watch",
     "start": "node dist/main.js",
