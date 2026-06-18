@@ -630,3 +630,13 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Tests** — n/a (config). Smoke: YAML parses (js-yaml); both gated specs pass locally with `RUN_DB_TESTS=1` against Postgres on 5433.
 **Demo / verify** — `RUN_DB_TESTS=1 DATABASE_URL=… pnpm --filter @vencura/api exec vitest run --no-file-parallelism src/infra/lock/pg-advisory-lock.int.spec.ts src/transactions/policy-race.int.spec.ts` → 2 passed.
 **Gotchas** — `--no-file-parallelism` is load-bearing: the lock's ordering assertion is timing-sensitive, so the two DB specs can't contend on the shared connection.
+
+---
+
+## Block 4 · VC4-06 Document CONFIRMATIONS (+ Sepolia RPC guidance) in .env.example    (audit fold-in)
+**What & why** — Audit (low): `CONFIRMATIONS` (read by the watcher) was absent from [.env.example](.env.example), so operators got the anvil-shaped default (1) with no reorg-safety guidance. Mode = config.
+**How it works** — Added `CONFIRMATIONS=1` (correct for anvil's on-demand mining) plus a commented Sepolia block: an example Infura URL (no key) and `CONFIRMATIONS=3` (3–12 for reorg safety), with a note to set it in the deploy env, not here.
+**Files touched** — [.env.example](.env.example) → doc only (no code change).
+**Tests** — n/a (config). Verified read-only that [chain.module.ts](packages/api/src/infra/chain/chain.module.ts#L13) reads `RPC_URL` and [confirmation-watcher.service.ts](packages/api/src/transactions/confirmation-watcher.service.ts#L10) reads `CONFIRMATIONS` — neither touched.
+**Demo / verify** — `node dist/main.js` against local anvil → "Nest application successfully started", zero Sepolia/Infura calls.
+**Gotchas** — `.env.example` is the local-anvil default, so the Sepolia values stay commented; deploy supplies its own `.env`.
