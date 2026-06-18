@@ -18,8 +18,9 @@ async function call<T>(
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
   if (!res.ok) {
-    const detail = (await res.json().catch(() => ({}))) as { message?: string };
-    throw new Error(detail.message ?? `HTTP ${res.status}`);
+    // The API's global filter emits RFC-7807 `{ detail }`; fall back to `message` / status.
+    const body = (await res.json().catch(() => ({}))) as { detail?: string; message?: string };
+    throw new Error(body.detail ?? body.message ?? `HTTP ${res.status}`);
   }
   return res.json() as Promise<T>;
 }
@@ -44,6 +45,32 @@ export interface BalanceView {
   walletId: string;
   balances: BalanceLine[];
 }
+export interface Transaction {
+  id: string;
+  asset: string;
+  amount: string;
+  toAddress: string;
+  status: 'pending' | 'confirmed' | 'failed';
+  txHash: string | null;
+  nonce: number | null;
+  createdAt: string;
+}
+export interface Policy {
+  walletId?: string;
+  allowlist: string[];
+  perTxLimit: string | null;
+  dailyLimit: string | null;
+}
+export interface SendInput {
+  to: string;
+  asset: string;
+  amount: string; // base units (wei / token units)
+}
+export interface SeedResult {
+  email: string;
+  password: string;
+  wallets: { id: string; address: string; funded: boolean }[];
+}
 
 export const api = {
   register: (email: string, password: string) =>
@@ -59,4 +86,16 @@ export const api = {
       body: { message },
       auth: true,
     }),
+  send: (walletId: string, input: SendInput) =>
+    call<Transaction>(`/wallets/${walletId}/transactions`, {
+      method: 'POST',
+      body: input,
+      auth: true,
+    }),
+  listTransactions: (walletId: string) =>
+    call<Transaction[]>(`/wallets/${walletId}/transactions`, { auth: true }),
+  getPolicy: (walletId: string) => call<Policy>(`/wallets/${walletId}/policy`, { auth: true }),
+  setPolicy: (walletId: string, policy: Policy) =>
+    call<Policy>(`/wallets/${walletId}/policy`, { method: 'PUT', body: policy, auth: true }),
+  seedDemo: () => call<SeedResult>('/admin/seed', { method: 'POST' }),
 };

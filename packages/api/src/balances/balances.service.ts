@@ -7,6 +7,10 @@ import { WalletsService } from '../wallets/wallets.service';
 
 const STALE_MS = 15_000; // serve cache; revalidate in the background if older than this
 
+/** Fixed native buffer held back from `available` so a send always leaves room for gas.
+ *  0.001 ETH — generous on Sepolia/anvil where gas is cheap; tune per network. */
+export const GAS_RESERVE_WEI = 1_000_000_000_000_000n; // 0.001 ETH
+
 export interface BalanceView {
   walletId: string;
   balances: Array<{
@@ -54,6 +58,15 @@ export class BalancesService {
     return this.toView(walletId, rows);
   }
 
+  /** Sum of outgoing amounts still pending on-chain for a wallet+asset (optimistic debit). */
+  private async pendingOutgoing(walletId: string, asset: string): Promise<bigint> {
+    const rows = await this.prisma.transaction.findMany({
+      where: { walletId, status: 'pending', asset },
+      select: { amount: true },
+    });
+    return rows.reduce((sum, r) => sum + BigInt(r.amount), 0n);
+  }
+
   /** Read live balances and upsert the cache. Idempotent. */
   async refresh(walletId: string, address: Hex): Promise<void> {
     const asOfBlock = Number(await this.chain.getBlockNumber());
@@ -73,22 +86,29 @@ export class BalancesService {
     });
   }
 
-  private toView(
+  private async toView(
     walletId: string,
     rows: Array<{ asset: string; confirmed: string; asOfBlock: number | null }>,
-  ): BalanceView {
-    return {
-      walletId,
-      balances: rows.map((r) => ({
-        asset: r.asset,
-        symbol:
-          r.asset === NATIVE_ASSET
-            ? 'ETH'
-            : (TRACKED_TOKENS.find((t) => t.address === r.asset)?.symbol ?? r.asset),
-        confirmed: r.confirmed,
-        available: r.confirmed, // available == confirmed until sends (Block 4)
-        asOfBlock: r.asOfBlock,
-      })),
-    };
+  ): Promise<BalanceView> {
+    const balances = await Promise.all(
+      rows.map(async (r) => {
+        // available = confirmed − pending(outgoing, same asset) − gas reserve (ETH only), clamped ≥ 0.
+        const pending = await this.pendingOutgoing(walletId, r.asset);
+        const reserve = r.asset === NATIVE_ASSET ? GAS_RESERVE_WEI : 0n;
+        let available = BigInt(r.confirmed) - pending - reserve;
+        if (available < 0n) available = 0n;
+        return {
+          asset: r.asset,
+          symbol:
+            r.asset === NATIVE_ASSET
+              ? 'ETH'
+              : (TRACKED_TOKENS.find((t) => t.address === r.asset)?.symbol ?? r.asset),
+          confirmed: r.confirmed,
+          available: available.toString(),
+          asOfBlock: r.asOfBlock,
+        };
+      }),
+    );
+    return { walletId, balances };
   }
 }

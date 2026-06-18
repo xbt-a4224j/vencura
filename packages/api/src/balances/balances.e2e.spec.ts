@@ -12,6 +12,7 @@ import { BalancesModule } from './balances.module';
 const prismaMock = {
   wallet: { findFirst: vi.fn() },
   walletBalance: { findMany: vi.fn(), upsert: vi.fn() },
+  transaction: { findMany: vi.fn().mockResolvedValue([]) }, // no pending outgoing sends
 };
 const chainMock = {
   getBlockNumber: vi.fn().mockResolvedValue(1n),
@@ -51,15 +52,20 @@ describe('Balances HTTP', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns balances for an owned wallet', async () => {
+  it('returns balances for an owned wallet (available = confirmed − gas reserve)', async () => {
     prismaMock.wallet.findFirst.mockResolvedValue({ id: 'w1', address: '0xabc' });
+    const confirmed = '2000000000000000'; // 0.002 ETH, comfortably above the 0.001 reserve
     prismaMock.walletBalance.findMany.mockResolvedValue([
-      { walletId: 'w1', asset: 'ETH', confirmed: '1000', asOfBlock: 5, updatedAt: new Date() },
+      { walletId: 'w1', asset: 'ETH', confirmed, asOfBlock: 5, updatedAt: new Date() },
     ]);
     const res = await request(app.getHttpServer())
       .get('/wallets/w1/balance')
       .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
-    expect(res.body.balances[0]).toMatchObject({ asset: 'ETH', confirmed: '1000', available: '1000' });
+    expect(res.body.balances[0]).toMatchObject({
+      asset: 'ETH',
+      confirmed,
+      available: '1000000000000000', // 0.002 − 0.001 reserve
+    });
   });
 });

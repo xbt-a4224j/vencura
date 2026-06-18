@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
+import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { BalancesModule } from './balances/balances.module';
 import { HealthModule } from './health/health.module';
@@ -25,6 +26,7 @@ import { WalletsModule } from './wallets/wallets.module';
     BalancesModule,
     PolicyModule,
     TransactionsModule,
+    AdminModule,
     HealthModule,
   ],
 })

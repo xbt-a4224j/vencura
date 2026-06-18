@@ -13,6 +13,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "dotenv -e ../../.env -- prisma migrate deploy",
     "db:migrate:dev": "dotenv -e ../../.env -- prisma migrate dev",
+    "db:seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -45,6 +46,7 @@
     "dotenv-cli": "^8.0.0",
     "prisma": "^6.1.0",
     "supertest": "^7.0.0",
+    "tsx": "^4.22.4",
     "unplugin-swc": "^1.5.1"
   }
 }
