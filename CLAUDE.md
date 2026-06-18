@@ -247,6 +247,7 @@ free) — target a thorough walkthrough, ~2× a normal explainer. This is the on
 stays terse (§12), the study guide goes deep.
 
 Every guide MUST include:
+- **A 3-paragraph summary** near the top (its own `Summary` section, right after the one-line lead): a narrative recap of *what* the block built, the *key design decision* and why, and *how it fits / what's deferred & next*. Prose, not bullets.
 - **Diagrams — at least 10 per guide.** Inline SVG, no external JS, light mode, **non-sticky** TOC, print-friendly. Diagram everything worth seeing: structure/module wiring, each request &amp; data flow, the data model, control flow, and every new mechanism the block introduced (AES-GCM encrypt + decrypt, JWT anatomy, the auth request path, DI token resolution, nonce locking…). Favor several focused diagrams over one busy one.
 - **Annotated code snippets from the REAL shipped files** — for each key file, paste a focused excerpt (the signature /
   core 5–20 lines, never the whole file) under **its filepath as a heading** (e.g. `packages/api/src/...`), then explain
