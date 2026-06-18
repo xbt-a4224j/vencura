@@ -469,3 +469,14 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Tests** — [balances.service.spec.ts](packages/api/src/balances/balances.service.spec.ts) (hit/miss/404/503) + [balances.e2e.spec.ts](packages/api/src/balances/balances.e2e.spec.ts) + [chain.service.spec.ts](packages/api/src/infra/chain/chain.service.spec.ts). 26 green.
 **Demo / verify** — `curl localhost:3000/wallets/$ID/balance -H "authorization: Bearer $TOKEN"` → `{balances:[{asset:"ETH",confirmed:"0",available:"0",asOfBlock:N}]}`.
 **Gotchas** — single `RPC_URL`, fail-fast (no fallback branch). e2e imports real modules → must set `JWT_SECRET`/`RPC_URL`/`MASTER_ENCRYPTION_KEY` env (candidate for a Vitest setup file). ERC-20 symbol/decimals from config so a token-less anvil degrades to native-only.
+
+---
+
+## v0.3.0 · Block 3 · T-012 signMessage (EIP-191) + POST /wallets/:id/messages    ([#13](https://github.com/xbt-a4224j/vencura/issues/13) · [commit](https://github.com/xbt-a4224j/vencura/commit/d8c254f))
+**What & why** — Sign an arbitrary message with a wallet's key (EIP-191). First code that *uses* the private key, so it exercises the full decrypt→sign→zeroize path.
+**How it works** — `EncryptedKeySigner.signMessage` loads the envelope, `decrypt()`s to a Buffer, builds a viem account, signs, and **zeroizes the buffer in `finally`** (the reason `decrypt` returns a Buffer, T-008). The endpoint lives in `transactions/` per §6.1; the controller calls `findOwnedOrThrow` (authz) *before* touching the key.
+**Files touched** — [encrypted-key.signer.ts](packages/api/src/signer/encrypted-key.signer.ts) (signMessage) · [messages.controller.ts](packages/api/src/transactions/messages.controller.ts) · [transactions.module.ts](packages/api/src/transactions/transactions.module.ts) · [message.schema.ts](packages/shared/src/message.schema.ts).
+**Key code** — `signMessage(walletId,message)`; `finally { keyBuf.fill(0) }`.
+**Tests** — [encrypted-key.signer.spec.ts](packages/api/src/signer/encrypted-key.signer.spec.ts): signature **recovers to the wallet address** (viem `verifyMessage`, Foundry acct #0 vector) + deterministic; [messages.e2e.spec.ts](packages/api/src/transactions/messages.e2e.spec.ts): 201/404/400/401. 32 green.
+**Demo / verify** — `curl -XPOST localhost:3000/wallets/$ID/messages -H "authorization: Bearer $TOKEN" -d '{"message":"gm"}'` → `{signature:"0x…"}`.
+**Gotchas** — known-vector test proves real EIP-191 (recovery), not just byte-determinism. The string copy of the key isn't zeroizable; best-effort zeroizes the Buffer.
