@@ -696,3 +696,20 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Demo / verify** — Admin tab → "Start over" → confirm → DB wiped, demo reseeded, logged out → log in as `demo@vencura.local` / `demo-password`. On the live Railway deploy (`NODE_ENV=production`) the same call returns 403 by design.
 
 **Gotchas** — (1) The `import * as seed` (vs named `import { seedDemo }`) is deliberate: it guarantees `vi.spyOn(seed, 'seedDemo')` intercepts the call regardless of transpilation. (2) The env-gate must run *before* the delete — ordering matters; a refusal that fires after `deleteMany` would be catastrophic. (3) `deleteMany({})` with an empty filter means "all rows" — intentional here, but the kind of call that should never appear outside a gated reset.
+
+---
+
+## v0.5.0 · Block 5 · T-022 Blockchain inspector    ([#23](https://github.com/xbt-a4224j/vencura/issues/23) · [commit](https://github.com/xbt-a4224j/vencura/commit/2671721))
+**What & why** — Make on-chain state reachable from the admin in one click. A custodial platform's demo is far more convincing when every address and tx hash links straight to Etherscan and you can fund a wallet from a faucet without leaving the UI. This is the surface where the Sepolia path becomes *visible* — proof the app is talking to a real chain, not a mock.
+
+**How it works (mechanism).** A tiny pure module, `explorer.ts`, owns all the deep-link knowledge: `explorerAddress(addr)` and `explorerTx(hash)` return `https://sepolia.etherscan.io/address/<addr>` and `.../tx/<hash>`, and `FAUCET_URL` points at a public Sepolia faucet. Keeping these in one helper (rather than scattering string templates through JSX) means the chain/explorer is named in exactly one place — if we ever switch networks or explorers, it's a one-line change, and the helper is trivially unit-testable. The UI then consumes it in three spots: (1) `TxList` wraps each tx's `toAddress` and `txHash` in `<a>` tags to Etherscan; (2) the admin "Wallet addresses" list links each address; (3) a new "Chain inspector" section adds a faucet link, a free-form **tx-hash lookup** (type a hash → "Open ↗" deep-links to it on Etherscan), and a **force balance refresh** button.
+
+**The force-refresh detail.** Rather than add a new endpoint, the refresh button reuses the existing `onChange` callback the admin tab already receives — the same one the app uses after any mutation. It re-fetches the wallet list, which re-mounts the `WalletItem`s, each of which re-reads its balance; because `GET /balance` is stale-while-revalidate, that read also kicks off a background chain re-read. So "force refresh" is really "re-trigger the read path," which is exactly what the user wants and required zero backend work — reuse over reinvention (§3.1).
+
+**Files touched** — [explorer.ts](packages/web/src/explorer.ts) → the URL/faucet helper · [explorer.spec.ts](packages/web/src/explorer.spec.ts) → its tests · [App.tsx](packages/web/src/App.tsx) → links in `TxList`, the inspector section, and address links in the admin tab.
+
+**Tests (red→green).** Test-first on the pure helper: two unit tests asserting `explorerAddress`/`explorerTx` produce the exact Sepolia URLs. The rest of the ticket is presentational (anchor tags, an input) and was smoke-verified via the build + manual UI; per §13 we don't build a harness to "test" that an `<a href>` renders. 4/4 web turbo tasks green.
+
+**Demo / verify** — Admin tab → click any wallet address or tx hash → opens it on sepolia.etherscan.io; paste a hash in the lookup → "Open ↗"; "Sepolia faucet ↗" opens the faucet; "Force balance refresh" re-reads balances.
+
+**Gotchas** — (1) All external links use `target="_blank" rel="noreferrer"` — `rel` matters for security (stops the opened page from reaching back via `window.opener`). (2) The lookup "Open" link sets `href={txLookup ? explorerTx(txLookup) : undefined}` + `aria-disabled` when empty, so it's inert (no `/tx/` with an empty hash) until you type something. (3) The faucet URL is a known weak spot — public faucets move/rate-limit; it's centralized in `explorer.ts` precisely so it's a one-line fix when it rots.
