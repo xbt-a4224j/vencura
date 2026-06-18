@@ -138,6 +138,16 @@ importers:
       '@vencura/shared':
         specifier: workspace:*
         version: link:../shared
+      viem:
+        specifier: ^2.52.2
+        version: 2.52.2(typescript@5.9.3)(zod@3.25.76)
+    devDependencies:
+      '@types/node':
+        specifier: ^25.9.3
+        version: 25.9.3
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
 
   packages/shared:
     dependencies:
