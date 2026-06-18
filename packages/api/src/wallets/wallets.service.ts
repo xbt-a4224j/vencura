@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../infra/prisma/prisma.service';
 import { SIGNER, type Signer } from '../signer/signer';
 
@@ -29,5 +29,16 @@ export class WalletsService {
       select: { id: true, address: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  /** Authz seam: resolve a wallet only if it belongs to the user. 404 (not 403) → no ownership
+   *  enumeration. Reused by balances + transactions so the ownership check lives in one place. */
+  async findOwnedOrThrow(walletId: string, userId: string): Promise<{ id: string; address: string }> {
+    const wallet = await this.prisma.wallet.findFirst({
+      where: { id: walletId, userId },
+      select: { id: true, address: true },
+    });
+    if (!wallet) throw new NotFoundException('wallet not found');
+    return wallet;
   }
 }
