@@ -736,3 +736,32 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Demo / verify** — sign a message and send a tx from a wallet → the Activity feed shows both, newest first, signature truncated, tx hash linking to Etherscan. `GET /wallets/:id/activity` returns the merged JSON.
 
 **Gotchas** — (1) `messages.controller` gained a `PrismaService` dep, so its e2e prisma mock needed `signedMessage.create`. (2) The signature is truncated in the UI (`slice(0,20)`) — it's not secret (it's a public signature), just long. (3) This reverts parts of two already-closed tickets (#22 reset gating) — acceptable churn; the simpler design wins.
+
+---
+
+## v0.5.0 · Block 5 · T-024 Concurrency demo button    ([#25](https://github.com/xbt-a4224j/vencura/issues/25) · [commit](https://github.com/xbt-a4224j/vencura/commit/dea1b2e))
+**What & why.** The single most convincing artifact for a custody reviewer: a button that makes the per-wallet nonce lock *visible*. The correctness was always there and unit-tested (`transactions.service.spec`: "N concurrent sends get unique, monotonic nonces"), but a reviewer shouldn't have to read a test to believe it — so we surface it live. Fire N sends at one wallet simultaneously and show that, despite racing, every send came back with a unique, consecutive nonce.
+
+**How it works (mechanism).** `ConcurrencyDemo` builds an array of `N` `api.send(...)` promises to the *same* wallet and resolves them with `Promise.all` — i.e. they hit the API concurrently, not in sequence. Each resolves to its transaction's `nonce` (or an error). The component then computes two properties over the returned nonces: **unique** (`new Set(nonces).size === nonces.length` — no two sends grabbed the same nonce) and **monotonic/consecutive** (each sorted value is exactly the previous +1 — no gaps or duplicates). It renders the sorted nonce list plus a ✓/✗ verdict. Server-side, the existing `nonce acquired`/`nonce released` log lines (emitted inside the advisory-lock critical section in `transactions.service`) narrate the serialization in real time — open the API logs during the demo and you watch the lock hand off N times. The whole thing is UI over already-correct, already-tested behavior: no new backend code, no new tests (per §13, you don't re-test the library/behavior the service spec already covers — this is a smoke-verified presentational surface).
+
+**Why it's honest now.** The issue (#25) stipulated this land *after* the policy-daily-limit TOCTOU fix, so the demo can't accidentally pass by letting two racing sends both slip the daily limit. That fix (`dd58cae`, daily-limit check moved inside the wallet lock) is already in, so a concurrent burst is genuinely serialized end-to-end — policy check, nonce read, sign, broadcast, persist — and the nonces it shows are real.
+
+**Environment caveat (called out, per §9 honesty).** The demo is loudest **locally against anvil**: wallets are pre-funded via `anvil_setBalance` and mining is instant, so N sends all succeed and return consecutive nonces immediately. On the live **Sepolia** deploy, the same button works only if the wallet is faucet-funded (else every send fails the balance check and you see N errors instead of nonces) — and even funded, the nonces come back at broadcast time (status `pending`) so the demo is still snappy, but it costs real testnet ETH. The component handles the failure path: if there's no recipient it explains why, and it surfaces the first error if sends fail.
+
+**Files touched** — [App.tsx](packages/web/src/App.tsx) → `ConcurrencyDemo` component + its placement in `WalletItem` (passed the first allowlist/other-wallet recipient).
+
+**Tests.** None added by design — the serialization invariant is owned by `transactions.service.spec`; this is a UI driver. 4/4 web turbo tasks green (typecheck/lint/test/build).
+
+**Demo / verify** — locally: `pnpm db:seed` → log in as the demo user → open the policy wallet → "Concurrency demo" → "Fire 5 concurrent sends" → see `nonces: 0, 1, 2, 3, 4 · ✓ unique + consecutive`, with five `nonce acquired/released` pairs in the API log.
+
+**Gotchas** — (1) It sends 1 wei each to keep amounts trivial and stay under any policy limit. (2) On Sepolia it needs a funded wallet; that's surfaced as errors, not a crash. (3) The recipient is the first allowlisted/other-wallet address — on a wallet with neither, the demo explains it needs one rather than firing blind.
+
+---
+
+### Block 5 recap — Admin view & demoability → **v0.5.0** ✅
+
+**Shipped (and live):** the app is now fully demoable + resettable from the browser. **T-021** `POST /admin/reset` (AdminGuard-gated, wipe-and-reseed) + a "Start over" button. **T-022** a chain inspector — Etherscan deep-links on every address/tx-hash, a tx-hash lookup, a faucet link, force-refresh. **T-023, reframed** — instead of a bespoke audit ledger, the requirement-true **on/off-chain activity history**: `signMessage` now persists to `signed_messages`, an `ActivityService` merges it with `transactions`, and the web shows one unified feed. **T-024** a concurrency-demo button that makes the nonce lock visible (unique + consecutive nonces under a live race).
+
+**The Block-5 story is a simplification story.** Mid-block, three features that had drifted beyond `REQUIREMENTS.md` were deliberately cut or rebuilt: rate limiting (removed — documented as a scale-path), the tamper-evident hash-chained audit log (replaced by the activity reader — *the history is the audit*), and the dual-gated reset (collapsed to a single key gate). Net code change for the block was **subtractive** while *better* matching the brief. Everything auto-deployed to Railway/Vercel on push; the first post-deploy migration (`signed_messages`) applied cleanly to Neon, verified live. Issues #22–#25 closed.
+
+**How to demo:** `pnpm db:seed` → `pnpm dev` → log in `demo@vencura.local`/`demo-password` → Admin tab (seed/reset/inspector/admin-key) and any wallet (send, sign, concurrency demo, unified activity feed with Etherscan links). Or hit the live app at **vencura-alpha.vercel.app**.
