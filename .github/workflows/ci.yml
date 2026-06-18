@@ -89,6 +89,12 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # The int specs import @vencura/shared (resolved from its dist). The verify job
+      # builds it transitively via turbo (^build), but this job runs vitest directly,
+      # so build the workspace dep explicitly first.
+      - name: Build shared
+        run: pnpm --filter @vencura/shared build
+
       - name: Migrate
         run: pnpm --filter @vencura/api exec prisma migrate deploy
 
