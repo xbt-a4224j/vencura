@@ -190,6 +190,4 @@ export const api = {
     call<Account>('/admin/accounts', { method: 'POST', body: { email }, admin: true }),
   seedDemo: () => call<SeedResult>('/admin/seed', { method: 'POST', admin: true }),
   resetDemo: () => call<SeedResult>('/admin/reset', { method: 'POST', admin: true }),
-  getPolling: () => call<{ live: boolean }>('/chain/polling'),
-  setPolling: (live: boolean) => call<{ live: boolean }>('/admin/polling', { method: 'POST', body: { live }, admin: true }),
 };

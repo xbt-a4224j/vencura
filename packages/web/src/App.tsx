@@ -11,7 +11,6 @@ import {
   type Wallet,
 } from './api';
 import { AuthProvider, useAuth } from './auth-context';
-import { PollingProvider, usePolling } from './polling-context';
 import { explorerAddress, explorerTx, FAUCET_URL } from './explorer';
 import { shortHex, toEth } from './format';
 
@@ -46,46 +45,33 @@ function HashLink({ value, href }: { value: string; href: string }) {
   );
 }
 
-// Polls the chain head for the status-bar heartbeat (block height + gas), no auth.
-// One initial fetch always runs; recurring interval only when live polling is ON.
+// Fetches the chain head (block height + gas) once on mount + on demand. No auto-poll — the user
+// refreshes via the status-bar Refresh button (manual-refresh model).
 function useChainHead() {
-  const { live } = usePolling();
   const [head, setHead] = useState<{ blockNumber: number; gasGwei: number } | null>(null);
-  useEffect(() => {
-    let active = true;
-    const tick = () =>
+  const refresh = useCallback(
+    () =>
       api
         .chainHead()
-        .then((h) => active && setHead(h))
-        .catch(() => undefined);
-    void tick();
-    if (!live) return () => { active = false; };
-    const t = setInterval(tick, 6000);
-    return () => {
-      active = false;
-      clearInterval(t);
-    };
-  }, [live]);
-  return head;
+        .then(setHead)
+        .catch(() => undefined),
+    [],
+  );
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+  return { head, refresh };
 }
 
-// Shared status bar: network + live block/gas heartbeat, the time that block reading was
-// fetched ("updated"), and a right-aligned wall clock — together they assure the user the
-// block number is current (it updates, and "now" keeps ticking past it). lastUpdated/onRefresh
-// stay optional for callers that still want a manual refresh control.
+// Shared status bar: network + block/gas (as of last fetch) + an "updated" stamp. Updates aren't
+// live — the Refresh button re-fetches the chain head and (if provided) the caller's data.
 function StatusBar({ onRefresh }: { lastUpdated?: string; onRefresh?: () => void }) {
-  const head = useChainHead();
+  const { head, refresh } = useChainHead();
   const [headAt, setHeadAt] = useState('');
-  const [now, setNow] = useState(() => new Date().toLocaleTimeString());
   // Stamp the fetch time whenever a fresh head arrives.
   useEffect(() => {
     if (head) setHeadAt(new Date().toLocaleTimeString());
   }, [head]);
-  // Tick the wall clock every second so "now" visibly advances.
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date().toLocaleTimeString()), 1000);
-    return () => clearInterval(t);
-  }, []);
   return (
     <div className="statusbar">
       <span className="net">
@@ -100,14 +86,17 @@ function StatusBar({ onRefresh }: { lastUpdated?: string; onRefresh?: () => void
         </>
       )}
       {headAt && <span>updated {headAt}</span>}
-      {onRefresh && (
-        <button type="button" className="copybtn" onClick={onRefresh}>
-          Refresh
-        </button>
-      )}
-      <span className="clock" style={{ marginLeft: 'auto' }} title="current time">
-        {now}
-      </span>
+      <button
+        type="button"
+        className="copybtn"
+        style={{ marginLeft: 'auto' }}
+        onClick={() => {
+          void refresh();
+          onRefresh?.();
+        }}
+      >
+        Refresh
+      </button>
     </div>
   );
 }
@@ -457,28 +446,22 @@ function SendForm({
   );
 }
 
-/** Polls the wallet's recent transactions and shows status + hash. */
-// Unified on/off-chain history: on-chain sends + off-chain signatures, newest-first.
-// One initial fetch always runs; recurring interval only when live polling is ON.
+// Unified on/off-chain history: on-chain sends + off-chain signatures, newest-first. Fetches on
+// mount + whenever `refreshKey` changes (a send/sign or the wallet's Refresh) — no auto-poll, so
+// PENDING→CONFIRMED appears when the user refreshes (the confirmation watcher runs server-side).
 function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: number }) {
-  const { live } = usePolling();
   const [items, setItems] = useState<ActivityItem[]>([]);
 
   useEffect(() => {
     let active = true;
-    const load = () =>
-      api
-        .listActivity(wallet.id)
-        .then((rows) => active && setItems(rows))
-        .catch(() => undefined);
-    void load();
-    if (!live) return () => { active = false; };
-    const timer = setInterval(load, 4000); // poll pending → confirmed/failed
+    api
+      .listActivity(wallet.id)
+      .then((rows) => active && setItems(rows))
+      .catch(() => undefined);
     return () => {
       active = false;
-      clearInterval(timer);
     };
-  }, [wallet.id, refreshKey, live]);
+  }, [wallet.id, refreshKey]);
 
   if (items.length === 0)
     return (
@@ -715,9 +698,18 @@ function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
         </div>
       )}
       <div>
-        <button onClick={() => load()} disabled={busy}>
-          Refresh balances
+        <button
+          onClick={() => {
+            void load();
+            setRefreshKey((k) => k + 1);
+          }}
+          disabled={busy}
+        >
+          Refresh
         </button>
+        <span className="bal-sub" style={{ marginLeft: 8 }}>
+          updates aren't live — click Refresh to update balance &amp; activity (e.g. after a send confirms)
+        </span>
         {balances && (
           <div className="bal-grid">
             {balances.map((b) => (
@@ -1139,39 +1131,6 @@ function ActivityTab({ wallets }: { wallets: Wallet[] }) {
   );
 }
 
-function PollingToggle() {
-  const { live, setLive, ready } = usePolling();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  const toggle = async () => {
-    setError('');
-    setBusy(true);
-    try {
-      await setLive(!live);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={toggle}
-        disabled={busy || !ready}
-        aria-pressed={live}
-      >
-        {busy ? 'Updating…' : `Live blockchain polling: ${live ? 'ON' : 'OFF'}`}
-      </button>
-      <p className="bal-sub">OFF by default to conserve RPC quota. Turn ON to enable auto-refresh of balances, confirmations, and activity.</p>
-      {error && <p role="alert">{error}</p>}
-    </div>
-  );
-}
-
 // Admin Token tab: deploy a demo ERC-20 (admin owns the supply), distribute it to the user, then —
 // once the user approves the admin as spender — pull their tokens via transferFrom. The on-chain
 // allowance is the gate (replacing the old off-chain allowlist).
@@ -1533,9 +1492,6 @@ function SettingsTab({ onChange }: { onChange: () => void }) {
       {seedMsg && <p>{seedMsg}</p>}
       {error && <p role="alert">{error}</p>}
 
-      <h3>Live blockchain polling</h3>
-      <PollingToggle />
-
       <h3>Chain inspector</h3>
       <p>
         <a href={FAUCET_URL} target="_blank" rel="noreferrer">
@@ -1625,9 +1581,7 @@ function Root() {
 export function App() {
   return (
     <AuthProvider>
-      <PollingProvider>
-        <Root />
-      </PollingProvider>
+      <Root />
     </AuthProvider>
   );
 }
