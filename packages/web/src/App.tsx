@@ -1,4 +1,4 @@
-import { type FormEvent, useCallback, useEffect, useState } from 'react';
+import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { erc20Abi, isAddress, parseEther, recoverMessageAddress } from 'viem';
 import {
   type ActivityItem,
@@ -6,6 +6,7 @@ import {
   api,
   type BalanceLine,
   DEMO_PASSWORD,
+  type LogLine,
   type Person,
   type Policy,
   type Wallet,
@@ -133,6 +134,75 @@ function useWallets(enabled: boolean) {
   return { wallets, refresh, lastUpdated, error };
 }
 
+// Accessible tablist: role=tab + aria-selected, ←/→/Home/End keyboard nav. The active tab is the
+// caller's state (synced to the URL hash via useHashTab) so it's deep-linkable + survives refresh.
+function Tabs({
+  tabs,
+  active,
+  onChange,
+}: {
+  tabs: { id: string; label: string }[];
+  active: string;
+  onChange: (id: string) => void;
+}) {
+  return (
+    <div className="tablist" role="tablist" aria-label="Admin sections">
+      {tabs.map((t, i) => (
+        <button
+          key={t.id}
+          role="tab"
+          type="button"
+          id={`tab-${t.id}`}
+          aria-selected={active === t.id}
+          tabIndex={active === t.id ? 0 : -1}
+          onClick={() => onChange(t.id)}
+          onKeyDown={(e) => {
+            const last = tabs.length - 1;
+            let next = -1;
+            if (e.key === 'ArrowRight') next = i === last ? 0 : i + 1;
+            else if (e.key === 'ArrowLeft') next = i === 0 ? last : i - 1;
+            else if (e.key === 'Home') next = 0;
+            else if (e.key === 'End') next = last;
+            if (next >= 0) {
+              e.preventDefault();
+              onChange(tabs[next].id);
+            }
+          }}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Keep the active Admin tab in the URL hash (#admin/wallets) so it's deep-linkable + refresh-safe.
+function useHashTab(fallback: string): [string, (id: string) => void] {
+  const read = () => window.location.hash.match(/^#admin\/(\w+)/)?.[1] ?? fallback;
+  const [tab, setTab] = useState(read);
+  useEffect(() => {
+    const onHash = () => setTab(read());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+  const set = (id: string) => {
+    window.location.hash = `admin/${id}`;
+    setTab(id);
+  };
+  return [tab, set];
+}
+
+// Demo-mode banner: auth is deliberately bypassed for the demo — say so, and point at the prod design.
+function DemoBanner() {
+  return (
+    <p className="demobanner">
+      <strong>Demo mode</strong> — auth is bypassed (one shared password) so you can click straight
+      in. In production each account has its own credentials behind a per-user JWT; the admin key is
+      a server secret, never shown.
+    </p>
+  );
+}
+
 // Root landing page: two tiles — User (use wallets) and Admin (manage accounts / demo data).
 function Landing({ onPick }: { onPick: (view: 'user' | 'admin') => void }) {
   return (
@@ -191,6 +261,7 @@ function UserView({ onExit }: { onExit: () => void }) {
             ← Home
           </button>
         </header>
+        <DemoBanner />
         <section className="picker">
           <h3>Choose an account</h3>
           {accounts.length === 0 ? (
@@ -346,6 +417,10 @@ function VenmoSend({ wallet, onSent }: { wallet: Wallet; onSent: () => void }) {
   const [amount, setAmount] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  // Two-step send: validate → review panel → confirm. `alsoAllow` makes allowlisting a deliberate,
+  // separate choice instead of a side effect of Pay (audit #7).
+  const [confirm, setConfirm] = useState<{ to: string; wei: bigint } | null>(null);
+  const [alsoAllow, setAlsoAllow] = useState(false);
 
   const loadPolicy = useCallback(
     () => api.getPolicy(wallet.id).then(setPolicy).catch(() => undefined),
@@ -376,10 +451,10 @@ function VenmoSend({ wallet, onSent }: { wallet: Wallet; onSent: () => void }) {
     }
   };
 
-  const submit = async (e: FormEvent) => {
+  // Step 1: validate and open the review panel (no funds move yet).
+  const review = (e: FormEvent) => {
     e.preventDefault();
     setError('');
-    setBusy(true);
     try {
       if (!to) throw new Error('Pick a recipient.');
       if (!isAddress(to)) throw new Error('Enter a valid 0x address.');
@@ -390,9 +465,23 @@ function VenmoSend({ wallet, onSent }: { wallet: Wallet; onSent: () => void }) {
         throw new Error('Enter a valid amount.');
       }
       if (wei <= 0n) throw new Error('Amount must be greater than 0.');
-      if (!isAllowed(to)) await allowAddress(to); // auto-allow custom address before sending
-      await api.send(wallet.id, { to, asset: 'ETH', amount: wei.toString() });
+      setAlsoAllow(false);
+      setConfirm({ to, wei });
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  // Step 2: confirm. Allowlisting only happens if the user explicitly opted in (alsoAllow).
+  const confirmPay = async () => {
+    if (!confirm) return;
+    setError('');
+    setBusy(true);
+    try {
+      if (!isAllowed(confirm.to) && alsoAllow) await allowAddress(confirm.to);
+      await api.send(wallet.id, { to: confirm.to, asset: 'ETH', amount: confirm.wei.toString() });
       setAmount('');
+      setConfirm(null);
       onSent();
     } catch (err) {
       setError((err as Error).message);
@@ -402,7 +491,7 @@ function VenmoSend({ wallet, onSent }: { wallet: Wallet; onSent: () => void }) {
   };
 
   return (
-    <form onSubmit={submit}>
+    <form onSubmit={review}>
       <div className="form-grid">
         <label className="field" htmlFor={`pay-${wallet.id}`}>
           <span>To</span>
@@ -445,18 +534,45 @@ function VenmoSend({ wallet, onSent }: { wallet: Wallet; onSent: () => void }) {
           />
         </label>
 
-        <button type="submit" disabled={busy || amount.length === 0}>
-          {busy ? 'Sending…' : 'Pay'}
+        <button type="submit" disabled={amount.length === 0 || !!confirm}>
+          Review payment
         </button>
       </div>
-      {to && isAddress(to) && !isAllowed(to) && (
+      {to && isAddress(to) && !isAllowed(to) && !confirm && (
         <p className="hint">
           🔒 {shortHex(to)} isn't on your allowlist yet —{' '}
           <button type="button" className="copybtn" onClick={() => void allowAddress(to)}>
             Allow
           </button>{' '}
-          to enable paying them (Pay will also auto-allow).
+          to enable paying them.
         </p>
+      )}
+      {confirm && (
+        <div className="hint" role="group" aria-label="Confirm payment">
+          <div>
+            Send <strong>{toEth(confirm.wei.toString())} ETH</strong> to{' '}
+            <code>{shortHex(confirm.to)}</code>?
+          </div>
+          {!isAllowed(confirm.to) && (
+            <label style={{ display: 'flex', flexDirection: 'row', gap: 6, textTransform: 'none' }}>
+              <input type="checkbox" checked={alsoAllow} onChange={(e) => setAlsoAllow(e.target.checked)} />
+              Also add this recipient to the allowlist
+            </label>
+          )}
+          {!isAllowed(confirm.to) && !alsoAllow && (
+            <p className="preflight bad" style={{ margin: '4px 0 0' }}>
+              ✗ not on the allowlist — the send will be blocked by policy unless you allow them
+            </p>
+          )}
+          <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+            <button type="button" onClick={confirmPay} disabled={busy}>
+              {busy ? 'Sending…' : 'Confirm & pay'}
+            </button>
+            <button type="button" className="copybtn" onClick={() => setConfirm(null)} disabled={busy}>
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
       {error && <p role="alert">{error}</p>}
     </form>
@@ -711,14 +827,19 @@ function TransferForm({
           <select value={toWalletId} onChange={(e) => setToWalletId(e.target.value)}>
             {otherWallets.map((w) => (
               <option key={w.id} value={w.id}>
-                {w.address.slice(0, 12)}…
+                {walletLabel(w.id, w.address)}
               </option>
             ))}
           </select>
         </label>{' '}
         <label>
           Amount (ETH)
-          <input value={amount} placeholder="0.01" onChange={(e) => setAmount(e.target.value)} />
+          <input
+            aria-label="internal transfer amount in ETH"
+            value={amount}
+            placeholder="0.01"
+            onChange={(e) => setAmount(e.target.value)}
+          />
         </label>{' '}
         <button disabled={busy}>{busy ? 'Sending…' : 'Transfer'}</button>
         {msg && <p>{msg}</p>}
@@ -787,7 +908,12 @@ function ContractPanel({ wallet }: { wallet: Wallet }) {
       <summary>Contracts (ERC-20)</summary>
       <label>
         Token address
-        <input value={token} placeholder="0x… ERC-20 contract" onChange={(e) => setToken(e.target.value)} />
+        <input
+          aria-label="ERC-20 token contract address"
+          value={token}
+          placeholder="0x… ERC-20 contract"
+          onChange={(e) => setToken(e.target.value)}
+        />
       </label>{' '}
       <button onClick={inspect} disabled={busy || !token}>
         {busy ? 'Reading…' : 'Inspect token'}
@@ -795,8 +921,18 @@ function ContractPanel({ wallet }: { wallet: Wallet }) {
       {info && <p>{info}</p>}
 
       <h4>Approve a spender</h4>
-      <input value={spender} placeholder="spender 0x…" onChange={(e) => setSpender(e.target.value)} />{' '}
-      <input value={approveAmt} placeholder="amount (ETH units)" onChange={(e) => setApproveAmt(e.target.value)} />{' '}
+      <input
+        aria-label="spender address"
+        value={spender}
+        placeholder="spender 0x…"
+        onChange={(e) => setSpender(e.target.value)}
+      />{' '}
+      <input
+        aria-label="approve amount in token units"
+        value={approveAmt}
+        placeholder="amount (ETH units)"
+        onChange={(e) => setApproveAmt(e.target.value)}
+      />{' '}
       <button onClick={approve} disabled={!token || !spender}>
         Approve
       </button>{' '}
@@ -837,11 +973,35 @@ function RawContractCall({ wallet }: { wallet: Wallet }) {
 
   return (
     <details>
-      <summary>Advanced — raw call (any ABI)</summary>
-      <input value={address} placeholder="contract 0x…" onChange={(e) => setAddress(e.target.value)} />
-      <textarea value={abi} placeholder='ABI JSON, e.g. [{"type":"function",...}]' onChange={(e) => setAbi(e.target.value)} />
-      <input value={fn} placeholder="functionName" onChange={(e) => setFn(e.target.value)} />{' '}
-      <input value={args} placeholder='args JSON, e.g. ["0x..",123]' onChange={(e) => setArgs(e.target.value)} />{' '}
+      <summary>Developer tools — raw contract call (any ABI)</summary>
+      <p className="hint">
+        ⚠ Power-user surface: sends an arbitrary contract call from this custodial wallet. Use the
+        curated Send / Approve controls above for normal operations.
+      </p>
+      <input
+        aria-label="raw call contract address"
+        value={address}
+        placeholder="contract 0x…"
+        onChange={(e) => setAddress(e.target.value)}
+      />
+      <textarea
+        aria-label="raw call ABI JSON"
+        value={abi}
+        placeholder='ABI JSON, e.g. [{"type":"function",...}]'
+        onChange={(e) => setAbi(e.target.value)}
+      />
+      <input
+        aria-label="raw call function name"
+        value={fn}
+        placeholder="functionName"
+        onChange={(e) => setFn(e.target.value)}
+      />{' '}
+      <input
+        aria-label="raw call arguments JSON"
+        value={args}
+        placeholder='args JSON, e.g. ["0x..",123]'
+        onChange={(e) => setArgs(e.target.value)}
+      />{' '}
       <button onClick={() => run(false)} disabled={!address || !fn}>
         Read
       </button>{' '}
@@ -867,9 +1027,18 @@ function ConcurrencyDemo({
   const [n, setN] = useState(5);
   const [results, setResults] = useState<{ nonce: number | null; error?: string }[]>([]);
   const [busy, setBusy] = useState(false);
+  // Dry-run: render the serialized nonce timeline the lock WOULD assign, without spending — so the
+  // payoff is visible even on an unfunded wallet (audit #11). Relative (n, n+1, …) since the live
+  // starting nonce isn't known client-side.
+  const [sim, setSim] = useState(false);
+  const simulate = () => {
+    setSim(true);
+    setResults(Array.from({ length: n }, (_, i) => ({ nonce: i })));
+  };
 
   const fire = async () => {
     if (!recipient) return;
+    setSim(false);
     setBusy(true);
     setResults([]);
     const sends = Array.from({ length: n }, () =>
@@ -893,57 +1062,58 @@ function ConcurrencyDemo({
       <summary>Concurrency demo (nonce lock)</summary>
       <p className="bal-sub">
         Fires N sends at one wallet at once — proof the per-wallet nonce lock serializes them into
-        unique, consecutive nonces (no collisions). Needs a funded wallet and a recipient.
+        unique, consecutive nonces (no collisions, no gaps). Simulate it anytime; a funded wallet
+        runs it for real on-chain.
       </p>
-      {!recipient || !canSend ? (
-        <p className="hint">
-          {!recipient
-            ? 'Add a recipient (another wallet or an allowlist entry) to run this.'
-            : 'This wallet is unfunded — fund it (Sepolia faucet) to run the demo.'}
-        </p>
+      <label>
+        N concurrent sends{' '}
+        <input type="number" min={2} max={20} value={n} onChange={(e) => setN(Number(e.target.value))} />
+      </label>{' '}
+      <button type="button" className="copybtn" onClick={simulate} disabled={busy}>
+        Simulate (dry-run)
+      </button>{' '}
+      {recipient && canSend ? (
+        <button type="button" onClick={fire} disabled={busy}>
+          {busy ? 'Firing…' : `Fire ${n} concurrent sends`}
+        </button>
       ) : (
-        <>
-          <label>
-            N concurrent sends{' '}
-            <input
-              type="number"
-              min={2}
-              max={20}
-              value={n}
-              onChange={(e) => setN(Number(e.target.value))}
-            />
-          </label>{' '}
-          <button onClick={fire} disabled={busy}>
-            {busy ? 'Firing…' : `Fire ${n} concurrent sends`}
-          </button>
-          {results.length > 0 && (
-            <div style={{ marginTop: 10 }}>
-              {[...results]
-                .sort((a, b) => (a.nonce ?? Number.MAX_SAFE_INTEGER) - (b.nonce ?? Number.MAX_SAFE_INTEGER))
-                .map((r, i) => (
-                  <div className="nonce-row" key={i}>
-                    <span className="lock" aria-hidden>
-                      🔒
-                    </span>
-                    <span className="nnum">{r.nonce != null ? `nonce ${r.nonce}` : '—'}</span>
-                    <span>
-                      {r.error ? (
-                        <span className="pill failed">failed</span>
-                      ) : (
-                        <span className="pill pending">broadcast</span>
-                      )}
-                      {r.error ? ` ${r.error}` : ''}
-                    </span>
-                  </div>
-                ))}
-              <p className={`verdict ${unique && monotonic && errors.length === 0 ? 'ok' : 'bad'}`}>
-                {errors.length === 0
-                  ? `${nonces.length}/${results.length} serialized — unique, consecutive nonces ✓`
-                  : `${errors.length}/${results.length} failed (${errors[0].error})`}
-              </p>
-            </div>
+        <span className="bal-sub">
+          {!recipient ? 'add a recipient to fire for real' : 'fund this wallet to fire for real'}
+        </span>
+      )}
+      {results.length > 0 && (
+        <div style={{ marginTop: 10 }}>
+          {sim && (
+            <p className="bal-sub">
+              Dry-run — the nonces the lock would assign (relative); no funds moved.
+            </p>
           )}
-        </>
+          {[...results]
+            .sort((a, b) => (a.nonce ?? Number.MAX_SAFE_INTEGER) - (b.nonce ?? Number.MAX_SAFE_INTEGER))
+            .map((r, i) => (
+              <div className="nonce-row" key={i}>
+                <span className="lock" aria-hidden>
+                  🔒
+                </span>
+                <span className="nnum">
+                  {r.nonce != null ? (sim ? `nonce n+${r.nonce}` : `nonce ${r.nonce}`) : '—'}
+                </span>
+                <span>
+                  {r.error ? (
+                    <span className="pill failed">failed</span>
+                  ) : (
+                    <span className="pill pending">{sim ? 'would broadcast' : 'broadcast'}</span>
+                  )}
+                  {r.error ? ` ${r.error}` : ''}
+                </span>
+              </div>
+            ))}
+          <p className={`verdict ${unique && monotonic && errors.length === 0 ? 'ok' : 'bad'}`}>
+            {errors.length === 0
+              ? `${nonces.length}/${results.length} serialized — unique, consecutive nonces ✓${sim ? ' (simulated)' : ''}`
+              : `${errors.length}/${results.length} failed (${errors[0].error})`}
+          </p>
+        </div>
       )}
     </details>
   );
@@ -1140,14 +1310,18 @@ function WalletItem({
   );
 }
 
+// Wallets as collapsed accordion rows: only the open wallet's action panel is mounted, so the page
+// height stops scaling with wallet count (audit #1). One open at a time.
 function WalletsTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => void }) {
   const [error, setError] = useState('');
+  const [openId, setOpenId] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const create = async () => {
     setError('');
     try {
       const w = await api.createWallet();
       setHighlightId(w.id);
+      setOpenId(w.id);
       setTimeout(() => setHighlightId(null), 1800);
       onChange();
     } catch (err) {
@@ -1157,32 +1331,56 @@ function WalletsTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => 
 
   return (
     <section>
-      <button onClick={create}>Create wallet</button>
-      <button onClick={onChange}>Refresh</button>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <button onClick={create}>Create wallet</button>
+        <button className="copybtn" onClick={onChange}>
+          Refresh
+        </button>
+      </div>
       {error && <p role="alert">{error}</p>}
       {wallets.length === 0 ? (
-        <p>No wallets yet — create one or seed demo data from the Admin tab.</p>
+        <p>No wallets yet — create one above, or seed demo data in Settings.</p>
       ) : (
-        <ul>
-          {wallets.map((w) => (
-            <WalletItem
-              key={w.id}
-              wallet={w}
-              otherWallets={wallets.filter((o) => o.id !== w.id)}
-              highlight={w.id === highlightId}
-            />
-          ))}
-        </ul>
+        wallets.map((w) => {
+          const open = openId === w.id;
+          return (
+            <div key={w.id} className={highlightId === w.id ? 'flash' : undefined}>
+              <button
+                type="button"
+                className="wrow-head"
+                aria-expanded={open}
+                onClick={() => setOpenId(open ? null : w.id)}
+              >
+                <span className="nick">{nicknames.get(w.id) || 'Wallet'}</span>
+                <code>{shortHex(w.address)}</code>
+                <span className="bal-sub">{open ? 'open' : 'manage →'}</span>
+                <span className="caret" aria-hidden>
+                  {open ? '▾' : '▸'}
+                </span>
+              </button>
+              {open && (
+                <div className="wrow-detail">
+                  <ul style={{ margin: 0 }}>
+                    <WalletItem wallet={w} otherWallets={wallets.filter((o) => o.id !== w.id)} />
+                  </ul>
+                </div>
+              )}
+            </div>
+          );
+        })
       )}
     </section>
   );
 }
 
-/** Edit a wallet's policy: allowlist (one address per line) + per-tx/daily limits (wei). */
+/** Edit one wallet's policy as a self-contained card: allowlist (one address per line) + per-tx
+ *  and daily limits (entered in ETH). Labels sit directly above their field; save is disabled
+ *  until something changes (audit #2). */
 function PolicyEditor({ wallet }: { wallet: Wallet }) {
   const [allowlist, setAllowlist] = useState('');
   const [perTxLimit, setPerTxLimit] = useState('');
   const [dailyLimit, setDailyLimit] = useState('');
+  const [loaded, setLoaded] = useState<Policy | null>(null);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
 
@@ -1193,16 +1391,36 @@ function PolicyEditor({ wallet }: { wallet: Wallet }) {
         setAllowlist(p.allowlist.join('\n'));
         setPerTxLimit(p.perTxLimit ? toEth(p.perTxLimit) : '');
         setDailyLimit(p.dailyLimit ? toEth(p.dailyLimit) : '');
+        setLoaded(p);
       })
       .catch((e) => setError((e as Error).message));
   }, [wallet.id]);
+
+  // Dirty check vs the loaded policy so Save only lights up on a real change.
+  const dirty =
+    !!loaded &&
+    (allowlist !== loaded.allowlist.join('\n') ||
+      perTxLimit !== (loaded.perTxLimit ? toEth(loaded.perTxLimit) : '') ||
+      dailyLimit !== (loaded.dailyLimit ? toEth(loaded.dailyLimit) : ''));
+
+  const badAddr = allowlist
+    .split('\n')
+    .map((a) => a.trim())
+    .filter(Boolean)
+    .some((a) => !isAddress(a));
+
+  const cur = loaded
+    ? loaded.allowlist.length === 0 && !loaded.perTxLimit && !loaded.dailyLimit
+      ? 'No limits set — any recipient, any amount.'
+      : `${loaded.allowlist.length} allowed · per-tx ${loaded.perTxLimit ? `≤ ${toEth(loaded.perTxLimit)} ETH` : '∞'} · daily ${loaded.dailyLimit ? `≤ ${toEth(loaded.dailyLimit)} ETH` : '∞'}`
+    : 'Loading…';
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setStatus('');
     try {
-      await api.setPolicy(wallet.id, {
+      const next: Policy = {
         allowlist: allowlist
           .split('\n')
           .map((a) => a.trim())
@@ -1210,7 +1428,9 @@ function PolicyEditor({ wallet }: { wallet: Wallet }) {
         // Limits are entered in ETH; persist as wei base units to match the backend.
         perTxLimit: perTxLimit.trim() ? parseEther(perTxLimit.trim()).toString() : null,
         dailyLimit: dailyLimit.trim() ? parseEther(dailyLimit.trim()).toString() : null,
-      });
+      };
+      await api.setPolicy(wallet.id, next);
+      setLoaded(next);
       setStatus(`✓ saved ${new Date().toLocaleTimeString()}`);
     } catch (err) {
       setError((err as Error).message);
@@ -1218,36 +1438,298 @@ function PolicyEditor({ wallet }: { wallet: Wallet }) {
   };
 
   return (
-    <form onSubmit={save}>
-      <h4>
-        Policy for <code>{wallet.address.slice(0, 12)}…</code>
-      </h4>
-      <label htmlFor={`allow-${wallet.id}`}>Allowlist (one address per line; empty = any)</label>
-      <textarea
-        id={`allow-${wallet.id}`}
-        value={allowlist}
-        onChange={(e) => setAllowlist(e.target.value)}
-      />
-      <label htmlFor={`pertx-${wallet.id}`}>Per-tx limit (ETH; blank = none)</label>
-      <input
-        id={`pertx-${wallet.id}`}
-        value={perTxLimit}
-        onChange={(e) => setPerTxLimit(e.target.value)}
-      />
-      <label htmlFor={`daily-${wallet.id}`}>Daily limit (ETH; blank = none)</label>
-      <input
-        id={`daily-${wallet.id}`}
-        value={dailyLimit}
-        onChange={(e) => setDailyLimit(e.target.value)}
-      />
-      <button type="submit">Save policy</button>
-      {status && <p>{status}</p>}
+    <form className="policy-card" onSubmit={save}>
+      <header>
+        <span className="nick">{nicknames.get(wallet.id) || 'Wallet'}</span>
+        <a href={explorerAddress(wallet.address)} target="_blank" rel="noreferrer" title={wallet.address}>
+          <code>{shortHex(wallet.address)}</code> ↗
+        </a>
+        <CopyButton value={wallet.address} label="⧉" />
+      </header>
+      <p className="cur">Currently: {cur}</p>
+      <div className="policy-grid">
+        <label htmlFor={`allow-${wallet.id}`}>
+          Allowlist (one address per line — empty = any)
+          <textarea
+            id={`allow-${wallet.id}`}
+            aria-label={`allowlist for ${wallet.address}`}
+            value={allowlist}
+            onChange={(e) => setAllowlist(e.target.value)}
+          />
+        </label>
+        <div className="policy-limits">
+          <label htmlFor={`pertx-${wallet.id}`}>
+            Per-tx limit (ETH)
+            <input
+              id={`pertx-${wallet.id}`}
+              type="number"
+              step="any"
+              min="0"
+              placeholder="∞"
+              value={perTxLimit}
+              onChange={(e) => setPerTxLimit(e.target.value)}
+            />
+          </label>
+          <label htmlFor={`daily-${wallet.id}`}>
+            Daily limit (ETH)
+            <input
+              id={`daily-${wallet.id}`}
+              type="number"
+              step="any"
+              min="0"
+              placeholder="∞"
+              value={dailyLimit}
+              onChange={(e) => setDailyLimit(e.target.value)}
+            />
+          </label>
+        </div>
+      </div>
+      {badAddr && <p className="preflight bad">✗ allowlist has an invalid 0x address</p>}
+      <div className="save-row">
+        {status && <span className="bal-sub">{status}</span>}
+        <button type="submit" disabled={!dirty || badAddr}>
+          Save policy
+        </button>
+      </div>
       {error && <p role="alert">{error}</p>}
     </form>
   );
 }
 
-function AdminTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => void }) {
+// Unified activity rows as a table (time · wallet · type · detail) — shared by Overview + Activity.
+function ActivityTable({ items, wallets }: { items: ActivityItem[]; wallets: Wallet[] }) {
+  if (items.length === 0) return <p className="bal-sub">No activity yet.</p>;
+  const label = (id?: string | null) => {
+    const w = wallets.find((x) => x.id === id);
+    return w ? walletLabel(w.id, w.address) : '—';
+  };
+  return (
+    <table className="act-table">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Wallet</th>
+          <th>Type</th>
+          <th>Detail</th>
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((it) => (
+          <tr key={it.id}>
+            <td>{new Date(it.createdAt).toLocaleTimeString()}</td>
+            <td>{label(it.walletId)}</td>
+            <td>
+              {it.kind === 'transaction' ? (
+                <span className={`pill ${it.status}`}>{it.status}</span>
+              ) : it.kind === 'signature' ? (
+                <span className="pill signed">signed</span>
+              ) : (
+                <span className="pill audit">{it.type}</span>
+              )}
+            </td>
+            <td>
+              {it.kind === 'transaction' && (
+                <>
+                  sent <strong>{toEth(it.amount)}</strong> →{' '}
+                  <HashLink value={it.to} href={explorerAddress(it.to)} />
+                  {it.txHash && (
+                    <>
+                      {' '}
+                      · tx <HashLink value={it.txHash} href={explorerTx(it.txHash)} />
+                    </>
+                  )}
+                </>
+              )}
+              {it.kind === 'signature' && (
+                <>
+                  “{it.message}” → <code>{shortHex(it.signature)}</code>
+                </>
+              )}
+              {it.kind === 'audit' && <span className="bal-sub">{JSON.stringify(it.detail)}</span>}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+// Overview dashboard: the at-a-glance state the old single-scroll Admin never had (audit #1).
+function OverviewTab({ wallets, onGoWallets }: { wallets: Wallet[]; onGoWallets: () => void }) {
+  const [bals, setBals] = useState<Record<string, bigint>>({});
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
+  useEffect(() => {
+    let active = true;
+    Promise.all(
+      wallets.map((w) =>
+        api
+          .getBalance(w.id)
+          .then((b) => [w.id, BigInt(b.balances.find((l) => l.asset === 'ETH')?.confirmed ?? '0')] as const)
+          .catch(() => [w.id, 0n] as const),
+      ),
+    ).then((entries) => active && setBals(Object.fromEntries(entries)));
+    api.listAllActivity().then((a) => active && setActivity(a)).catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [wallets]);
+  const total = Object.values(bals).reduce((s, v) => s + v, 0n);
+  const funded = Object.values(bals).filter((v) => v > 0n).length;
+  return (
+    <section>
+      <div className="summary-tiles">
+        <div className="stat">
+          <div className="stat-num">{wallets.length}</div>
+          <div className="stat-label">Wallets</div>
+        </div>
+        <div className="stat">
+          <div className="stat-num">{funded}</div>
+          <div className="stat-label">Funded</div>
+        </div>
+        <div className="stat">
+          <div className="stat-num">{toEth(total)}</div>
+          <div className="stat-label">ETH under mgmt</div>
+        </div>
+        <div className="stat">
+          <div className="stat-num">{activity.length}</div>
+          <div className="stat-label">Recent events</div>
+        </div>
+      </div>
+      <h2>Recent activity</h2>
+      <ActivityTable items={activity.slice(0, 10)} wallets={wallets} />
+      <p style={{ marginTop: 14 }}>
+        <button type="button" className="copybtn" onClick={onGoWallets}>
+          Manage wallets →
+        </button>
+      </p>
+    </section>
+  );
+}
+
+// Policies tab: one card per wallet, separate from wallet operation (audit #1/#2).
+function PoliciesTab({ wallets }: { wallets: Wallet[] }) {
+  if (wallets.length === 0)
+    return (
+      <section>
+        <p>No wallets — create one or seed demo data first.</p>
+      </section>
+    );
+  return (
+    <section>
+      {wallets.map((w) => (
+        <PolicyEditor key={w.id} wallet={w} />
+      ))}
+    </section>
+  );
+}
+
+// The live "system log": polls GET /events with a seq cursor and tails the ring buffer.
+function LiveLog() {
+  const [lines, setLines] = useState<LogLine[]>([]);
+  const cursor = useRef(0);
+  const boxRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    let active = true;
+    const tick = () =>
+      api
+        .events(cursor.current)
+        .then(({ lines: l, seq }) => {
+          if (!active) return;
+          cursor.current = seq;
+          if (l.length) setLines((prev) => [...prev, ...l].slice(-300));
+        })
+        .catch(() => undefined);
+    void tick();
+    const t = setInterval(tick, 1500);
+    return () => {
+      active = false;
+      clearInterval(t);
+    };
+  }, []);
+  useEffect(() => {
+    boxRef.current?.scrollTo(0, boxRef.current.scrollHeight);
+  }, [lines]);
+  return (
+    <div className="logconsole" ref={boxRef} role="log" aria-label="Live system log" aria-live="polite">
+      {lines.length === 0
+        ? 'Waiting for events… create a wallet, set a policy, or send to see the engine narrate.'
+        : lines.map((l) => (
+            <div key={l.seq}>
+              <span className="ts">{new Date(l.at).toLocaleTimeString()} </span>
+              <span className={l.level}>{l.msg}</span>
+            </div>
+          ))}
+    </div>
+  );
+}
+
+// Activity tab: two subviews of one event stream — a durable, filterable audit log, and the
+// ephemeral live system log (audit #8).
+function ActivityTab({ wallets }: { wallets: Wallet[] }) {
+  const [sub, setSub] = useState<'audit' | 'live'>('audit');
+  const [items, setItems] = useState<ActivityItem[]>([]);
+  const [kind, setKind] = useState('all');
+  const [q, setQ] = useState('');
+  useEffect(() => {
+    if (sub !== 'audit') return;
+    let active = true;
+    const load = () => api.listAllActivity().then((a) => active && setItems(a)).catch(() => undefined);
+    void load();
+    const t = setInterval(load, 5000);
+    return () => {
+      active = false;
+      clearInterval(t);
+    };
+  }, [sub]);
+  const filtered = items.filter(
+    (it) =>
+      (kind === 'all' || it.kind === kind) &&
+      (!q || JSON.stringify(it).toLowerCase().includes(q.toLowerCase())),
+  );
+  return (
+    <section>
+      <div className="subtabs">
+        <button type="button" aria-pressed={sub === 'audit'} onClick={() => setSub('audit')}>
+          Audit log
+        </button>
+        <button type="button" aria-pressed={sub === 'live'} onClick={() => setSub('live')}>
+          Live system log
+        </button>
+      </div>
+      {sub === 'audit' ? (
+        <>
+          <div className="act-filters">
+            <label className="field" htmlFor="act-kind">
+              <span>Type</span>
+              <select id="act-kind" value={kind} onChange={(e) => setKind(e.target.value)}>
+                <option value="all">all</option>
+                <option value="transaction">sends</option>
+                <option value="signature">signatures</option>
+                <option value="audit">governance</option>
+              </select>
+            </label>
+            <label className="field" htmlFor="act-q">
+              <span>Filter</span>
+              <input
+                id="act-q"
+                value={q}
+                placeholder="address, hash, type…"
+                onChange={(e) => setQ(e.target.value)}
+              />
+            </label>
+          </div>
+          <ActivityTable items={filtered} wallets={wallets} />
+        </>
+      ) : (
+        <LiveLog />
+      )}
+    </section>
+  );
+}
+
+// Settings / Dev tools: the low-frequency, environment-level, or destructive controls — one tab
+// deep on purpose (audit #1/#10). Admin key shown as a status, never as the value.
+function SettingsTab({ onChange }: { onChange: () => void }) {
   const [seedMsg, setSeedMsg] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1310,20 +1792,30 @@ function AdminTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => vo
 
   return (
     <section>
-      <h3>Admin key</h3>
-      <label>
-        x-admin-key — gates only seed/reset (creating wallets, sending, and policy do not need
-        it). From the deploy env; locally it is <code>dev-admin-key</code>.
-        <input
-          type="password"
-          value={adminKey}
-          placeholder="admin key"
-          onChange={(e) => {
-            setAdminKey(e.target.value);
-            adminKeyStore.set(e.target.value);
-          }}
-        />
-      </label>
+      <h3>
+        Admin key{' '}
+        {adminKey ? (
+          <span className="pill confirmed">configured ✓</span>
+        ) : (
+          <span className="pill pending">not set</span>
+        )}
+      </h3>
+      <p className="bal-sub">
+        Gates only seed/reset — creating wallets, sending, and policy don't need it. In production
+        it's a server-side secret, never shown; here you paste the dev key to enable the destructive
+        actions below.
+      </p>
+      <label htmlFor="admin-key-input">x-admin-key</label>{' '}
+      <input
+        id="admin-key-input"
+        type="password"
+        value={adminKey}
+        placeholder="paste admin key"
+        onChange={(e) => {
+          setAdminKey(e.target.value);
+          adminKeyStore.set(e.target.value);
+        }}
+      />
 
       <h3>Accounts</h3>
       <p className="bal-sub">
@@ -1363,13 +1855,6 @@ function AdminTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => vo
       {seedMsg && <p>{seedMsg}</p>}
       {error && <p role="alert">{error}</p>}
 
-      <h3>Policies</h3>
-      {wallets.length === 0 ? (
-        <p>No wallets — create or seed first.</p>
-      ) : (
-        wallets.map((w) => <PolicyEditor key={w.id} wallet={w} />)
-      )}
-
       <h3>Chain inspector</h3>
       <p>
         <a href={FAUCET_URL} target="_blank" rel="noreferrer">
@@ -1397,31 +1882,27 @@ function AdminTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => vo
         Open ↗
       </a>
 
-      <h3>Wallet addresses</h3>
-      <ul>
-        {wallets.map((w) => (
-          <li key={w.id}>
-            <a href={explorerAddress(w.address)} target="_blank" rel="noreferrer" title={w.address}>
-              <code>{w.address}</code> ↗
-            </a>
-            <CopyButton value={w.address} label="⧉" />
-          </li>
-        ))}
-      </ul>
-      <button onClick={onChange}>Refresh wallets</button>
     </section>
   );
 }
 
-// Admin experience: account + demo-data management. It signs in as an account (the demo user by
-// default) so the wallet-scoped panels (policies, addresses) resolve; seed/reset use the admin key.
+// Admin experience: a tabbed custody-ops console. Signs in as an account (the demo user by
+// default) so wallet-scoped panels resolve; seed/reset use the admin key. The network heartbeat
+// stays outside the tabs (global state); the active tab lives in the URL hash (deep-linkable).
+const ADMIN_TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'wallets', label: 'Wallets' },
+  { id: 'policies', label: 'Policies' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'settings', label: 'Settings' },
+];
 function AdminView({ onExit }: { onExit: () => void }) {
   const { accounts, current, signIn } = useAuth();
-  // Act as an account so the wallet/policy panels work; default to the first (demo) account.
   useEffect(() => {
     if (!current && accounts.length > 0) void signIn(accounts[0]).catch(() => undefined);
   }, [current, accounts, signIn]);
   const { wallets, refresh, lastUpdated, error } = useWallets(!!current);
+  const [tab, setTab] = useHashTab('overview');
 
   return (
     <main className="app">
@@ -1435,14 +1916,16 @@ function AdminView({ onExit }: { onExit: () => void }) {
         </span>
       </header>
       <StatusBar lastUpdated={lastUpdated} onRefresh={() => void refresh()} />
+      <DemoBanner />
       {error && <p role="alert">{error}</p>}
-      <AdminTab wallets={wallets} onChange={refresh} />
-      <h3>Wallets (engineering surfaces)</h3>
-      <p className="bal-sub">
-        Create wallets, fire concurrent sends (nonce lock), internal transfers, send, sign, and
-        inspect — the surfaces that show the engineering. The User view is the Venmo experience.
-      </p>
-      <WalletsTab wallets={wallets} onChange={refresh} />
+      <Tabs tabs={ADMIN_TABS} active={tab} onChange={setTab} />
+      <div role="tabpanel" aria-labelledby={`tab-${tab}`}>
+        {tab === 'overview' && <OverviewTab wallets={wallets} onGoWallets={() => setTab('wallets')} />}
+        {tab === 'wallets' && <WalletsTab wallets={wallets} onChange={refresh} />}
+        {tab === 'policies' && <PoliciesTab wallets={wallets} />}
+        {tab === 'activity' && <ActivityTab wallets={wallets} />}
+        {tab === 'settings' && <SettingsTab onChange={refresh} />}
+      </div>
     </main>
   );
 }

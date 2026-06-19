@@ -216,3 +216,73 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* ── Admin tabs (real tablist: role=tab, arrow-key nav, aria-selected) ───────────── */
+.tablist { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 4px 0 20px; flex-wrap: wrap; }
+.tablist [role="tab"] {
+  background: transparent; border: 1px solid transparent; border-bottom: none; color: var(--muted);
+  border-radius: 8px 8px 0 0; padding: 8px 16px; font-weight: 600; margin: 0;
+}
+.tablist [role="tab"]:hover:not([aria-selected="true"]) { filter: none; color: var(--ink); }
+.tablist [role="tab"][aria-selected="true"] {
+  color: var(--accent-ink); border-color: var(--line); border-bottom: 2px solid var(--accent);
+  background: var(--panel); margin-bottom: -1px;
+}
+
+/* ── Demo-mode banner (trust narrative: auth bypassed on purpose) ─────────────────── */
+.demobanner {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  font-size: 12.5px; color: var(--pending); background: color-mix(in srgb, var(--pending) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pending) 30%, transparent); border-radius: 8px;
+  padding: 7px 12px; margin: 0 0 16px;
+}
+.demobanner strong { color: var(--pending); }
+
+/* ── Overview summary tiles ──────────────────────────────────────────────────────── */
+.summary-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 8px 0 20px; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+.stat .stat-num { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
+.stat .stat-label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+
+/* ── Balance hero (visual hierarchy: the number dominates) ───────────────────────── */
+.bal-hero { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1.1; }
+.bal-hero .unit { font-size: 16px; font-weight: 600; color: var(--muted); margin-left: 6px; }
+
+/* ── Wallets tab: accordion rows (one expanded at a time) ────────────────────────── */
+.wrow-head {
+  display: grid; grid-template-columns: 1.2fr 1.4fr 1fr auto; gap: 12px; align-items: center;
+  width: 100%; text-align: left; background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; margin: 8px 0 0;
+}
+.wrow-head:hover:not(:disabled) { filter: none; border-color: var(--accent); }
+.wrow-head[aria-expanded="true"] { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-color: var(--accent); }
+.wrow-head .caret { color: var(--muted); }
+.wrow-detail { border: 1px solid var(--accent); border-top: none; border-radius: 0 0 var(--radius) var(--radius); padding: 4px 16px 14px; margin: 0 0 8px; }
+
+/* ── Policy cards (clear per-wallet separation; labels above fields) ──────────────── */
+.policy-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin: 12px 0; }
+.policy-card > header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.policy-card .cur { font-size: 12.5px; color: var(--muted); margin: 0 0 12px; }
+.policy-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.policy-grid textarea { width: 100%; min-height: 64px; }
+.policy-limits { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.policy-card label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.policy-card .save-row { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 12px; }
+
+/* ── Activity tab: filterable audit table + live system-log console ──────────────── */
+.subtabs { display: flex; gap: 6px; margin: 4px 0 12px; }
+.subtabs button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.subtabs button[aria-pressed="false"] { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+.act-filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 10px; }
+.act-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.act-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); border-bottom: 1px solid var(--line); padding: 6px 8px; }
+.act-table td { border-bottom: 1px solid var(--line); padding: 7px 8px; vertical-align: top; }
+.logconsole {
+  font-family: var(--mono); font-size: 12px; background: #0f1320; color: #d7e0f5;
+  border-radius: var(--radius); padding: 12px 14px; height: 320px; overflow-y: auto; white-space: pre-wrap;
+}
+.logconsole .ts { color: #6b7794; }
+.logconsole .warn { color: #f0c674; }
+.logconsole .error { color: #ff8b8b; }
+
+.pill.audit { color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: color-mix(in srgb, var(--accent) 8%, transparent); }

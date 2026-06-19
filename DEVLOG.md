@@ -961,3 +961,10 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Files touched** — events.{service,controller,module}.ts · activity-merge.ts (audit kind + walletId) · activity.controller.ts (UserActivityController) · policy.controller.ts + wallets.service.ts (record) · api.ts (listAllActivity/events).
 **Tests** — [events.service.spec.ts](packages/api/src/infra/events/events.service.spec.ts): seq monotonicity, `since(after)` cursor, 200-cap eviction, `record()` persists+rings. Green: 88 passed.
 **Gotchas** — Ring is per-process (fine on Railway's long-lived node; poll over Vercel rewrite). audit_log has no FK relations on purpose — history outlives the wallet/user.
+
+## v0.x.0 · Block 5 · Admin → 5-tab console + trust/polish (#1,#2,#4,#7,#10,#11,#12)
+**What & why** — The single 4,000px Admin scroll became a real tablist console: Overview · Wallets · Policies · Activity · Settings. De-crowds by job, and the Activity tab surfaces #8 (audit log + live system log).
+**How it works** — [Tabs](packages/web/src/App.tsx) = role=tablist + ←/→/Home/End + aria-selected; [useHashTab](packages/web/src/App.tsx) deep-links the active tab (#admin/wallets). Wallets are accordion rows (one panel mounted at a time). PolicyEditor rebuilt as a card (labels-above-field grid, dirty-gated save, invalid-address hint). Pay got a confirm step with auto-allow unbundled (explicit opt-in checkbox). Concurrency demo gained a fund-free **Simulate** dry-run. Balance display rounds to 6dp. Demo-mode banner + admin-key shown as "configured ✓", never the value.
+**Files touched** — App.tsx (Tabs/useHashTab/DemoBanner/OverviewTab/PoliciesTab/ActivityTab/LiveLog/ActivityTable/SettingsTab, rebuilt WalletsTab+PolicyEditor+VenmoSend+ConcurrencyDemo) · format.ts (toEth dp) · index.css (tablist/cards/table/console/banner).
+**Tests** — web typecheck + lint + build green; api 88 passed (unchanged).
+**Gotchas** — `react-hooks/exhaustive-deps` rule isn't configured here, so the disable directive itself errors — don't add it. Overview fetches per-wallet balances (N calls) only on its own tab.
