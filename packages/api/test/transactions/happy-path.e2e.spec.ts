@@ -33,13 +33,14 @@ describe.skipIf(!process.env.RUN_DB_TESTS)('Happy path (anvil + postgres)', () =
   it('create → fund → balance → send → confirmed', async () => {
     const api = request(app.getHttpServer());
 
-    // 1. register + 2. create two wallets (sender + recipient)
+    // 1. register + 2. provision the user's single wallet (sender). Recipient is any address —
+    // one wallet per account, and there's no allowlist, so we send to a fixed burn address.
     const email = `e2e+${Date.now()}@vencura.test`;
     const token = (await api.post('/auth/register').send({ email, password: 'password123' }).expect(201)).body
       .accessToken as string;
     const auth = { Authorization: `Bearer ${token}` };
-    const sender = (await api.post('/wallets').set(auth).send({}).expect(201)).body;
-    const recipient = (await api.post('/wallets').set(auth).send({}).expect(201)).body;
+    const sender = (await api.post('/wallets/provision').set(auth).expect(201)).body;
+    const recipient = '0x000000000000000000000000000000000000dEaD';
 
     // 3. fund the sender on anvil
     const anvil = createTestClient({ mode: 'anvil', transport: viemHttp(process.env.RPC_URL) });
@@ -54,7 +55,7 @@ describe.skipIf(!process.env.RUN_DB_TESTS)('Happy path (anvil + postgres)', () =
       await api
         .post(`/wallets/${sender.id}/transactions`)
         .set(auth)
-        .send({ to: recipient.address, asset: 'ETH', amount: parseEther('0.1').toString() })
+        .send({ to: recipient, asset: 'ETH', amount: parseEther('0.1').toString() })
         .expect(201)
     ).body;
     expect(sent.txHash).toMatch(/^0x[0-9a-f]+$/i);
