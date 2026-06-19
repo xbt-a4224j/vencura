@@ -56,7 +56,7 @@ describe.skipIf(!process.env.RUN_DB_TESTS)('TransactionsService policy daily-lim
     walletId = wallet.id;
     // dailyLimit = 1.0 ETH; two 0.6 ETH sends must not both succeed.
     await prisma.walletPolicy.create({
-      data: { walletId, allowlist: [], perTxLimit: null, dailyLimit: (10n ** 18n).toString() },
+      data: { walletId, perTxLimit: null, dailyLimit: (10n ** 18n).toString() },
     });
   });
 

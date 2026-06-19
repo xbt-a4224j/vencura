@@ -25,4 +25,10 @@ export class AuthController {
   listAccounts() {
     return this.auth.listAccounts();
   }
+
+  // The single self-registered user (or null) — the User view shows register if null, else login.
+  @Get('user')
+  singleUser() {
+    return this.auth.singleUser();
+  }
 }

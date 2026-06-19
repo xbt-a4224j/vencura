@@ -20,7 +20,7 @@ class ProbeController {
   }
 }
 
-const prismaMock = { user: { findUnique: vi.fn(), create: vi.fn() } };
+const prismaMock = { user: { findUnique: vi.fn(), findFirst: vi.fn().mockResolvedValue(null), create: vi.fn() } };
 
 describe('Auth HTTP', () => {
   let app: INestApplication;

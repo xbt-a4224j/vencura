@@ -17,10 +17,6 @@ export class PolicyEngine {
     const policy = await this.prisma.walletPolicy.findUnique({ where: { walletId } });
     if (!policy) return; // no policy = unrestricted
 
-    if (policy.allowlist.length > 0 && !policy.allowlist.includes(intent.to)) {
-      this.deny(walletId, `recipient ${intent.to} not on allowlist`);
-    }
-
     // Amount limits apply to native ETH only (token amount-limits = future extension).
     if (intent.asset === NATIVE_ASSET) {
       const amount = BigInt(intent.amount);

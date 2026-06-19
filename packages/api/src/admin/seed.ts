@@ -8,13 +8,7 @@ import { DEMO_PASSWORD, type Hex } from '@vencura/shared';
 import { encrypt } from '../signer/aes-256-gcm';
 
 const DEMO_EMAIL = 'demo@vencura.local';
-// Peer demo accounts: so the User-view picker has accounts to switch between and "pay someone"
-// has real counterparties. All use the shared demo password (isDemo) → every picker entry works.
-// Unfunded by design (there's one funded key) — they receive + demonstrate switching.
-const PEER_EMAILS = ['alice@vencura.local', 'bob@vencura.local'];
 const WALLET_COUNT = 3;
-// A well-known recipient (vitalik.eth) so the allowlist dropdown has an external option.
-const KNOWN_RECIPIENT = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
 
 export interface SeedResult {
   email: string;
@@ -75,30 +69,14 @@ export async function seedDemo(prisma: PrismaClient): Promise<SeedResult> {
     wallets.push({ ...wallet, funded });
   }
 
-  // Policy on the first wallet: allow sends to the other demo wallets + the known recipient.
-  const [first, ...rest] = wallets;
-  const allowlist = [...rest.map((w) => w.address), KNOWN_RECIPIENT];
+  // Spending-limit policy on the first (funded) wallet — per-tx + daily caps (no allowlist).
+  const [first] = wallets;
   const limits = { perTxLimit: parseEther('5').toString(), dailyLimit: parseEther('8').toString() };
   await prisma.walletPolicy.upsert({
     where: { walletId: first.id },
-    create: { walletId: first.id, allowlist, ...limits },
-    update: { allowlist, ...limits },
+    create: { walletId: first.id, ...limits },
+    update: { ...limits },
   });
-
-  // Peer demo accounts (alice/bob): one wallet each, unfunded, shared demo password. They give the
-  // picker accounts to switch to and populate the "pay someone" directory.
-  for (const email of PEER_EMAILS) {
-    const peer = await prisma.user.upsert({
-      where: { email },
-      create: { email, passwordHash, isDemo: true },
-      update: { passwordHash, isDemo: true },
-    });
-    await prisma.wallet.deleteMany({ where: { userId: peer.id } });
-    const pk = generatePrivateKey();
-    await prisma.wallet.create({
-      data: { userId: peer.id, address: privateKeyToAddress(pk), ...encrypt(pk, key) },
-    });
-  }
 
   return { email: DEMO_EMAIL, password: DEMO_PASSWORD, wallets };
 }

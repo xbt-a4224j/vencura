@@ -24,7 +24,6 @@ export class PolicyController {
     return (
       (await this.prisma.walletPolicy.findUnique({ where: { walletId } })) ?? {
         walletId,
-        allowlist: [],
         perTxLimit: null,
         dailyLimit: null,
       }
@@ -44,8 +43,8 @@ export class PolicyController {
       userId: user.id,
       walletId,
       type: 'policy.changed',
-      detail: { allowlist: saved.allowlist.length, perTxLimit: saved.perTxLimit, dailyLimit: saved.dailyLimit },
-      msg: `policy changed: ${walletId} → ${saved.allowlist.length} allowed, per-tx ${saved.perTxLimit ?? '∞'}, daily ${saved.dailyLimit ?? '∞'}`,
+      detail: { perTxLimit: saved.perTxLimit, dailyLimit: saved.dailyLimit },
+      msg: `policy changed: ${walletId} → per-tx ${saved.perTxLimit ?? '∞'}, daily ${saved.dailyLimit ?? '∞'}`,
     });
     return saved;
   }

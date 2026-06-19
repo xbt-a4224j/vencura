@@ -25,6 +25,11 @@ export class AuthService {
     if (await this.prisma.user.findUnique({ where: { email } })) {
       throw new ConflictException('email already registered');
     }
+    // Single-user demo: exactly one self-registered (non-admin) account. Once it exists,
+    // registration is closed — the User view loads that one account, no picker.
+    if (await this.prisma.user.findFirst({ where: { isDemo: false } })) {
+      throw new ConflictException('registration is closed — this demo allows one user account');
+    }
     const passwordHash = await argon2.hash(password);
     const user = await this.prisma.user.create({ data: { email, passwordHash } });
     this.logger.log(`user registered: ${user.id}`);
@@ -64,6 +69,16 @@ export class AuthService {
     });
     const DEMO_EMAIL = 'demo@vencura.local';
     return [...users].sort((a, b) => Number(b.email === DEMO_EMAIL) - Number(a.email === DEMO_EMAIL));
+  }
+
+  /** The single self-registered (non-admin) user, or null if none exists yet. Drives the User
+   *  view: null → show register, else → show login for that one account. */
+  singleUser(): Promise<Account | null> {
+    return this.prisma.user.findFirst({
+      where: { isDemo: false },
+      select: { id: true, email: true },
+      orderBy: { createdAt: 'asc' },
+    });
   }
 
   private issue(user: { id: string; email: string }): AuthResult {

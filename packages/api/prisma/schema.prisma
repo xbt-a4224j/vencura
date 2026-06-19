@@ -66,11 +66,10 @@ model SignedMessage {
 }
 
 model WalletPolicy {
-  walletId   String   @id
-  allowlist  String[] @default([])
+  walletId   String  @id
   perTxLimit String?
   dailyLimit String?
-  wallet     Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  wallet     Wallet  @relation(fields: [walletId], references: [id], onDelete: Cascade)
 
   @@map("wallet_policies")
 }

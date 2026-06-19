@@ -10,6 +10,7 @@ import { AuthService } from '@/auth/auth.service';
 const prismaMock = {
   user: {
     findUnique: vi.fn(),
+    findFirst: vi.fn().mockResolvedValue(null), // no existing non-admin user → register allowed
     findMany: vi.fn(),
     create: vi.fn(),
   },
