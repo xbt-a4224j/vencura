@@ -7,7 +7,8 @@ import {
   type SendTransactionInput,
   type TransferInput,
 } from '@vencura/shared';
-import { type Abi, encodeFunctionData, erc20Abi } from 'viem';
+import { type Abi, encodeDeployData, encodeFunctionData, erc20Abi, parseEther } from 'viem';
+import { DEMO_TOKEN_ABI, DEMO_TOKEN_BYTECODE } from '../admin/demo-token.artifact';
 import { ChainService } from '../infra/chain/chain.service';
 import { LOCK, type Lock } from '../infra/lock/lock';
 import { PrismaService } from '../infra/prisma/prisma.service';
@@ -125,6 +126,47 @@ export class TransactionsService {
       this.logger.log(`nonce released: ${walletId}`);
       return this.shape(row);
     });
+  }
+
+  /** Deploy the demo ERC-20 from `walletId` (the funded admin wallet owns the full supply), then
+   *  record it as the singleton demo token. Reuses the locked nonce/sign/broadcast critical section;
+   *  the ~block-time receipt wait happens OUTSIDE the lock so it doesn't stall the wallet. */
+  async deployDemoToken(walletId: string, userId: string) {
+    const wallet = await this.wallets.findOwnedOrThrow(walletId, userId);
+    const supply = parseEther('1000000'); // 1,000,000 VCD, all minted to the deployer
+    const data = encodeDeployData({ abi: DEMO_TOKEN_ABI, bytecode: DEMO_TOKEN_BYTECODE, args: [supply] }) as Hex;
+
+    const hash = await this.lock.withWalletLock(walletId, async () => {
+      const w = await this.prisma.wallet.findUnique({ where: { id: walletId } });
+      const pending = await this.chain.getPendingNonce(wallet.address as Hex);
+      const nonce = Math.max(pending, w!.nextNonce);
+      const request = await this.chain.prepareTransaction({ from: wallet.address as Hex, data, nonce }); // no `to` = deploy
+      const raw = (await this.signer.signTransaction(walletId, request)) as Hex;
+      let txHash: Hex;
+      try {
+        txHash = await this.chain.sendRawTransaction(raw);
+      } catch (e) {
+        throw new BadRequestException((e as Error).message);
+      }
+      await this.prisma.wallet.update({ where: { id: walletId }, data: { nextNonce: nonce + 1 } });
+      this.logger.log(`demo token deploy broadcast: ${txHash} (nonce ${nonce})`);
+      return txHash;
+    });
+
+    const receipt = await this.chain.waitForReceipt(hash);
+    if (!receipt.contractAddress) throw new BadRequestException('deploy produced no contract address');
+    const saved = await this.prisma.demoToken.upsert({
+      where: { id: 'singleton' },
+      create: { id: 'singleton', address: receipt.contractAddress, owner: wallet.address },
+      update: { address: receipt.contractAddress, owner: wallet.address },
+    });
+    this.logger.log(`demo token deployed: ${saved.address} (owner ${saved.owner})`);
+    return { address: saved.address, owner: saved.owner, txHash: hash };
+  }
+
+  /** The current demo token (address + owner=spender) or null. */
+  getDemoToken() {
+    return this.prisma.demoToken.findUnique({ where: { id: 'singleton' }, select: { address: true, owner: true } });
   }
 
   list(walletId: string, userId: string) {

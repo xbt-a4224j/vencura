@@ -179,6 +179,13 @@ export const api = {
   listAllActivity: () => call<ActivityItem[]>('/activity', { auth: true }),
   // Live system-log ring buffer; poll with the last-seen seq as a cursor.
   events: (after = 0) => call<{ lines: LogLine[]; seq: number }>(`/events?after=${after}`, { auth: true }),
+  // Demo ERC-20 (approve/transferFrom demo): deploy from a wallet, or read the current token.
+  deployToken: (walletId: string) =>
+    call<{ address: string; owner: string; txHash: string }>(`/wallets/${walletId}/deploy-token`, {
+      method: 'POST',
+      auth: true,
+    }),
+  getToken: () => call<{ address: string; owner: string } | null>('/token', { auth: true }),
   getPolicy: (walletId: string) => call<Policy>(`/wallets/${walletId}/policy`, { auth: true }),
   setPolicy: (walletId: string, policy: Policy) =>
     call<Policy>(`/wallets/${walletId}/policy`, { method: 'PUT', body: policy, auth: true }),

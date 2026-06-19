@@ -257,6 +257,7 @@ function UserView({ onExit }: { onExit: () => void }) {
         </span>
       </header>
       <StatusBar lastUpdated={lastUpdated} onRefresh={() => void refresh()} />
+      <UserTokenPanel wallets={wallets} />
       <h2 className="cap">Your wallets</h2>
       <p className="bal-sub">
         Create as many wallets as you like — each can hold ETH and tokens, send, and sign.
@@ -1519,6 +1520,239 @@ function PollingToggle() {
   );
 }
 
+// Admin Token tab: deploy a demo ERC-20 (admin owns the supply), distribute it to the user, then —
+// once the user approves the admin as spender — pull their tokens via transferFrom. The on-chain
+// allowance is the gate (replacing the old off-chain allowlist).
+function TokenTab({ wallets }: { wallets: Wallet[] }) {
+  const [token, setToken] = useState<{ address: string; owner: string } | null | undefined>(undefined);
+  const [deployFrom, setDeployFrom] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [dist, setDist] = useState({ to: '', amt: '' });
+  const [pull, setPull] = useState({ from: '', amt: '' });
+  const [holder, setHolder] = useState('');
+
+  const load = useCallback(() => api.getToken().then(setToken).catch(() => setToken(null)), []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  useEffect(() => {
+    if (!deployFrom && wallets[0]) setDeployFrom(wallets[0].id);
+  }, [wallets, deployFrom]);
+
+  const ownerWallet = token
+    ? wallets.find((w) => w.address.toLowerCase() === token.owner.toLowerCase())
+    : undefined;
+  const run = (fn: () => Promise<string>) => {
+    setBusy(true);
+    setMsg('');
+    fn()
+      .then(setMsg)
+      .catch((e) => setMsg((e as Error).message))
+      .finally(() => setBusy(false));
+  };
+  const deploy = () =>
+    run(async () => {
+      const t = await api.deployToken(deployFrom);
+      await load();
+      return `✓ deployed ${t.address} — tx ${shortHex(t.txHash)}`;
+    });
+  const distribute = () =>
+    run(async () => {
+      if (!ownerWallet) throw new Error('owner wallet not found locally');
+      const tx = await api.contractWrite(ownerWallet.id, {
+        address: token!.address,
+        abi: erc20Abi,
+        functionName: 'transfer',
+        args: [dist.to, parseEther(dist.amt || '0').toString()],
+      });
+      return `✓ sent ${dist.amt} VCD → ${shortHex(dist.to)} (nonce ${tx.nonce})`;
+    });
+  const transferFrom = () =>
+    run(async () => {
+      if (!ownerWallet) throw new Error('owner wallet not found locally');
+      const tx = await api.contractWrite(ownerWallet.id, {
+        address: token!.address,
+        abi: erc20Abi,
+        functionName: 'transferFrom',
+        args: [pull.from, token!.owner, parseEther(pull.amt || '0').toString()],
+      });
+      return `✓ pulled ${pull.amt} VCD from ${shortHex(pull.from)} → admin (nonce ${tx.nonce})`;
+    });
+  const checkAllowance = () =>
+    run(async () => {
+      const r = await api.contractRead({
+        address: token!.address,
+        abi: erc20Abi,
+        functionName: 'allowance',
+        args: [holder, token!.owner],
+      });
+      return `allowance(${shortHex(holder)} → admin) = ${toEth(String(r.result))} VCD`;
+    });
+
+  return (
+    <section>
+      <p className="bal-sub">
+        Deploy a demo ERC-20, distribute it to the user, then — once the user approves the admin —
+        pull their tokens with <code>transferFrom</code>. The on-chain allowance is the gate.
+      </p>
+      {token === undefined ? (
+        <p className="bal-sub">Loading…</p>
+      ) : !token ? (
+        <div className="form-grid">
+          <label className="field" htmlFor="deploy-from">
+            <span>Deploy from (funded wallet)</span>
+            <select id="deploy-from" value={deployFrom} onChange={(e) => setDeployFrom(e.target.value)}>
+              {wallets.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {walletLabel(w.id, w.address)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button onClick={deploy} disabled={busy || !deployFrom}>
+            {busy ? 'Deploying…' : 'Deploy demo token'}
+          </button>
+        </div>
+      ) : (
+        <>
+          <p>
+            Token <HashLink value={token.address} href={explorerAddress(token.address)} /> · owner /
+            spender <code>{shortHex(token.owner)}</code>
+            <CopyButton value={token.owner} label="⧉" />
+          </p>
+          <h4>1 · Distribute to a holder</h4>
+          <input
+            aria-label="recipient address"
+            placeholder="holder wallet 0x…"
+            value={dist.to}
+            onChange={(e) => setDist({ ...dist, to: e.target.value })}
+          />{' '}
+          <input
+            aria-label="distribute amount"
+            placeholder="amount (VCD)"
+            value={dist.amt}
+            onChange={(e) => setDist({ ...dist, amt: e.target.value })}
+          />{' '}
+          <button onClick={distribute} disabled={busy || !dist.to}>
+            Send tokens
+          </button>
+          <h4>2 · After the holder approves — pull with transferFrom</h4>
+          <input
+            aria-label="from address"
+            placeholder="holder 0x…"
+            value={pull.from}
+            onChange={(e) => setPull({ ...pull, from: e.target.value })}
+          />{' '}
+          <input
+            aria-label="transferFrom amount"
+            placeholder="amount (VCD)"
+            value={pull.amt}
+            onChange={(e) => setPull({ ...pull, amt: e.target.value })}
+          />{' '}
+          <button onClick={transferFrom} disabled={busy || !pull.from}>
+            transferFrom → admin
+          </button>
+          <h4>Check allowance</h4>
+          <input
+            aria-label="holder address for allowance"
+            placeholder="holder 0x…"
+            value={holder}
+            onChange={(e) => setHolder(e.target.value)}
+          />{' '}
+          <button onClick={checkAllowance} disabled={busy || !holder}>
+            Read allowance
+          </button>
+        </>
+      )}
+      {msg && <p>{msg}</p>}
+    </section>
+  );
+}
+
+// User-side demo-token panel: shows the token + lets the user approve the admin (spender) so the
+// admin can transferFrom their tokens. Hidden until a token has been deployed.
+function UserTokenPanel({ wallets }: { wallets: Wallet[] }) {
+  const [token, setToken] = useState<{ address: string; owner: string } | null>(null);
+  const [walletId, setWalletId] = useState('');
+  const [amt, setAmt] = useState('');
+  const [bal, setBal] = useState('');
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.getToken().then((t) => setToken(t)).catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    if (!walletId && wallets[0]) setWalletId(wallets[0].id);
+  }, [wallets, walletId]);
+
+  const wallet = wallets.find((w) => w.id === walletId);
+  const refreshBal = useCallback(() => {
+    if (!token || !wallet) return;
+    api
+      .contractRead({ address: token.address, abi: erc20Abi, functionName: 'balanceOf', args: [wallet.address] })
+      .then((r) => setBal(toEth(String(r.result))))
+      .catch(() => undefined);
+  }, [token, wallet]);
+  useEffect(() => {
+    refreshBal();
+  }, [refreshBal]);
+
+  if (!token || !wallet) return null;
+
+  const approve = () => {
+    setBusy(true);
+    setMsg('');
+    api
+      .contractWrite(walletId, {
+        address: token.address,
+        abi: erc20Abi,
+        functionName: 'approve',
+        args: [token.owner, parseEther(amt || '0').toString()],
+      })
+      .then((tx) => setMsg(`✓ approved admin for ${amt} VCD (nonce ${tx.nonce})`))
+      .catch((e) => setMsg((e as Error).message))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <section>
+      <h2 className="cap">Demo token (ERC-20)</h2>
+      <p className="bal-sub">
+        The admin issued a demo token (<HashLink value={token.address} href={explorerAddress(token.address)} />).
+        Approve the admin as a spender to let them move your tokens via <code>transferFrom</code>.
+      </p>
+      <div className="form-grid">
+        <label className="field" htmlFor="tok-wallet">
+          <span>From wallet</span>
+          <select id="tok-wallet" value={walletId} onChange={(e) => setWalletId(e.target.value)}>
+            {wallets.map((w) => (
+              <option key={w.id} value={w.id}>
+                {walletLabel(w.id, w.address)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span className="bal-sub">
+          balance {bal || '—'} VCD{' '}
+          <button type="button" className="copybtn" onClick={refreshBal}>
+            refresh
+          </button>
+        </span>
+        <label className="field" htmlFor="tok-amt">
+          <span>Approve amount (VCD)</span>
+          <input id="tok-amt" type="number" step="any" min="0" value={amt} onChange={(e) => setAmt(e.target.value)} />
+        </label>
+        <button onClick={approve} disabled={busy || !amt}>
+          {busy ? 'Approving…' : 'Approve admin'}
+        </button>
+      </div>
+      {msg && <p>{msg}</p>}
+    </section>
+  );
+}
+
 // Settings / Dev tools: the low-frequency, environment-level, or destructive controls — one tab
 // deep on purpose (audit #1/#10). Admin key shown as a status, never as the value.
 function SettingsTab({ onChange }: { onChange: () => void }) {
@@ -1688,6 +1922,7 @@ const ADMIN_TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'wallets', label: 'Wallets' },
   { id: 'limits', label: 'Limits' },
+  { id: 'token', label: 'Token' },
   { id: 'activity', label: 'Activity' },
   { id: 'settings', label: 'Settings' },
 ];
@@ -1718,6 +1953,7 @@ function AdminView({ onExit }: { onExit: () => void }) {
         {tab === 'overview' && <OverviewTab wallets={wallets} onGoWallets={() => setTab('wallets')} />}
         {tab === 'wallets' && <WalletsTab wallets={wallets} onChange={refresh} />}
         {tab === 'limits' && <PoliciesTab wallets={wallets} />}
+        {tab === 'token' && <TokenTab wallets={wallets} />}
         {tab === 'activity' && <ActivityTab wallets={wallets} />}
         {tab === 'settings' && <SettingsTab onChange={refresh} />}
       </div>

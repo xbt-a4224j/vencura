@@ -1004,3 +1004,10 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Files touched** — App.tsx (UserView/UserAuth, SendForm/WalletItem/PolicyEditor de-allowlisted, nickname), auth-context (loginUser/registerUser), api.ts (drop Person/allowlist, +singleUser); api: auth.service/controller, policy.engine/controller, seed, wallets.module, demo-mode (drop maskEmail), migration.
 **Tests** — api 94 pass; web typecheck/lint/build green.
 **Gotchas** — On deploy the prod DB still has isDemo=false junk accounts → /auth/user would surface one → must run admin reset to clean (done post-deploy). ERC-20 approve/transferFrom demo is the remaining unit.
+
+## v0.x.0 · Block 5 · ERC-20 approve/transferFrom demo (U3)
+**What & why** — The custody-gating demo: admin deploys a fixed-supply ERC-20, distributes it to a holder, then — only after the holder `approve`s the admin — pulls tokens via `transferFrom`. On-chain allowance replaces the old off-chain allowlist.
+**How it works** — [DemoToken](packages/api/src/admin/demo-token.artifact.ts) compiled (solc 0.8.26) + embedded. [deployDemoToken](packages/api/src/transactions/transactions.service.ts) signs a contract-creation tx via the existing wallet signer in the nonce lock, waits the receipt OUTSIDE the lock for the address, stores it ([DemoToken](packages/api/prisma/schema.prisma) singleton). [TokenController](packages/api/src/transactions/token.controller.ts): POST /wallets/:id/deploy-token, GET /token. Frontend: admin **Token** tab (deploy → distribute → transferFrom → allowance) + user approve panel — all via the existing contractRead/Write + viem erc20Abi.
+**Files** — schema+migration, chain.service (to? optional + waitForReceipt), transactions.service, token.controller, transactions.module, demo-token.artifact; web App.tsx (TokenTab/UserTokenPanel), api.ts.
+**Tests** — api 94 pass; web typecheck/lint/build green.
+**Gotchas** — Deploy is auth+owner (UI exposes it in Admin only); receipt wait is outside the lock so the wallet isn't stalled ~12s. The holder wallet needs gas (master-funded) to call approve.

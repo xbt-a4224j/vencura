@@ -130,3 +130,15 @@ model AuditLog {
   @@index([userId, createdAt])
   @@map("audit_log")
 }
+
+// The single deployed demo ERC-20 (approve/transferFrom demo). One row (id pinned to "singleton")
+// — redeploying replaces it. `owner` = the deployer wallet address, i.e. the spender the user
+// approves so the admin can transferFrom.
+model DemoToken {
+  id        String   @id @default("singleton")
+  address   String
+  owner     String
+  createdAt DateTime @default(now())
+
+  @@map("demo_token")
+}

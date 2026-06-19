@@ -45,7 +45,7 @@ export class ChainService {
 
   prepareTransaction(params: {
     from: Hex;
-    to: Hex;
+    to?: Hex; // omitted = contract creation (deploy)
     value?: bigint;
     data?: Hex;
     nonce: number;
@@ -59,6 +59,12 @@ export class ChainService {
 
   sendRawTransaction(serializedTransaction: Hex): Promise<Hex> {
     return this.client.sendRawTransaction({ serializedTransaction });
+  }
+
+  /** Wait for a tx to mine and return its receipt (used by contract deploy to read the new
+   *  contract address). */
+  waitForReceipt(hash: Hex) {
+    return this.client.waitForTransactionReceipt({ hash });
   }
 
   async getTransactionReceipt(hash: Hex) {
