@@ -4,6 +4,7 @@ import type { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { createTestClient, http, parseEther } from 'viem';
 import { generatePrivateKey, privateKeyToAddress } from 'viem/accounts';
+import type { Hex } from '@vencura/shared';
 import { encrypt } from '../signer/aes-256-gcm';
 
 const DEMO_EMAIL = 'demo@vencura.local';
@@ -23,6 +24,13 @@ function masterKey(): Buffer {
   const key = Buffer.from(hex, 'hex');
   if (key.length !== 32) throw new Error('MASTER_ENCRYPTION_KEY must be 32 bytes of hex (64 hex chars)');
   return key;
+}
+
+/** A fixed demo private key (DEMO_FUNDED_PRIVKEY) so the demo wallet's address is stable
+ *  across re-seeds and stays funded; null if unset/invalid → fall back to a random key. */
+function demoFundedKey(): Hex | null {
+  const k = process.env.DEMO_FUNDED_PRIVKEY ?? '';
+  return /^0x[0-9a-fA-F]{64}$/.test(k) ? (k as Hex) : null;
 }
 
 /** Best-effort fund a wallet on a local anvil node; no-op (logged) on a real RPC. */
@@ -51,7 +59,10 @@ export async function seedDemo(prisma: PrismaClient): Promise<SeedResult> {
 
   const wallets: SeedResult['wallets'] = [];
   for (let i = 0; i < WALLET_COUNT; i++) {
-    const privateKey = generatePrivateKey();
+    // Wallet 0 (the policy/sender wallet) uses a fixed key from DEMO_FUNDED_PRIVKEY when set,
+    // so its address is STABLE across re-seeds/resets — fund it once on a faucet and the funds
+    // persist (they live on-chain at the address, not in the DB). Other wallets stay random.
+    const privateKey = i === 0 ? (demoFundedKey() ?? generatePrivateKey()) : generatePrivateKey();
     const address = privateKeyToAddress(privateKey);
     const wallet = await prisma.wallet.create({
       data: { userId: user.id, address, ...encrypt(privateKey, key) },
