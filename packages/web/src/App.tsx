@@ -65,9 +65,23 @@ function useChainHead() {
   return head;
 }
 
-// Shared status bar: network, live block/gas heartbeat, last refresh.
-function StatusBar({ lastUpdated, onRefresh }: { lastUpdated?: string; onRefresh?: () => void }) {
+// Shared status bar: network + live block/gas heartbeat, the time that block reading was
+// fetched ("updated"), and a right-aligned wall clock — together they assure the user the
+// block number is current (it updates, and "now" keeps ticking past it). lastUpdated/onRefresh
+// stay optional for callers that still want a manual refresh control.
+function StatusBar({ onRefresh }: { lastUpdated?: string; onRefresh?: () => void }) {
   const head = useChainHead();
+  const [headAt, setHeadAt] = useState('');
+  const [now, setNow] = useState(() => new Date().toLocaleTimeString());
+  // Stamp the fetch time whenever a fresh head arrives.
+  useEffect(() => {
+    if (head) setHeadAt(new Date().toLocaleTimeString());
+  }, [head]);
+  // Tick the wall clock every second so "now" visibly advances.
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date().toLocaleTimeString()), 1000);
+    return () => clearInterval(t);
+  }, []);
   return (
     <div className="statusbar">
       <span className="net">
@@ -81,12 +95,15 @@ function StatusBar({ lastUpdated, onRefresh }: { lastUpdated?: string; onRefresh
           <span>gas {head.gasGwei} gwei</span>
         </>
       )}
-      {lastUpdated && <span>updated {lastUpdated}</span>}
+      {headAt && <span>updated {headAt}</span>}
       {onRefresh && (
         <button type="button" className="copybtn" onClick={onRefresh}>
           Refresh
         </button>
       )}
+      <span className="clock" style={{ marginLeft: 'auto' }} title="current time">
+        {now}
+      </span>
     </div>
   );
 }
