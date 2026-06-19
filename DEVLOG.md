@@ -929,3 +929,8 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **What & why** — Coded, traceable errors read as a production system (ux-redressal §3 #3; the brainstorm's "audit & observability"). Every error now carries a stable `code` + a per-error `traceId`.
 **How it works** — [chain-error.ts](packages/api/src/common/chain-error.ts) returns a `code` (INSUFFICIENT_FUNDS / NONCE_TOO_LOW / REPLACEMENT_UNDERPRICED / RPC_UNAVAILABLE). [all-exceptions.filter.ts](packages/api/src/common/all-exceptions.filter.ts) adds `code` (via a `codeFor` taxonomy — POLICY_VIOLATION, INVALID_ADDRESS, UNAUTHORIZED, NOT_FOUND, CONFLICT, INTERNAL, …) and a `traceId` (`randomBytes(4)`) to the RFC-7807 body, and logs `[traceId]` on a 5xx so a reported error maps to a server log line. The web client surfaces the traceId in 5xx messages.
 **Tests** — chain-error.spec asserts the code; filter.spec asserts code + a traceId (+ no-leak still holds). 13 common tests green; full suite green.
+
+## Backend/wow · B2 — live chain-head heartbeat (block + gas)    ([#41](https://github.com/xbt-a4224j/vencura/issues/41))
+**What & why** — The "system is alive" ambient signal (the brainstorm's block-height heartbeat + metrics). A ticking block number reads as connected-to-a-live-chain even when idle.
+**How it works** — `ChainService.getGasPrice()` + a public `GET /chain/head` ([chain.controller.ts](packages/api/src/infra/chain/chain.controller.ts)) return `{ network, blockNumber, gasGwei }`; the web `Shell` polls it every 6s and renders `Sepolia ● · block N · gas X gwei` in the status bar (block ticking = heartbeat). Public chain data, so unauthenticated.
+**Tests** — thin passthrough controller (§13 config → smoke): typecheck 5/5, lint 4/4, build ok, full suite green.

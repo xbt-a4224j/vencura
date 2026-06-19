@@ -1,11 +1,13 @@
 import { Global, Module } from '@nestjs/common';
 import { createPublicClient, http } from 'viem';
+import { ChainController } from './chain.controller';
 import { ChainService } from './chain.service';
 import { PUBLIC_CLIENT } from './chain.constants';
 
 // @Global: balances + transactions inject ChainService without re-importing.
 @Global()
 @Module({
+  controllers: [ChainController],
   providers: [
     {
       provide: PUBLIC_CLIENT,

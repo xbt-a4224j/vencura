@@ -12,6 +12,10 @@ export class ChainService {
     return this.client.getBlockNumber();
   }
 
+  getGasPrice(): Promise<bigint> {
+    return this.client.getGasPrice();
+  }
+
   getNativeBalance(address: Hex): Promise<bigint> {
     return this.client.getBalance({ address });
   }

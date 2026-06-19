@@ -111,6 +111,8 @@ export const api = {
     call<AuthResult>('/auth/register', { method: 'POST', body: { email, password } }),
   login: (email: string, password: string) =>
     call<AuthResult>('/auth/login', { method: 'POST', body: { email, password } }),
+  // Public chain head for the status-bar heartbeat (block height + gas), no auth.
+  chainHead: () => call<{ network: string; blockNumber: number; gasGwei: number }>('/chain/head'),
   createWallet: () => call<Wallet>('/wallets', { method: 'POST', auth: true }),
   listWallets: () => call<Wallet[]>('/wallets', { auth: true }),
   getBalance: (walletId: string) => call<BalanceView>(`/wallets/${walletId}/balance`, { auth: true }),

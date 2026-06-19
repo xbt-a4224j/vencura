@@ -1028,6 +1028,7 @@ function Shell() {
   const [tab, setTab] = useState<'wallets' | 'admin'>('wallets');
   const [error, setError] = useState('');
   const [lastUpdated, setLastUpdated] = useState('');
+  const [head, setHead] = useState<{ blockNumber: number; gasGwei: number } | null>(null);
 
   const refresh = useCallback(() => {
     if (!email) {
@@ -1048,6 +1049,22 @@ function Shell() {
     void refresh();
   }, [refresh]);
 
+  // Ambient heartbeat: poll the chain head so the status bar shows the block ticking + gas.
+  useEffect(() => {
+    let active = true;
+    const tick = () =>
+      api
+        .chainHead()
+        .then((h) => active && setHead(h))
+        .catch(() => undefined);
+    void tick();
+    const t = setInterval(tick, 6000);
+    return () => {
+      active = false;
+      clearInterval(t);
+    };
+  }, []);
+
   return (
     <main className="app">
       <header>
@@ -1062,6 +1079,14 @@ function Shell() {
             <span className="net">
               <span className="dot" aria-hidden /> Sepolia
             </span>
+            {head && (
+              <>
+                <span>
+                  block <strong>{head.blockNumber.toLocaleString()}</strong>
+                </span>
+                <span>gas {head.gasGwei} gwei</span>
+              </>
+            )}
             <span>{lastUpdated ? `updated ${lastUpdated}` : 'connecting…'}</span>
             <button type="button" className="copybtn" onClick={() => void refresh()}>
               Refresh
