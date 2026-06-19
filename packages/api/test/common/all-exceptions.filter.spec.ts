@@ -20,12 +20,14 @@ describe('AllExceptionsFilter', () => {
     const { host, status, json } = mockHost();
     filter.catch(new ForbiddenException('policy violation'), host);
     expect(status).toHaveBeenCalledWith(HttpStatus.FORBIDDEN);
-    expect(json).toHaveBeenCalledWith({
+    const body = json.mock.calls[0][0];
+    expect(body).toMatchObject({
       type: 'about:blank',
-      title: expect.any(String),
       status: HttpStatus.FORBIDDEN,
       detail: 'policy violation',
+      code: 'POLICY_VIOLATION',
     });
+    expect(body.traceId).toEqual(expect.any(String));
   });
 
   it('preserves a 404 HttpException status', () => {

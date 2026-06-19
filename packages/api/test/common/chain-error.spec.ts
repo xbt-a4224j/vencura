@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { mapChainError } from '@/common/chain-error';
 
 describe('mapChainError', () => {
-  it('maps insufficient funds to 400', () => {
+  it('maps insufficient funds to 400 with a code', () => {
     const mapped = mapChainError(new Error('insufficient funds for gas * price + value'));
-    expect(mapped).toEqual({ status: 400, detail: expect.stringMatching(/insufficient funds/i) });
+    expect(mapped).toMatchObject({
+      status: 400,
+      detail: expect.stringMatching(/insufficient funds/i),
+      code: 'INSUFFICIENT_FUNDS',
+    });
   });
 
   it('maps nonce too low to 409', () => {
