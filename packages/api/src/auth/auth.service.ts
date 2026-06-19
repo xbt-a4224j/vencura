@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import type { Account, LoginInput, RegisterInput } from '@vencura/shared';
+import { ADMIN_EMAIL, type Account, type LoginInput, type RegisterInput } from '@vencura/shared';
 import * as argon2 from 'argon2';
 import { isDemoMode } from '../common/demo-mode';
 import { EventsService } from '../infra/events/events.service';
@@ -67,8 +67,7 @@ export class AuthService {
       select: { id: true, email: true },
       orderBy: { createdAt: 'asc' },
     });
-    const DEMO_EMAIL = 'demo@vencura.local';
-    return [...users].sort((a, b) => Number(b.email === DEMO_EMAIL) - Number(a.email === DEMO_EMAIL));
+    return [...users].sort((a, b) => Number(b.email === ADMIN_EMAIL) - Number(a.email === ADMIN_EMAIL));
   }
 
   /** The single self-registered (non-admin) user, or null if none exists yet. Drives the User

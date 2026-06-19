@@ -20,6 +20,11 @@ export const adminKeyStore = {
 // duplicated here to avoid pulling a workspace build dependency into the SPA for one constant.
 export const DEMO_PASSWORD = 'demo-password';
 
+// The seeded operator account — an admin, NOT a regular user. The User view never treats this
+// session as "the user". Mirrors ADMIN_EMAIL in packages/shared (kept in sync, duplicated to avoid
+// a workspace build dependency in the SPA, same as DEMO_PASSWORD above).
+export const ADMIN_EMAIL = 'admin@vencura.local';
+
 async function call<T>(
   path: string,
   options: { method?: string; body?: unknown; auth?: boolean; admin?: boolean } = {},

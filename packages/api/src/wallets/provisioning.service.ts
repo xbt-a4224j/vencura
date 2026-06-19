@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { NATIVE_ASSET, type Hex } from '@vencura/shared';
+import { ADMIN_EMAIL, NATIVE_ASSET, type Hex } from '@vencura/shared';
 import { parseEther } from 'viem';
 import { privateKeyToAddress } from 'viem/accounts';
 import { ChainService } from '../infra/chain/chain.service';
@@ -41,11 +41,11 @@ export class ProvisioningService {
       this.logger.warn(`master address ${address} from DEMO_FUNDED_PRIVKEY has no wallet row`);
       return null;
     }
-    const demo = await this.prisma.user.findUnique({ where: { email: 'demo@vencura.local' } });
-    if (!demo) return null;
-    this.logger.warn('DEMO_FUNDED_PRIVKEY unset — using the demo user\'s oldest wallet as master (best-effort)');
+    const admin = await this.prisma.user.findUnique({ where: { email: ADMIN_EMAIL } });
+    if (!admin) return null;
+    this.logger.warn("DEMO_FUNDED_PRIVKEY unset — using the admin account's oldest wallet as master (best-effort)");
     return this.prisma.wallet.findFirst({
-      where: { userId: demo.id },
+      where: { userId: admin.id },
       orderBy: { createdAt: 'asc' },
       select: { id: true, address: true },
     });

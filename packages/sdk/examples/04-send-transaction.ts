@@ -12,7 +12,7 @@ import { VencuraClient } from '../src';
 
 async function main() {
   const v = new VencuraClient();
-  await v.login('demo@vencura.local', 'demo-password');
+  await v.login('admin@vencura.local', 'demo-password');
 
   const wallets = await v.listWallets();
   if (wallets.length < 2) throw new Error('run `pnpm --filter @vencura/api db:seed` first');

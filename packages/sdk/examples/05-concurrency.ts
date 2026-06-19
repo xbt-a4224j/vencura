@@ -14,7 +14,7 @@ const N = 5;
 
 async function main() {
   const v = new VencuraClient();
-  await v.login('demo@vencura.local', 'demo-password');
+  await v.login('admin@vencura.local', 'demo-password');
   const wallets = await v.listWallets();
   const [sender, recipient] = wallets;
 

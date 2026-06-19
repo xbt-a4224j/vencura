@@ -4,10 +4,9 @@ import type { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { createTestClient, http, parseEther } from 'viem';
 import { generatePrivateKey, privateKeyToAddress } from 'viem/accounts';
-import { DEMO_PASSWORD, type Hex } from '@vencura/shared';
+import { ADMIN_EMAIL, DEMO_PASSWORD, type Hex } from '@vencura/shared';
 import { encrypt } from '../signer/aes-256-gcm';
 
-const DEMO_EMAIL = 'demo@vencura.local';
 const WALLET_COUNT = 1; // one wallet per account
 
 export interface SeedResult {
@@ -47,8 +46,8 @@ export async function seedDemo(prisma: PrismaClient): Promise<SeedResult> {
   const key = masterKey();
   const passwordHash = await argon2.hash(DEMO_PASSWORD);
   const user = await prisma.user.upsert({
-    where: { email: DEMO_EMAIL },
-    create: { email: DEMO_EMAIL, passwordHash, isDemo: true },
+    where: { email: ADMIN_EMAIL },
+    create: { email: ADMIN_EMAIL, passwordHash, isDemo: true },
     update: { passwordHash, isDemo: true },
   });
   // Re-seed cleanly: drop any prior demo wallets (cascades policies/txs/balances).
@@ -78,5 +77,5 @@ export async function seedDemo(prisma: PrismaClient): Promise<SeedResult> {
     update: { ...limits },
   });
 
-  return { email: DEMO_EMAIL, password: DEMO_PASSWORD, wallets };
+  return { email: ADMIN_EMAIL, password: DEMO_PASSWORD, wallets };
 }

@@ -271,3 +271,10 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
 
 /* Section caption used on a proper heading level (semantic h2) without the large default size. */
 .cap { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; margin: 18px 0 8px; }
+
+/* Clickable logo (in-app header h1) → back to the landing page. Inherits the h1's type; the
+   header's ◆ glyph stays on the h1, before the button. */
+.app > header h1 .logobtn {
+  background: none; border: none; padding: 0; margin: 0; font: inherit; color: inherit; cursor: pointer;
+}
+.app > header h1 .logobtn:hover { color: var(--accent-ink); }

@@ -22,3 +22,8 @@ export interface Account {
  *  one click), and the seed + admin "create account" register accounts with it. Demo-only —
  *  the deployment perimeter (Vercel Authentication) is the real security boundary. */
 export const DEMO_PASSWORD = 'demo-password';
+
+/** The seeded operator account. It's an `isDemo` account, NOT a regular user — it never appears
+ *  in the User view (which is for self-registered, non-admin accounts). The single source of truth
+ *  for "who is the admin", so the role check lives in one place. */
+export const ADMIN_EMAIL = 'admin@vencura.local';

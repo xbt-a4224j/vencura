@@ -5,7 +5,7 @@ import * as seed from '@/admin/seed';
 
 // seedDemo is heavy (argon2 + viem); stub it — we're testing reset's control flow,
 // not the seed routine (covered elsewhere).
-const seedResult = { email: 'demo@vencura.local', password: 'demo-password', wallets: [] };
+const seedResult = { email: 'admin@vencura.local', password: 'demo-password', wallets: [] };
 
 describe('AdminController.reset', () => {
   const prisma = { user: { deleteMany: vi.fn() } } as unknown as PrismaService;

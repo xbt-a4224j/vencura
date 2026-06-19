@@ -3,6 +3,7 @@ import { erc20Abi, isAddress, parseEther, recoverMessageAddress } from 'viem';
 import {
   type Account,
   type ActivityItem,
+  ADMIN_EMAIL,
   adminKeyStore,
   api,
   type BalanceLine,
@@ -229,12 +230,18 @@ function UserView({ onExit }: { onExit: () => void }) {
   const { current, signOut } = useAuth();
   const { wallets, refresh, lastUpdated } = useWallets(!!current);
 
-  if (!current) return <UserAuth onExit={onExit} />;
+  // The admin (a shared session) must not render as "the user" — the User view is for the
+  // self-registered, non-admin account only.
+  if (!current || current.email === ADMIN_EMAIL) return <UserAuth onExit={onExit} />;
 
   return (
     <main className="app">
       <header>
-        <h1>VenCura</h1>
+        <h1>
+          <button type="button" className="logobtn" onClick={onExit}>
+            VenCura
+          </button>
+        </h1>
         <span style={{ marginLeft: 'auto' }} className="account signed-in">
           <span>{current.email}</span>{' '}
           <button type="button" onClick={signOut} title="Sign out">
@@ -294,7 +301,12 @@ function UserAuth({ onExit }: { onExit: () => void }) {
   return (
     <main className="app">
       <header>
-        <h1>VenCura · User</h1>
+        <h1>
+          <button type="button" className="logobtn" onClick={onExit}>
+            VenCura
+          </button>{' '}
+          · User
+        </h1>
         <button type="button" className="link" style={{ marginLeft: 'auto' }} onClick={onExit}>
           ← Home
         </button>
@@ -1536,16 +1548,24 @@ const ADMIN_TABS = [
 ];
 function AdminView({ onExit }: { onExit: () => void }) {
   const { accounts, current, signIn } = useAuth();
+  // Always act as the admin: if no session, or a (stale) non-admin user is signed in, switch to
+  // the admin account. listAccounts only returns isDemo accounts, so accounts[0] is the admin.
+  const actingAsAdmin = current?.email === ADMIN_EMAIL;
   useEffect(() => {
-    if (!current && accounts.length > 0) void signIn(accounts[0]).catch(() => undefined);
-  }, [current, accounts, signIn]);
-  const { wallets, refresh, lastUpdated, error } = useWallets(!!current);
+    if (!actingAsAdmin && accounts.length > 0) void signIn(accounts[0]).catch(() => undefined);
+  }, [actingAsAdmin, accounts, signIn]);
+  const { wallets, refresh, lastUpdated, error } = useWallets(actingAsAdmin);
   const [tab, setTab] = useHashTab('overview');
 
   return (
     <main className="app">
       <header>
-        <h1>VenCura · Admin</h1>
+        <h1>
+          <button type="button" className="logobtn" onClick={onExit}>
+            VenCura
+          </button>{' '}
+          · Admin
+        </h1>
         <span style={{ marginLeft: 'auto' }} className="account signed-in">
           {current ? <span>acting as {current.email}</span> : <span>no account yet</span>}{' '}
           <button type="button" className="link" onClick={onExit}>
