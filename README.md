@@ -1,4 +1,4 @@
-# VenCura — the Venmo of wallets
+# VenCura — custodial Ethereum wallets over an API
 
 [![CI](https://github.com/xbt-a4224j/vencura/actions/workflows/ci.yml/badge.svg)](https://github.com/xbt-a4224j/vencura/actions/workflows/ci.yml)
 

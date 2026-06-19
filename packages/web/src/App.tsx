@@ -212,7 +212,7 @@ function Landing({ onPick }: { onPick: (view: 'user' | 'admin') => void }) {
     <main className="app landing">
       <header className="landing-head">
         <h1>VenCura</h1>
-        <p className="tagline">the Venmo of wallets</p>
+        <p className="tagline">custodial Ethereum wallets, over an API</p>
       </header>
       <div className="tiles">
         <button type="button" className="tile" onClick={() => onPick('user')}>
