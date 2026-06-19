@@ -1027,6 +1027,7 @@ function Shell() {
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [tab, setTab] = useState<'wallets' | 'admin'>('wallets');
   const [error, setError] = useState('');
+  const [lastUpdated, setLastUpdated] = useState('');
 
   const refresh = useCallback(() => {
     if (!email) {
@@ -1036,7 +1037,10 @@ function Shell() {
     setError('');
     return api
       .listWallets()
-      .then(setWallets)
+      .then((w) => {
+        setWallets(w);
+        setLastUpdated(new Date().toLocaleTimeString());
+      })
       .catch((err) => setError((err as Error).message));
   }, [email]);
 
@@ -1054,6 +1058,15 @@ function Shell() {
       </header>
       {email ? (
         <>
+          <div className="statusbar">
+            <span className="net">
+              <span className="dot" aria-hidden /> Sepolia
+            </span>
+            <span>{lastUpdated ? `updated ${lastUpdated}` : 'connecting…'}</span>
+            <button type="button" className="copybtn" onClick={() => void refresh()}>
+              Refresh
+            </button>
+          </div>
           <nav className="tabs">
             <button onClick={() => setTab('wallets')} disabled={tab === 'wallets'}>
               Wallets
