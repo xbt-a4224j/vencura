@@ -7,11 +7,6 @@ import { WalletsService } from '../wallets/wallets.service';
 
 const STALE_MS = 15_000; // serve cache; revalidate in the background if older than this
 
-/** Fixed native buffer held back from `available` so a send always leaves room for gas.
- *  0.0002 ETH ≈ 8 ETH transfers / ~3 ERC-20 approves at ~1 gwei (Sepolia), with headroom for a
- *  gas spike. Keeps a 0.001-provisioned wallet showing positive available; tune per network. */
-export const GAS_RESERVE_WEI = 200_000_000_000_000n; // 0.0002 ETH
-
 export interface BalanceView {
   walletId: string;
   balances: Array<{
@@ -93,10 +88,11 @@ export class BalancesService {
   ): Promise<BalanceView> {
     const balances = await Promise.all(
       rows.map(async (r) => {
-        // available = confirmed − pending(outgoing, same asset) − gas reserve (ETH only), clamped ≥ 0.
+        // available = confirmed − pending(outgoing, same asset), clamped ≥ 0. No gas reserve: the
+        // chain enforces balance ≥ amount + gas at broadcast (mapped to a clean "insufficient
+        // funds" error), so we don't hold back a hand-tuned buffer from the displayed balance.
         const pending = await this.pendingOutgoing(walletId, r.asset);
-        const reserve = r.asset === NATIVE_ASSET ? GAS_RESERVE_WEI : 0n;
-        let available = BigInt(r.confirmed) - pending - reserve;
+        let available = BigInt(r.confirmed) - pending;
         if (available < 0n) available = 0n;
         return {
           asset: r.asset,

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '@/infra/prisma/prisma.service';
 import { ChainService } from '@/infra/chain/chain.service';
 import { WalletsService } from '@/wallets/wallets.service';
-import { BalancesService, GAS_RESERVE_WEI } from '@/balances/balances.service';
+import { BalancesService } from '@/balances/balances.service';
 
 const prismaMock = {
   walletBalance: { findMany: vi.fn(), upsert: vi.fn() },
@@ -29,45 +29,41 @@ describe('BalancesService', () => {
     service = moduleRef.get(BalancesService);
   });
 
-  it('cache hit: confirmed minus the native gas reserve, no chain read', async () => {
+  it('cache hit: available = confirmed (no pending), no chain read', async () => {
     walletsMock.findOwnedOrThrow.mockResolvedValue({ id: 'w1', address: '0xabc' });
-    const confirmed = GAS_RESERVE_WEI + 1000n; // comfortably above the reserve
     prismaMock.walletBalance.findMany.mockResolvedValue([
-      { walletId: 'w1', asset: 'ETH', confirmed: confirmed.toString(), asOfBlock: 5, updatedAt: new Date() },
+      { walletId: 'w1', asset: 'ETH', confirmed: '1000', asOfBlock: 5, updatedAt: new Date() },
     ]);
     const view = await service.getBalances('w1', 'user-1');
     expect(view.balances[0]).toMatchObject({
       asset: 'ETH',
       symbol: 'ETH',
-      confirmed: confirmed.toString(),
-      available: (confirmed - GAS_RESERVE_WEI).toString(),
+      confirmed: '1000',
+      available: '1000', // no gas reserve held back
     });
     expect(chainMock.getNativeBalance).not.toHaveBeenCalled();
   });
 
-  it('available = confirmed − pending(outgoing, same asset) − gas reserve (ETH)', async () => {
+  it('available = confirmed − pending(outgoing, same asset)', async () => {
     walletsMock.findOwnedOrThrow.mockResolvedValue({ id: 'w1', address: '0xabc' });
-    const confirmed = GAS_RESERVE_WEI + 1000n;
     prismaMock.walletBalance.findMany.mockResolvedValue([
-      { walletId: 'w1', asset: 'ETH', confirmed: confirmed.toString(), asOfBlock: 5, updatedAt: new Date() },
+      { walletId: 'w1', asset: 'ETH', confirmed: '1000', asOfBlock: 5, updatedAt: new Date() },
     ]);
     prismaMock.transaction.findMany.mockResolvedValue([{ amount: '300' }]); // one pending outgoing ETH tx
     const view = await service.getBalances('w1', 'user-1');
-    expect(view.balances[0]).toMatchObject({
-      confirmed: confirmed.toString(),
-      available: (confirmed - 300n - GAS_RESERVE_WEI).toString(),
-    });
+    expect(view.balances[0]).toMatchObject({ confirmed: '1000', available: '700' });
     expect(prismaMock.transaction.findMany).toHaveBeenCalledWith({
       where: { walletId: 'w1', status: 'pending', asset: 'ETH' },
       select: { amount: true },
     });
   });
 
-  it('clamps available at 0 when pending + reserve exceed confirmed', async () => {
+  it('clamps available at 0 when pending exceeds confirmed', async () => {
     walletsMock.findOwnedOrThrow.mockResolvedValue({ id: 'w1', address: '0xabc' });
     prismaMock.walletBalance.findMany.mockResolvedValue([
       { walletId: 'w1', asset: 'ETH', confirmed: '100', asOfBlock: 5, updatedAt: new Date() },
     ]);
+    prismaMock.transaction.findMany.mockResolvedValue([{ amount: '500' }]); // pending > confirmed
     const view = await service.getBalances('w1', 'user-1');
     expect(view.balances[0].available).toBe('0');
   });
