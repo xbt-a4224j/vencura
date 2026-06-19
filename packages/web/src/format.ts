@@ -1,9 +1,10 @@
 import { formatEther } from 'viem';
 
-/** wei (bigint string) → human ETH string, rounded to `dp` decimals for legibility (the exact
- *  value lives in the wei tooltip). Falls back to the raw value if unparseable. Demo ERC-20s are
- *  18-decimal too, so this is used for all assets (see SendForm). */
-export function toEth(wei: string | bigint, dp = 6): string {
+/** wei (bigint string) → human ETH string, shown to `dp` decimals with trailing zeros trimmed
+ *  (so small balances read with real precision, e.g. 0.04877485; the exact wei lives in the
+ *  tooltip). Falls back to the raw value if unparseable. Demo ERC-20s are 18-decimal too, so this
+ *  is used for all assets (see SendForm). */
+export function toEth(wei: string | bigint, dp = 8): string {
   try {
     const full = formatEther(BigInt(wei));
     // Trim to dp decimals without scientific notation, then drop trailing zeros.
