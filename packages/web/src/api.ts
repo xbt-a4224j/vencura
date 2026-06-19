@@ -110,6 +110,11 @@ export interface SendInput {
   asset: string;
   amount: string; // base units (wei / token units)
 }
+export interface Person {
+  accountId: string;
+  email: string;
+  address: string;
+}
 export interface SeedResult {
   email: string;
   password: string;
@@ -127,7 +132,11 @@ export const api = {
   // Public chain head for the status-bar heartbeat (block height + gas), no auth.
   chainHead: () => call<{ network: string; blockNumber: number; gasGwei: number }>('/chain/head'),
   createWallet: () => call<Wallet>('/wallets', { method: 'POST', auth: true }),
+  // One wallet per account: returns the user's wallet, creating + master-funding it on first call.
+  provisionWallet: () => call<Wallet>('/wallets/provision', { method: 'POST', auth: true }),
   listWallets: () => call<Wallet[]>('/wallets', { auth: true }),
+  // Venmo-style recipient directory: other accounts with a payable wallet address.
+  listPeople: () => call<Person[]>('/people', { auth: true }),
   getBalance: (walletId: string) => call<BalanceView>(`/wallets/${walletId}/balance`, { auth: true }),
   signMessage: (walletId: string, message: string) =>
     call<{ signature: string }>(`/wallets/${walletId}/messages`, {

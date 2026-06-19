@@ -6,6 +6,7 @@ import {
   api,
   type BalanceLine,
   DEMO_PASSWORD,
+  type Person,
   type Policy,
   type Wallet,
 } from './api';
@@ -146,7 +147,6 @@ function Landing({ onPick }: { onPick: (view: 'user' | 'admin') => void }) {
 // User experience: pick an account (password prepopulated → one click), then drive your wallets.
 function UserView({ onExit }: { onExit: () => void }) {
   const { accounts, current, signIn, signOut } = useAuth();
-  const { wallets, refresh, lastUpdated, error: walletsError } = useWallets(!!current);
   const [selected, setSelected] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -222,10 +222,227 @@ function UserView({ onExit }: { onExit: () => void }) {
           </button>
         </span>
       </header>
-      <StatusBar lastUpdated={lastUpdated} onRefresh={() => void refresh()} />
-      {walletsError && <p role="alert">{walletsError}</p>}
-      <WalletsTab wallets={wallets} onChange={refresh} />
+      <StatusBar />
+      <Venmo />
     </main>
+  );
+}
+
+// Auto-refreshing native-ETH available balance for one wallet. Polls every BLOCK_MS so the
+// "updated" stamp ticks on its own — no manual Refresh button (CLAUDE.md §8 demoability).
+const BLOCK_MS = 12_000; // Sepolia block time
+function usePolledBalance(walletId: string | undefined) {
+  const [line, setLine] = useState<BalanceLine | null>(null);
+  const [updated, setUpdated] = useState('');
+  useEffect(() => {
+    if (!walletId) return;
+    let active = true;
+    const tick = () =>
+      api
+        .getBalance(walletId)
+        .then((b) => {
+          if (!active) return;
+          setLine(b.balances.find((l) => l.asset === 'ETH') ?? null);
+          setUpdated(new Date().toLocaleTimeString());
+        })
+        .catch(() => undefined);
+    void tick();
+    const t = setInterval(tick, BLOCK_MS);
+    return () => {
+      active = false;
+      clearInterval(t);
+    };
+  }, [walletId]);
+  return { line, updated };
+}
+
+// The Venmo user experience: one wallet (provisioned + funded on sign-in), a big balance,
+// a people-picker Send card, and an activity feed. The engineering surfaces live in Admin.
+function Venmo() {
+  const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [error, setError] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const { line, updated } = usePolledBalance(wallet?.id);
+
+  // One wallet per account: provision (create + master-fund) it on entry; idempotent server-side.
+  useEffect(() => {
+    let active = true;
+    api
+      .provisionWallet()
+      .then((w) => active && setWallet(w))
+      .catch((e) => active && setError((e as Error).message));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (error) return <p role="alert">{error}</p>;
+  if (!wallet) return <p className="bal-sub">Setting up your wallet…</p>;
+
+  const onSent = () => setRefreshKey((k) => k + 1);
+
+  return (
+    <section>
+      <div className="bal-grid">
+        <div className="bal-line">
+          <span className="bal-label">Available balance</span>
+          <span className="bal-amt" title={line ? `${line.available} wei` : undefined}>
+            {line ? toEth(line.available) : '—'} ETH
+          </span>
+          <span className="bal-sub">
+            <a href={explorerAddress(wallet.address)} target="_blank" rel="noreferrer" title={wallet.address}>
+              <code>{shortHex(wallet.address)}</code> ↗
+            </a>
+            <CopyButton value={wallet.address} label="⧉" />
+            {updated && ` · updated ${updated}`}
+          </span>
+        </div>
+      </div>
+      {line && BigInt(line.available) === 0n && (
+        <p className="hint">
+          Your wallet is empty — fund it from the{' '}
+          <a href={FAUCET_URL} target="_blank" rel="noreferrer">
+            Sepolia faucet ↗
+          </a>
+          <CopyButton value={wallet.address} label="copy address" />
+        </p>
+      )}
+
+      <h4>Pay someone</h4>
+      <VenmoSend wallet={wallet} onSent={onSent} />
+
+      <h4>Activity</h4>
+      <ActivityFeed wallet={wallet} refreshKey={refreshKey} />
+
+      <ContractPanel wallet={wallet} />
+    </section>
+  );
+}
+
+// Venmo-style send: pick a person (annotated allowed ✓ / blocked + inline Allow), enter ETH.
+// "Allow" appends them to this wallet's policy allowlist (setPolicy) so the send can proceed.
+function VenmoSend({ wallet, onSent }: { wallet: Wallet; onSent: () => void }) {
+  const [people, setPeople] = useState<Person[]>([]);
+  const [policy, setPolicy] = useState<Policy | null>(null);
+  const [recipient, setRecipient] = useState(CUSTOM);
+  const [custom, setCustom] = useState('');
+  const [amount, setAmount] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const loadPolicy = useCallback(
+    () => api.getPolicy(wallet.id).then(setPolicy).catch(() => undefined),
+    [wallet.id],
+  );
+  useEffect(() => {
+    api.listPeople().then(setPeople).catch(() => undefined);
+    void loadPolicy();
+  }, [loadPolicy]);
+
+  const allow = (policy?.allowlist ?? []).map((a) => a.toLowerCase());
+  const to = recipient === CUSTOM ? custom.trim() : recipient;
+  const isAllowed = (addr: string) => allow.length === 0 || allow.includes(addr.toLowerCase());
+
+  // Append `addr` to the wallet's allowlist (preserving limits), then refresh the local policy.
+  const allowAddress = async (addr: string) => {
+    setError('');
+    try {
+      const next = Array.from(new Set([...(policy?.allowlist ?? []), addr]));
+      await api.setPolicy(wallet.id, {
+        allowlist: next,
+        perTxLimit: policy?.perTxLimit ?? null,
+        dailyLimit: policy?.dailyLimit ?? null,
+      });
+      await loadPolicy();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      if (!to) throw new Error('Pick a recipient.');
+      if (!isAddress(to)) throw new Error('Enter a valid 0x address.');
+      let wei: bigint;
+      try {
+        wei = parseEther(amount);
+      } catch {
+        throw new Error('Enter a valid amount.');
+      }
+      if (wei <= 0n) throw new Error('Amount must be greater than 0.');
+      if (!isAllowed(to)) await allowAddress(to); // auto-allow custom address before sending
+      await api.send(wallet.id, { to, asset: 'ETH', amount: wei.toString() });
+      setAmount('');
+      onSent();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit}>
+      <div className="form-grid">
+        <label className="field" htmlFor={`pay-${wallet.id}`}>
+          <span>To</span>
+          <select id={`pay-${wallet.id}`} value={recipient} onChange={(e) => setRecipient(e.target.value)}>
+            <optgroup label="People">
+              {people.map((p) => (
+                <option key={p.accountId} value={p.address}>
+                  {isAllowed(p.address) ? '✓ ' : '🔒 '}
+                  {p.email}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Custom">
+              <option value={CUSTOM}>custom address…</option>
+            </optgroup>
+          </select>
+        </label>
+
+        {recipient === CUSTOM && (
+          <label className="field">
+            <span>Custom address</span>
+            <input
+              aria-label="custom recipient address"
+              placeholder="0x…"
+              value={custom}
+              onChange={(e) => setCustom(e.target.value)}
+            />
+          </label>
+        )}
+
+        <label className="field" htmlFor={`amt-${wallet.id}`}>
+          <span>Amount (ETH)</span>
+          <input
+            id={`amt-${wallet.id}`}
+            type="number"
+            step="any"
+            min="0"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+        </label>
+
+        <button type="submit" disabled={busy || amount.length === 0}>
+          {busy ? 'Sending…' : 'Pay'}
+        </button>
+      </div>
+      {to && isAddress(to) && !isAllowed(to) && (
+        <p className="hint">
+          🔒 {shortHex(to)} isn't on your allowlist yet —{' '}
+          <button type="button" className="copybtn" onClick={() => void allowAddress(to)}>
+            Allow
+          </button>{' '}
+          to enable paying them (Pay will also auto-allow).
+        </p>
+      )}
+      {error && <p role="alert">{error}</p>}
+    </form>
   );
 }
 
@@ -1194,6 +1411,12 @@ function AdminView({ onExit }: { onExit: () => void }) {
       <StatusBar lastUpdated={lastUpdated} onRefresh={() => void refresh()} />
       {error && <p role="alert">{error}</p>}
       <AdminTab wallets={wallets} onChange={refresh} />
+      <h3>Wallets (engineering surfaces)</h3>
+      <p className="bal-sub">
+        Create wallets, fire concurrent sends (nonce lock), internal transfers, send, sign, and
+        inspect — the surfaces that show the engineering. The User view is the Venmo experience.
+      </p>
+      <WalletsTab wallets={wallets} onChange={refresh} />
     </main>
   );
 }

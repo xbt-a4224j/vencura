@@ -1,4 +1,4 @@
-import { type INestApplication } from '@nestjs/common';
+import { Global, type INestApplication, Module } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -7,6 +7,7 @@ import { PrismaModule } from '@/infra/prisma/prisma.module';
 import { PrismaService } from '@/infra/prisma/prisma.service';
 import { ChainModule } from '@/infra/chain/chain.module';
 import { ChainService } from '@/infra/chain/chain.service';
+import { LOCK } from '@/infra/lock/lock';
 import { BalancesModule } from '@/balances/balances.module';
 
 const prismaMock = {
@@ -20,13 +21,21 @@ const chainMock = {
   getErc20Balance: vi.fn(),
 };
 
+// BalancesModule → WalletsModule → ProvisioningService needs LOCK (a @Global in the app).
+@Global()
+@Module({
+  providers: [{ provide: LOCK, useValue: { withWalletLock: <T>(_id: string, fn: () => Promise<T>) => fn() } }],
+  exports: [LOCK],
+})
+class GlobalLockMock {}
+
 describe('Balances HTTP', () => {
   let app: INestApplication;
   let token: string;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [PrismaModule, ChainModule, BalancesModule],
+      imports: [GlobalLockMock, PrismaModule, ChainModule, BalancesModule],
     })
       .overrideProvider(PrismaService)
       .useValue(prismaMock)

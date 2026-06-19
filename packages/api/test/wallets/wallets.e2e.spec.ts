@@ -1,14 +1,31 @@
-import { type INestApplication } from '@nestjs/common';
+import { Global, type INestApplication, Module } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { ChainService } from '@/infra/chain/chain.service';
+import { LOCK } from '@/infra/lock/lock';
 import { PrismaModule } from '@/infra/prisma/prisma.module';
 import { PrismaService } from '@/infra/prisma/prisma.service';
 import { SIGNER } from '@/signer/signer';
 import { WalletsModule } from '@/wallets/wallets.module';
 
 const prismaMock = { wallet: { create: vi.fn(), findMany: vi.fn() } };
+// ChainModule + LockModule are @Global in the real app; this isolated module test supplies
+// minimal doubles so ProvisioningService (which injects them) can be constructed.
+const chainMock = {};
+const lockMock = { withWalletLock: <T>(_id: string, fn: () => Promise<T>) => fn() };
+
+// Stand in for the app's @Global ChainModule + LockModule so ProvisioningService resolves.
+@Global()
+@Module({
+  providers: [
+    { provide: ChainService, useValue: chainMock },
+    { provide: LOCK, useValue: lockMock },
+  ],
+  exports: [ChainService, LOCK],
+})
+class GlobalInfraMock {}
 const signerMock = {
   createKey: vi.fn().mockResolvedValue({
     address: '0xWALLET',
@@ -23,7 +40,9 @@ describe('Wallets HTTP', () => {
   let token: string;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [PrismaModule, WalletsModule] })
+    const moduleRef = await Test.createTestingModule({
+      imports: [GlobalInfraMock, PrismaModule, WalletsModule],
+    })
       .overrideProvider(PrismaService)
       .useValue(prismaMock)
       .overrideProvider(SIGNER)
