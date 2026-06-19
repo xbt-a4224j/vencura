@@ -5,6 +5,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PrismaModule } from '@/infra/prisma/prisma.module';
 import { PrismaService } from '@/infra/prisma/prisma.service';
+import { EventsModule } from '@/infra/events/events.module';
 import { AuthModule } from '@/auth/auth.module';
 import { CurrentUser } from '@/auth/current-user.decorator';
 import { JwtAuthGuard } from '@/auth/jwt-auth.guard';
@@ -26,7 +27,7 @@ describe('Auth HTTP', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [PrismaModule, AuthModule],
+      imports: [PrismaModule, EventsModule, AuthModule],
       controllers: [ProbeController],
     })
       .overrideProvider(PrismaService)

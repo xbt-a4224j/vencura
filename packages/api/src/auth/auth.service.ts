@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import type { Account, LoginInput, RegisterInput } from '@vencura/shared';
 import * as argon2 from 'argon2';
 import { isDemoMode } from '../common/demo-mode';
+import { EventsService } from '../infra/events/events.service';
 import { PrismaService } from '../infra/prisma/prisma.service';
 
 export interface AuthResult {
@@ -17,6 +18,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly events: EventsService,
   ) {}
 
   async register({ email, password }: RegisterInput): Promise<AuthResult> {
@@ -36,6 +38,13 @@ export class AuthService {
       throw new UnauthorizedException('invalid email or password');
     }
     this.logger.log(`login succeeded: ${user.id}`);
+    // Durable governance event: a successful authentication belongs in the audit trail.
+    await this.events.record({
+      userId: user.id,
+      type: 'auth.login',
+      detail: { email: user.email },
+      msg: `login: ${user.email}`,
+    });
     return this.issue(user);
   }
 

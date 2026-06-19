@@ -974,3 +974,10 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **How it works** — [demo-mode.ts](packages/api/src/common/demo-mode.ts): `isDemoMode()` (default on; `DEMO_MODE=false` → endpoints stop enumerating tenants) + `maskEmail()`. [PeopleService](packages/api/src/wallets/people.service.ts) + [AuthService.listAccounts](packages/api/src/auth/auth.service.ts) gate on it; payee emails masked. Web: balance → `.bal-hero`, Venmo captions → semantic `<h2 className="cap">`, aria-labels on the contract/transfer/raw-call inputs, nicknames in the transfer dropdown.
 **Tests** — [demo-mode.spec.ts](packages/api/test/common/demo-mode.spec.ts) (maskEmail). 96 api tests pass; web green.
 **Gotchas** — DEMO_MODE defaults ON so the live demo is unchanged; set it false to see the prod posture (picker empty, no payee directory).
+
+## v0.x.0 · Block 5 · Login as an audited event (#8)
+**What & why** — A successful authentication is now a durable governance event, so the audit trail covers session creation alongside policy/wallet/send.
+**How it works** — [AuthService.login](packages/api/src/auth/auth.service.ts) injects EventsService (now global) and `record({ type: 'auth.login', detail:{email} })` after a verified login; surfaces on the live log + persists to `audit_log` (no new migration). Failed logins are intentionally NOT recorded as the user (no userId; same 401 to avoid enumeration).
+**Files touched** — auth.service.ts (inject + record); test wiring (auth.service.spec, auth.e2e) given an EventsService/EventsModule.
+**Tests** — 96 api tests pass.
+**Gotchas** — EventsModule imports AuthModule and AuthService injects EventsService (a global provider) — fine because it's not an `imports` cycle, only a global-provider injection.

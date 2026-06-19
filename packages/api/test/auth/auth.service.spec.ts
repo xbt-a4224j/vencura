@@ -4,6 +4,7 @@ import { Test } from '@nestjs/testing';
 import * as argon2 from 'argon2';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '@/infra/prisma/prisma.service';
+import { EventsService } from '@/infra/events/events.service';
 import { AuthService } from '@/auth/auth.service';
 
 const prismaMock = {
@@ -13,6 +14,7 @@ const prismaMock = {
     create: vi.fn(),
   },
 };
+const eventsMock = { record: vi.fn().mockResolvedValue(undefined), emit: vi.fn() };
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -22,7 +24,11 @@ describe('AuthService', () => {
     vi.clearAllMocks();
     const moduleRef = await Test.createTestingModule({
       imports: [JwtModule.register({ secret: 'test-secret', signOptions: { expiresIn: '1d' } })],
-      providers: [AuthService, { provide: PrismaService, useValue: prismaMock }],
+      providers: [
+        AuthService,
+        { provide: PrismaService, useValue: prismaMock },
+        { provide: EventsService, useValue: eventsMock },
+      ],
     }).compile();
     service = moduleRef.get(AuthService);
     jwt = moduleRef.get(JwtService);
