@@ -30,7 +30,10 @@ export class EventsService {
     return line;
   }
 
-  /** Persist a governance action to `audit_log` AND surface it on the live ring. */
+  /** Persist a governance action to `audit_log` AND surface it on the live ring. Best-effort: the
+   *  audit write must never fail the user's operation (e.g. a send/policy change), so a DB error
+   *  here is logged to the ring as a warning, not thrown. Production would harden this to a
+   *  transactional outbox so the trail can't silently drop a row. */
   async record(e: {
     userId: string;
     walletId?: string;
@@ -40,14 +43,18 @@ export class EventsService {
     level?: LogLine['level'];
   }): Promise<void> {
     this.emit(e.msg, e.level);
-    await this.prisma.auditLog.create({
-      data: {
-        userId: e.userId,
-        walletId: e.walletId ?? null,
-        type: e.type,
-        detail: (e.detail ?? undefined) as Prisma.InputJsonValue,
-      },
-    });
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          userId: e.userId,
+          walletId: e.walletId ?? null,
+          type: e.type,
+          detail: (e.detail ?? undefined) as Prisma.InputJsonValue,
+        },
+      });
+    } catch (err) {
+      this.emit(`audit write failed (${(err as Error).message})`, 'warn');
+    }
   }
 
   /** The live system log tail: every line with seq strictly greater than `after`, plus the head seq
