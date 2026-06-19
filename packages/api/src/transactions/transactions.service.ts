@@ -1,7 +1,13 @@
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { NATIVE_ASSET, type Hex, type SendTransactionInput } from '@vencura/shared';
-import { encodeFunctionData, erc20Abi } from 'viem';
+import {
+  NATIVE_ASSET,
+  type ContractWriteInput,
+  type Hex,
+  type SendTransactionInput,
+  type TransferInput,
+} from '@vencura/shared';
+import { type Abi, encodeFunctionData, erc20Abi } from 'viem';
 import { ChainService } from '../infra/chain/chain.service';
 import { LOCK, type Lock } from '../infra/lock/lock';
 import { PrismaService } from '../infra/prisma/prisma.service';
@@ -21,7 +27,30 @@ export class TransactionsService {
     @Inject(SIGNER) private readonly signer: Signer,
   ) {}
 
-  async send(walletId: string, userId: string, dto: SendTransactionInput, idempotencyKey?: string) {
+  /** Move funds between two wallets the SAME user owns. Reuses the send path entirely;
+   *  findOwnedOrThrow on the destination rejects cross-owner transfers with 403 (#30). */
+  async transfer(walletId: string, userId: string, input: TransferInput, idempotencyKey?: string) {
+    const dest = await this.wallets.findOwnedOrThrow(input.toWalletId, userId);
+    return this.send(walletId, userId, { to: dest.address, asset: input.asset, amount: input.amount }, idempotencyKey);
+  }
+
+  /** Write an arbitrary contract method: encode the call, then route it through the same
+   *  locked send path (sign + broadcast + nonce + idempotency). `value` is wei sent (#32). */
+  async writeContract(walletId: string, userId: string, input: ContractWriteInput, idempotencyKey?: string) {
+    const data = encodeFunctionData({
+      abi: input.abi as Abi,
+      functionName: input.functionName,
+      args: input.args,
+    });
+    return this.send(walletId, userId, { to: input.address, asset: 'CALL', amount: input.value, data }, idempotencyKey);
+  }
+
+  async send(
+    walletId: string,
+    userId: string,
+    dto: SendTransactionInput & { data?: string },
+    idempotencyKey?: string,
+  ) {
     const wallet = await this.wallets.findOwnedOrThrow(walletId, userId);
 
     return this.lock.withWalletLock(walletId, async () => {
@@ -42,8 +71,10 @@ export class TransactionsService {
       const nonce = Math.max(pending, w!.nextNonce);
       this.logger.log(`nonce acquired: ${walletId} → ${nonce}`);
 
-      const built =
-        dto.asset === NATIVE_ASSET
+      const built = dto.data
+        ? // generic contract call: raw calldata to `to`, optional value (#32)
+          { from: wallet.address as Hex, to: dto.to as Hex, data: dto.data as Hex, value: BigInt(dto.amount), nonce }
+        : dto.asset === NATIVE_ASSET
           ? { from: wallet.address as Hex, to: dto.to as Hex, value: BigInt(dto.amount), nonce }
           : {
               from: wallet.address as Hex,

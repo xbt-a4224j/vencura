@@ -7,16 +7,24 @@ import { WalletsModule } from '../wallets/wallets.module';
 import { ActivityController } from './activity.controller';
 import { ActivityService } from './activity.service';
 import { ConfirmationWatcher } from './confirmation-watcher.service';
+import { ContractsController } from './contracts.controller';
 import { MessagesController } from './messages.controller';
 import { TransactionsController } from './transactions.controller';
 import { TransactionsService } from './transactions.service';
+import { TransfersController } from './transfers.controller';
 
 // Hosts the sign + send operations and the unified on/off-chain activity history (§6.1).
 // ChainModule + LockModule are @Global, so ChainService and LOCK inject without re-importing.
 // BalancesModule is imported so the confirmation watcher can refresh balances on confirm.
 @Module({
   imports: [AuthModule, BalancesModule, PolicyModule, SignerModule, WalletsModule],
-  controllers: [MessagesController, TransactionsController, ActivityController],
+  controllers: [
+    MessagesController,
+    TransactionsController,
+    ActivityController,
+    TransfersController,
+    ContractsController,
+  ],
   providers: [TransactionsService, ConfirmationWatcher, ActivityService],
 })
 export class TransactionsModule {}

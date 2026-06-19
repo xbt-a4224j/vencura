@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { PublicClient } from 'viem';
+import type { Abi, PublicClient } from 'viem';
 import type { Hex } from '@vencura/shared';
 import { ERC20_ABI, PUBLIC_CLIENT } from './chain.constants';
 
@@ -22,6 +22,16 @@ export class ChainService {
       abi: ERC20_ABI,
       functionName: 'balanceOf',
       args: [address],
+    });
+  }
+
+  /** Generic view-function read (eth_call + decode) for an arbitrary contract (#32). */
+  readContract(input: { address: Hex; abi: unknown; functionName: string; args: unknown[] }): Promise<unknown> {
+    return this.client.readContract({
+      address: input.address,
+      abi: input.abi as Abi,
+      functionName: input.functionName,
+      args: input.args,
     });
   }
 

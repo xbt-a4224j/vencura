@@ -1,5 +1,5 @@
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
-import { parseEther } from 'viem';
+import { erc20Abi, parseEther } from 'viem';
 import {
   type ActivityItem,
   adminKeyStore,
@@ -209,6 +209,179 @@ function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: numb
   );
 }
 
+// #30: move ETH to another of your own wallets (checking → savings). Reuses the send path.
+function TransferForm({
+  wallet,
+  otherWallets,
+  onSent,
+}: {
+  wallet: Wallet;
+  otherWallets: Wallet[];
+  onSent: () => void;
+}) {
+  const [toWalletId, setToWalletId] = useState(otherWallets[0]?.id ?? '');
+  const [amount, setAmount] = useState('');
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+  if (otherWallets.length === 0) return null;
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setMsg('');
+    try {
+      const tx = await api.transfer(wallet.id, {
+        toWalletId,
+        asset: 'ETH',
+        amount: parseEther(amount || '0').toString(),
+      });
+      setMsg(`✓ transfer sent (nonce ${tx.nonce})`);
+      onSent();
+    } catch (err) {
+      setMsg((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <details>
+      <summary>Internal transfer (to your other wallets)</summary>
+      <form onSubmit={submit}>
+        <label>
+          To wallet
+          <select value={toWalletId} onChange={(e) => setToWalletId(e.target.value)}>
+            {otherWallets.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.address.slice(0, 12)}…
+              </option>
+            ))}
+          </select>
+        </label>{' '}
+        <label>
+          Amount (ETH)
+          <input value={amount} placeholder="0.01" onChange={(e) => setAmount(e.target.value)} />
+        </label>{' '}
+        <button disabled={busy}>{busy ? 'Sending…' : 'Transfer'}</button>
+        {msg && <p>{msg}</p>}
+      </form>
+    </details>
+  );
+}
+
+// #32: generic contract read/write, with a friendly ERC-20 front door + a raw "advanced" panel.
+function ContractPanel({ wallet }: { wallet: Wallet }) {
+  const [token, setToken] = useState('');
+  const [info, setInfo] = useState('');
+  const [spender, setSpender] = useState('');
+  const [approveAmt, setApproveAmt] = useState('');
+  const [apMsg, setApMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const readErc20 = (functionName: string, args: unknown[] = []) =>
+    api.contractRead({ address: token, abi: erc20Abi, functionName, args }).then((r) => r.result);
+
+  const inspect = async () => {
+    setBusy(true);
+    setInfo('');
+    try {
+      const [name, symbol, decimals, bal] = await Promise.all([
+        readErc20('name'),
+        readErc20('symbol'),
+        readErc20('decimals'),
+        readErc20('balanceOf', [wallet.address]),
+      ]);
+      setInfo(`${name} (${symbol}) · decimals ${decimals} · your balance ${bal}`);
+    } catch (e) {
+      setInfo((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const approve = async () => {
+    setApMsg('');
+    try {
+      const tx = await api.contractWrite(wallet.id, {
+        address: token,
+        abi: erc20Abi,
+        functionName: 'approve',
+        args: [spender, parseEther(approveAmt || '0').toString()],
+      });
+      setApMsg(`✓ approve sent (nonce ${tx.nonce})`);
+    } catch (e) {
+      setApMsg((e as Error).message);
+    }
+  };
+
+  return (
+    <details>
+      <summary>Contracts (ERC-20)</summary>
+      <label>
+        Token address
+        <input value={token} placeholder="0x… ERC-20 contract" onChange={(e) => setToken(e.target.value)} />
+      </label>{' '}
+      <button onClick={inspect} disabled={busy || !token}>
+        {busy ? 'Reading…' : 'Inspect token'}
+      </button>
+      {info && <p>{info}</p>}
+
+      <h4>Approve a spender</h4>
+      <input value={spender} placeholder="spender 0x…" onChange={(e) => setSpender(e.target.value)} />{' '}
+      <input value={approveAmt} placeholder="amount (ETH units)" onChange={(e) => setApproveAmt(e.target.value)} />{' '}
+      <button onClick={approve} disabled={!token || !spender}>
+        Approve
+      </button>
+      {apMsg && <p>{apMsg}</p>}
+
+      <RawContractCall wallet={wallet} />
+    </details>
+  );
+}
+
+// The fully-generic capability (any ABI / function / args) — power-user surface.
+function RawContractCall({ wallet }: { wallet: Wallet }) {
+  const [address, setAddress] = useState('');
+  const [abi, setAbi] = useState('');
+  const [fn, setFn] = useState('');
+  const [args, setArgs] = useState('[]');
+  const [out, setOut] = useState('');
+
+  const run = async (write: boolean) => {
+    setOut('');
+    try {
+      const parsedAbi = JSON.parse(abi);
+      const parsedArgs = JSON.parse(args || '[]');
+      if (write) {
+        const tx = await api.contractWrite(wallet.id, { address, abi: parsedAbi, functionName: fn, args: parsedArgs });
+        setOut(`✓ write sent (nonce ${tx.nonce})`);
+      } else {
+        const r = await api.contractRead({ address, abi: parsedAbi, functionName: fn, args: parsedArgs });
+        setOut(`result: ${JSON.stringify(r.result)}`);
+      }
+    } catch (e) {
+      setOut((e as Error).message);
+    }
+  };
+
+  return (
+    <details>
+      <summary>Advanced — raw call (any ABI)</summary>
+      <input value={address} placeholder="contract 0x…" onChange={(e) => setAddress(e.target.value)} />
+      <textarea value={abi} placeholder='ABI JSON, e.g. [{"type":"function",...}]' onChange={(e) => setAbi(e.target.value)} />
+      <input value={fn} placeholder="functionName" onChange={(e) => setFn(e.target.value)} />{' '}
+      <input value={args} placeholder='args JSON, e.g. ["0x..",123]' onChange={(e) => setArgs(e.target.value)} />{' '}
+      <button onClick={() => run(false)} disabled={!address || !fn}>
+        Read
+      </button>{' '}
+      <button onClick={() => run(true)} disabled={!address || !fn}>
+        Write
+      </button>
+      {out && <p>{out}</p>}
+    </details>
+  );
+}
+
 // Fires N sends at one wallet simultaneously to demonstrate the per-wallet nonce lock:
 // despite racing, every send gets a unique, consecutive nonce (no collisions, no gaps).
 function ConcurrencyDemo({ wallet, recipient }: { wallet: Wallet; recipient?: string }) {
@@ -357,6 +530,8 @@ function WalletItem({ wallet, otherWallets }: { wallet: Wallet; otherWallets: Wa
       />
 
       <ConcurrencyDemo wallet={wallet} recipient={recipientOptions[0]?.value} />
+      <TransferForm wallet={wallet} otherWallets={otherWallets} onSent={onSent} />
+      <ContractPanel wallet={wallet} />
 
       <h4>Activity (on-chain + signatures)</h4>
       <ActivityFeed wallet={wallet} refreshKey={refreshKey} />

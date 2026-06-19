@@ -115,6 +115,16 @@ export const api = {
       body: input,
       auth: true,
     }),
+  // #30: move funds between two of your own wallets (reuses the send path).
+  transfer: (walletId: string, input: { toWalletId: string; asset: string; amount: string }) =>
+    call<Transaction>(`/wallets/${walletId}/transfers`, { method: 'POST', body: input, auth: true }),
+  // #32: generic contract read (eth_call) + write (encode → send path).
+  contractRead: (input: { address: string; abi: unknown; functionName: string; args?: unknown[] }) =>
+    call<{ result: unknown }>('/contract/read', { method: 'POST', body: input, auth: true }),
+  contractWrite: (
+    walletId: string,
+    input: { address: string; abi: unknown; functionName: string; args?: unknown[]; value?: string },
+  ) => call<Transaction>(`/wallets/${walletId}/contract/write`, { method: 'POST', body: input, auth: true }),
   listTransactions: (walletId: string) =>
     call<Transaction[]>(`/wallets/${walletId}/transactions`, { auth: true }),
   listActivity: (walletId: string) =>
