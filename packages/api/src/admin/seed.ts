@@ -8,7 +8,7 @@ import { DEMO_PASSWORD, type Hex } from '@vencura/shared';
 import { encrypt } from '../signer/aes-256-gcm';
 
 const DEMO_EMAIL = 'demo@vencura.local';
-const WALLET_COUNT = 3;
+const WALLET_COUNT = 1; // one wallet per account
 
 export interface SeedResult {
   email: string;

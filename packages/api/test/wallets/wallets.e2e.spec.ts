@@ -59,17 +59,16 @@ describe('Wallets HTTP', () => {
 
   afterAll(async () => app?.close());
 
-  it('rejects an unauthenticated create with 401', async () => {
-    expect((await request(app.getHttpServer()).post('/wallets')).status).toBe(401);
+  // One wallet per account: provisioning is the only create path; the guard rejects anon callers.
+  it('rejects an unauthenticated provision with 401', async () => {
+    expect((await request(app.getHttpServer()).post('/wallets/provision')).status).toBe(401);
   });
 
-  it('creates a wallet for the authed user and returns only id + address', async () => {
-    prismaMock.wallet.create.mockResolvedValue({ id: 'w1', address: '0xWALLET' });
-    const res = await request(app.getHttpServer())
-      .post('/wallets')
-      .set('Authorization', `Bearer ${token}`);
-    expect(res.status).toBe(201);
-    expect(res.body).toEqual({ id: 'w1', address: '0xWALLET' });
-    expect(JSON.stringify(res.body)).not.toContain('ct');
+  it('lists wallets only for the authed user', async () => {
+    prismaMock.wallet.findMany.mockResolvedValue([{ id: 'w1', address: '0xWALLET', createdAt: new Date() }]);
+    const res = await request(app.getHttpServer()).get('/wallets').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body[0]).toMatchObject({ id: 'w1', address: '0xWALLET' });
+    expect(JSON.stringify(res.body)).not.toContain('ct'); // no key material
   });
 });

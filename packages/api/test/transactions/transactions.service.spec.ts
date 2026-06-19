@@ -108,15 +108,4 @@ describe('TransactionsService concurrency + idempotency', () => {
     expect(built.data).toBe('0xdeadbeef');
     expect(built.value).toBe(0n);
   });
-
-  // #30: an account↔account transfer resolves the destination wallet and reuses send().
-  it('transfer checks destination ownership and broadcasts via the send path', async () => {
-    const prisma = makePrisma();
-    const svc = await build(prisma);
-    await svc.transfer('w1', 'user-1', { toWalletId: 'w2', asset: 'ETH', amount: '5' });
-    // destination wallet was ownership-checked (findOwnedOrThrow == wallet.findFirst here)
-    expect(prisma.wallet.findFirst).toHaveBeenCalledWith('w2', 'user-1');
-    // and it went through the real send path → one broadcast
-    expect(chainMock.sendRawTransaction).toHaveBeenCalledTimes(1);
-  });
 });

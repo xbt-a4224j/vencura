@@ -1,12 +1,6 @@
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import {
-  NATIVE_ASSET,
-  type ContractWriteInput,
-  type Hex,
-  type SendTransactionInput,
-  type TransferInput,
-} from '@vencura/shared';
+import { NATIVE_ASSET, type ContractWriteInput, type Hex, type SendTransactionInput } from '@vencura/shared';
 import { type Abi, encodeDeployData, encodeFunctionData, erc20Abi, parseEther } from 'viem';
 import { DEMO_TOKEN_ABI, DEMO_TOKEN_BYTECODE } from '../admin/demo-token.artifact';
 import { ChainService } from '../infra/chain/chain.service';
@@ -27,13 +21,6 @@ export class TransactionsService {
     @Inject(LOCK) private readonly lock: Lock,
     @Inject(SIGNER) private readonly signer: Signer,
   ) {}
-
-  /** Move funds between two wallets the SAME user owns. Reuses the send path entirely;
-   *  findOwnedOrThrow on the destination rejects cross-owner transfers with 403 (#30). */
-  async transfer(walletId: string, userId: string, input: TransferInput, idempotencyKey?: string) {
-    const dest = await this.wallets.findOwnedOrThrow(input.toWalletId, userId);
-    return this.send(walletId, userId, { to: dest.address, asset: input.asset, amount: input.amount }, idempotencyKey);
-  }
 
   /** Write an arbitrary contract method: encode the call, then route it through the same
    *  locked send path (sign + broadcast + nonce + idempotency). `value` is wei sent (#32). */

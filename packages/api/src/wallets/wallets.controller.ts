@@ -15,12 +15,8 @@ export class WalletsController {
     private readonly provisioning: ProvisioningService,
   ) {}
 
-  @Post()
-  create(@CurrentUser() user: { id: string }) {
-    return this.wallets.create(user.id);
-  }
-
-  /** One wallet per account: return the user's wallet, creating + funding it on first call. */
+  /** One wallet per account: return the user's wallet, creating + funding it on first call.
+   *  (There is no create-additional endpoint — the model is exactly one wallet per account.) */
   @Post('provision')
   provision(@CurrentUser() user: { id: string }) {
     return this.provisioning.provision(user.id);

@@ -13,7 +13,7 @@ import {
 import { AuthProvider, useAuth } from './auth-context';
 import { PollingProvider, usePolling } from './polling-context';
 import { explorerAddress, explorerTx, FAUCET_URL } from './explorer';
-import { nicknames, shortHex, toEth, walletLabel } from './format';
+import { shortHex, toEth } from './format';
 
 // Copy any value to the clipboard with brief "Copied ✓" feedback.
 function CopyButton({ value, label = 'Copy' }: { value: string; label?: string }) {
@@ -262,7 +262,7 @@ function UserView({ onExit }: { onExit: () => void }) {
       <p className="bal-sub">
         Create as many wallets as you like — each can hold ETH and tokens, send, and sign.
       </p>
-      <WalletsTab wallets={wallets} onChange={refresh} />
+      <WalletsTab wallets={wallets} onChange={refresh} email={current.email} />
     </main>
   );
 }
@@ -556,70 +556,6 @@ function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: numb
   );
 }
 
-// #30: move ETH to another of your own wallets (checking → savings). Reuses the send path.
-function TransferForm({
-  wallet,
-  otherWallets,
-  onSent,
-}: {
-  wallet: Wallet;
-  otherWallets: Wallet[];
-  onSent: () => void;
-}) {
-  const [toWalletId, setToWalletId] = useState(otherWallets[0]?.id ?? '');
-  const [amount, setAmount] = useState('');
-  const [msg, setMsg] = useState('');
-  const [busy, setBusy] = useState(false);
-  if (otherWallets.length === 0) return null;
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    setMsg('');
-    try {
-      const tx = await api.transfer(wallet.id, {
-        toWalletId,
-        asset: 'ETH',
-        amount: parseEther(amount || '0').toString(),
-      });
-      setMsg(`✓ transfer sent (nonce ${tx.nonce})`);
-      onSent();
-    } catch (err) {
-      setMsg((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <details>
-      <summary>Internal transfer (to your other wallets)</summary>
-      <form onSubmit={submit}>
-        <label>
-          To wallet
-          <select value={toWalletId} onChange={(e) => setToWalletId(e.target.value)}>
-            {otherWallets.map((w) => (
-              <option key={w.id} value={w.id}>
-                {walletLabel(w.id, w.address)}
-              </option>
-            ))}
-          </select>
-        </label>{' '}
-        <label>
-          Amount (ETH)
-          <input
-            aria-label="internal transfer amount in ETH"
-            value={amount}
-            placeholder="0.01"
-            onChange={(e) => setAmount(e.target.value)}
-          />
-        </label>{' '}
-        <button disabled={busy}>{busy ? 'Sending…' : 'Transfer'}</button>
-        {msg && <p>{msg}</p>}
-      </form>
-    </details>
-  );
-}
 
 // #32: generic contract read/write, with a friendly ERC-20 front door + a raw "advanced" panel.
 function ContractPanel({ wallet }: { wallet: Wallet }) {
@@ -892,22 +828,12 @@ function ConcurrencyDemo({
   );
 }
 
-function WalletItem({
-  wallet,
-  otherWallets,
-  highlight,
-}: {
-  wallet: Wallet;
-  otherWallets: Wallet[];
-  highlight?: boolean;
-}) {
+function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
   const [balances, setBalances] = useState<BalanceLine[] | null>(null);
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [message, setMessage] = useState('');
   const [signature, setSignature] = useState('');
   const [verifyOut, setVerifyOut] = useState('');
-  const [nick, setNick] = useState(nicknames.get(wallet.id));
-  const [editNick, setEditNick] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -967,13 +893,6 @@ function WalletItem({
       .filter((b) => b.asset !== 'ETH')
       .map((b) => ({ value: b.asset, label: b.symbol })),
   ];
-  // Recipient dropdown: the user's own other wallets (plus a custom 0x address in the form).
-  const recipientOptions = otherWallets.map((w) => ({
-    value: w.address,
-    label: walletLabel(w.id, w.address),
-    group: 'Your wallets',
-  }));
-
   // Native-ETH availability drives the fund hint + gating the concurrency demo (needs gas).
   const ethBal = balances?.find((b) => b.asset === 'ETH');
   const ethAvailable = ethBal ? BigInt(ethBal.available) : 0n;
@@ -981,33 +900,9 @@ function WalletItem({
   const ethZero = !!balances && ethAvailable === 0n;
 
   return (
-    <li className={highlight ? 'flash' : undefined}>
+    <li>
       <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        {editNick ? (
-          <input
-            className="nick"
-            aria-label="wallet nickname"
-            placeholder="nickname"
-            autoFocus
-            value={nick}
-            style={{ width: 150 }}
-            onChange={(e) => {
-              setNick(e.target.value);
-              nicknames.set(wallet.id, e.target.value);
-            }}
-            onBlur={() => setEditNick(false)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') setEditNick(false);
-            }}
-          />
-        ) : (
-          <>
-            <span className="nick">{nick || 'Unnamed wallet'}</span>
-            <button type="button" className="copybtn" onClick={() => setEditNick(true)}>
-              Edit nickname…
-            </button>
-          </>
-        )}
+        <span className="nick">{email}</span>
         <a href={explorerAddress(wallet.address)} target="_blank" rel="noreferrer" title={wallet.address}>
           <code>{wallet.address}</code> ↗
         </a>
@@ -1050,16 +945,11 @@ function WalletItem({
       </div>
 
       <h4>Send</h4>
-      <SendForm
-        wallet={wallet}
-        assets={assetOptions}
-        recipients={recipientOptions}
-        policy={policy}
-        onSent={onSent}
-      />
+      <SendForm wallet={wallet} assets={assetOptions} recipients={[]} policy={policy} onSent={onSent} />
 
-      <ConcurrencyDemo wallet={wallet} recipient={recipientOptions[0]?.value} canSend={canSend} />
-      <TransferForm wallet={wallet} otherWallets={otherWallets} onSent={onSent} />
+      {/* One wallet per account → no internal "your wallets" recipients; the concurrency demo
+          fires repeated self-sends to prove the nonce lock. */}
+      <ConcurrencyDemo wallet={wallet} recipient={wallet.address} canSend={canSend} />
       <ContractPanel wallet={wallet} />
 
       <h4>Activity (on-chain + signatures)</h4>
@@ -1098,64 +988,27 @@ function WalletItem({
 
 // Wallets as collapsed accordion rows: only the open wallet's action panel is mounted, so the page
 // height stops scaling with wallet count (audit #1). One open at a time.
-function WalletsTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => void }) {
+// One wallet per account: ensure it exists (provision is idempotent + master-funds a new one),
+// then render its single panel — no create button, no list.
+function WalletsTab({ wallets, onChange, email }: { wallets: Wallet[]; onChange: () => void; email: string }) {
   const [error, setError] = useState('');
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [highlightId, setHighlightId] = useState<string | null>(null);
-  const create = async () => {
-    setError('');
-    try {
-      const w = await api.createWallet();
-      setHighlightId(w.id);
-      setOpenId(w.id);
-      setTimeout(() => setHighlightId(null), 1800);
-      onChange();
-    } catch (err) {
-      setError((err as Error).message);
+  useEffect(() => {
+    if (wallets.length === 0) {
+      api
+        .provisionWallet()
+        .then(() => onChange())
+        .catch((e) => setError((e as Error).message));
     }
-  };
+  }, [wallets.length, onChange]);
 
+  if (error) return <p role="alert">{error}</p>;
+  if (wallets.length === 0) return <p className="bal-sub">Setting up your wallet…</p>;
   return (
-    <section>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-        <button onClick={create}>Create wallet</button>
-        <button className="copybtn" onClick={onChange}>
-          Refresh
-        </button>
-      </div>
-      {error && <p role="alert">{error}</p>}
-      {wallets.length === 0 ? (
-        <p>No wallets yet — create one above, or seed demo data in Settings.</p>
-      ) : (
-        wallets.map((w) => {
-          const open = openId === w.id;
-          return (
-            <div key={w.id} className={highlightId === w.id ? 'flash' : undefined}>
-              <button
-                type="button"
-                className="wrow-head"
-                aria-expanded={open}
-                onClick={() => setOpenId(open ? null : w.id)}
-              >
-                <span className="nick">{nicknames.get(w.id) || 'Wallet'}</span>
-                <code>{shortHex(w.address)}</code>
-                <span className="bal-sub">{open ? 'open' : 'manage →'}</span>
-                <span className="caret" aria-hidden>
-                  {open ? '▾' : '▸'}
-                </span>
-              </button>
-              {open && (
-                <div className="wrow-detail">
-                  <ul style={{ margin: 0 }}>
-                    <WalletItem wallet={w} otherWallets={wallets.filter((o) => o.id !== w.id)} />
-                  </ul>
-                </div>
-              )}
-            </div>
-          );
-        })
-      )}
-    </section>
+    <ul>
+      {wallets.map((w) => (
+        <WalletItem key={w.id} wallet={w} email={email} />
+      ))}
+    </ul>
   );
 }
 
@@ -1212,7 +1065,7 @@ function PolicyEditor({ wallet }: { wallet: Wallet }) {
   return (
     <form className="policy-card" onSubmit={save}>
       <header>
-        <span className="nick">{nicknames.get(wallet.id) || 'Wallet'}</span>
+        <span className="nick">Wallet</span>
         <a href={explorerAddress(wallet.address)} target="_blank" rel="noreferrer" title={wallet.address}>
           <code>{shortHex(wallet.address)}</code> ↗
         </a>
@@ -1261,7 +1114,7 @@ function ActivityTable({ items, wallets }: { items: ActivityItem[]; wallets: Wal
   if (items.length === 0) return <p className="bal-sub">No activity yet.</p>;
   const label = (id?: string | null) => {
     const w = wallets.find((x) => x.id === id);
-    return w ? walletLabel(w.id, w.address) : '—';
+    return w ? shortHex(w.address) : '—';
   };
   return (
     <table className="act-table">
@@ -1605,7 +1458,7 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
             <select id="deploy-from" value={deployFrom} onChange={(e) => setDeployFrom(e.target.value)}>
               {wallets.map((w) => (
                 <option key={w.id} value={w.id}>
-                  {walletLabel(w.id, w.address)}
+                  {shortHex(w.address)}
                 </option>
               ))}
             </select>
@@ -1729,7 +1582,7 @@ function UserTokenPanel({ wallets }: { wallets: Wallet[] }) {
           <select id="tok-wallet" value={walletId} onChange={(e) => setWalletId(e.target.value)}>
             {wallets.map((w) => (
               <option key={w.id} value={w.id}>
-                {walletLabel(w.id, w.address)}
+                {shortHex(w.address)}
               </option>
             ))}
           </select>
@@ -1951,7 +1804,7 @@ function AdminView({ onExit }: { onExit: () => void }) {
       <Tabs tabs={ADMIN_TABS} active={tab} onChange={setTab} />
       <div role="tabpanel" aria-labelledby={`tab-${tab}`}>
         {tab === 'overview' && <OverviewTab wallets={wallets} onGoWallets={() => setTab('wallets')} />}
-        {tab === 'wallets' && <WalletsTab wallets={wallets} onChange={refresh} />}
+        {tab === 'wallets' && <WalletsTab wallets={wallets} onChange={refresh} email={current?.email ?? ''} />}
         {tab === 'limits' && <PoliciesTab wallets={wallets} />}
         {tab === 'token' && <TokenTab wallets={wallets} />}
         {tab === 'activity' && <ActivityTab wallets={wallets} />}

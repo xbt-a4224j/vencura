@@ -16,5 +16,4 @@ export * from './contract.schema';
 export * from './message.schema';
 export * from './policy.schema';
 export * from './send.schema';
-export * from './transfer.schema';
 export * from './polling.schema';

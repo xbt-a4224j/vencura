@@ -12,7 +12,6 @@ import { MessagesController } from './messages.controller';
 import { TokenController } from './token.controller';
 import { TransactionsController } from './transactions.controller';
 import { TransactionsService } from './transactions.service';
-import { TransfersController } from './transfers.controller';
 
 // Hosts the sign + send operations and the unified on/off-chain activity history (§6.1).
 // ChainModule + LockModule are @Global, so ChainService and LOCK inject without re-importing.
@@ -24,7 +23,6 @@ import { TransfersController } from './transfers.controller';
     TransactionsController,
     ActivityController,
     UserActivityController,
-    TransfersController,
     ContractsController,
     TokenController,
   ],

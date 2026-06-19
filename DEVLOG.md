@@ -1011,3 +1011,10 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Files** — schema+migration, chain.service (to? optional + waitForReceipt), transactions.service, token.controller, transactions.module, demo-token.artifact; web App.tsx (TokenTab/UserTokenPanel), api.ts.
 **Tests** — api 94 pass; web typecheck/lint/build green.
 **Gotchas** — Deploy is auth+owner (UI exposes it in Admin only); receipt wait is outside the lock so the wallet isn't stalled ~12s. The holder wallet needs gas (master-funded) to call approve.
+
+## v0.x.0 · Block 5 · One wallet per account + drop nicknames/internal-transfer
+**What & why** — Simplification: exactly one wallet per account (no create-many), wallet alias = the account email (nicknames removed entirely — they only existed to disambiguate multiple wallets), and internal transfer (which only worked with multiple wallets) removed with its plumbing.
+**How it works** — Seed makes 1 wallet; `WalletsController` drops POST /wallets (provision is the sole create path, idempotent + master-funded). [WalletsTab](packages/web/src/App.tsx) provisions-if-empty then renders the single [WalletItem](packages/web/src/App.tsx) (labeled by email). Recipients = custom 0x only; the concurrency demo self-sends. Removed: format.ts nicknames/walletLabel, TransferForm, /transfers controller+dto+service method, shared transfer.schema, api.createWallet/transfer.
+**Files** — seed.ts, wallets.controller.ts, transactions.{service,module}.ts, transfers.* (deleted), shared/transfer.schema (deleted), format.ts, App.tsx, api.ts; tests updated.
+**Tests** — api 93 pass; web typecheck/lint/build green.
+**Gotchas** — No new migration (WALLET_COUNT is seed-only); a reset is needed to bring an already-multi-wallet admin down to one wallet. The demo_token row survives reset (standalone table) so the deployed token persists.

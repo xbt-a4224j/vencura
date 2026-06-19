@@ -144,7 +144,6 @@ export const api = {
     call<AuthResult>('/auth/register', { method: 'POST', body: { email, password } }),
   // Public chain head for the status-bar heartbeat (block height + gas), no auth.
   chainHead: () => call<{ network: string; blockNumber: number; gasGwei: number }>('/chain/head'),
-  createWallet: () => call<Wallet>('/wallets', { method: 'POST', auth: true }),
   // One wallet per account: returns the user's wallet, creating + master-funding it on first call.
   provisionWallet: () => call<Wallet>('/wallets/provision', { method: 'POST', auth: true }),
   listWallets: () => call<Wallet[]>('/wallets', { auth: true }),
@@ -161,9 +160,6 @@ export const api = {
       body: input,
       auth: true,
     }),
-  // #30: move funds between two of your own wallets (reuses the send path).
-  transfer: (walletId: string, input: { toWalletId: string; asset: string; amount: string }) =>
-    call<Transaction>(`/wallets/${walletId}/transfers`, { method: 'POST', body: input, auth: true }),
   // #32: generic contract read (eth_call) + write (encode → send path).
   contractRead: (input: { address: string; abi: unknown; functionName: string; args?: unknown[] }) =>
     call<{ result: unknown }>('/contract/read', { method: 'POST', body: input, auth: true }),
