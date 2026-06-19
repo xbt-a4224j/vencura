@@ -997,3 +997,10 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Files touched** — polling-state.service.ts (new) · chain.module.ts · chain.controller.ts · admin.controller.ts · balance-refresher.service.ts · confirmation-watcher.service.ts · polling-context.tsx (new) · api.ts · App.tsx (useChainHead, usePolledBalance, ActivityFeed, PollingToggle, App root).
 **Tests** — Added no-op tests for both pollers when OFF; admin.controller.spec updated. 98 passed.
 **Gotchas** — In-memory singleton: restart resets to OFF (desired safe default). Multi-instance deploys get independent state — acceptable for single-node Railway target.
+
+## v0.x.0 · Block 5 · Single-user model + simplification (UX/API)
+**What & why** — Big simplification per review: one self-registered User (register if none → login after; no picker), Admin = the seeded funded account. Dropped the recipient allowlist (keep limits), the cross-user people directory, and email masking.
+**How it works** — User view = [UserAuth](packages/web/src/App.tsx) (register/login via real credentials) → manage many wallets (reuses WalletsTab). Recipients = own wallets + custom 0x. Policies tab → **Limits** (per-tx/daily only). Nickname is an explicit "Edit nickname…" toggle. Backend: register closes after one non-admin user; GET /auth/user; allowlist removed from schema/engine/policy; people module deleted.
+**Files touched** — App.tsx (UserView/UserAuth, SendForm/WalletItem/PolicyEditor de-allowlisted, nickname), auth-context (loginUser/registerUser), api.ts (drop Person/allowlist, +singleUser); api: auth.service/controller, policy.engine/controller, seed, wallets.module, demo-mode (drop maskEmail), migration.
+**Tests** — api 94 pass; web typecheck/lint/build green.
+**Gotchas** — On deploy the prod DB still has isDemo=false junk accounts → /auth/user would surface one → must run admin reset to clean (done post-deploy). ERC-20 approve/transferFrom demo is the remaining unit.

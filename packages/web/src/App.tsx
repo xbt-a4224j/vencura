@@ -1,13 +1,12 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { erc20Abi, isAddress, parseEther, recoverMessageAddress } from 'viem';
 import {
+  type Account,
   type ActivityItem,
   adminKeyStore,
   api,
   type BalanceLine,
-  DEMO_PASSWORD,
   type LogLine,
-  type Person,
   type Policy,
   type Wallet,
 } from './api';
@@ -235,76 +234,13 @@ function Landing({ onPick }: { onPick: (view: 'user' | 'admin') => void }) {
   );
 }
 
-// User experience: pick an account (password prepopulated → one click), then drive your wallets.
+// User experience: ONE self-registered account (register if none exists, else log in), then manage
+// your own wallets. No account picker — one user, arbitrarily many wallets.
 function UserView({ onExit }: { onExit: () => void }) {
-  const { accounts, current, signIn, signOut } = useAuth();
-  const [selected, setSelected] = useState('');
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
+  const { current, signOut } = useAuth();
+  const { wallets, refresh, lastUpdated } = useWallets(!!current);
 
-  const enter = async () => {
-    const acct = accounts.find((a) => a.id === (selected || accounts[0]?.id));
-    if (!acct) return;
-    setError('');
-    setBusy(true);
-    try {
-      await signIn(acct);
-    } catch (err) {
-      const m = (err as Error).message;
-      // The shared demo password only works for demo accounts; real/test registrations 401.
-      setError(
-        /invalid email or password/i.test(m)
-          ? `${m} — this account uses its own password. Pick the demo account (top of the list).`
-          : m,
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  if (!current) {
-    return (
-      <main className="app">
-        <header>
-          <h1>VenCura · User</h1>
-          <button type="button" className="link" style={{ marginLeft: 'auto' }} onClick={onExit}>
-            ← Home
-          </button>
-        </header>
-        <DemoBanner />
-        <section className="picker">
-          <h3>Choose an account</h3>
-          {accounts.length === 0 ? (
-            <p>
-              No accounts yet — open the <strong>Admin</strong> view to seed demo data or create one.
-            </p>
-          ) : (
-            <>
-              <label htmlFor="user-account">Account</label>{' '}
-              <select
-                id="user-account"
-                value={selected || accounts[0]?.id}
-                onChange={(e) => setSelected(e.target.value)}
-              >
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.email}
-                  </option>
-                ))}
-              </select>
-              <p className="bal-sub">
-                Password is prepopulated (<code>{DEMO_PASSWORD}</code>) — just continue.
-              </p>
-              <button type="button" onClick={enter} disabled={busy}>
-                {busy ? 'Signing in…' : 'Continue'}
-              </button>
-              {error && <p role="alert">{error}</p>}
-            </>
-          )}
-        </section>
-      </main>
-    );
-  }
+  if (!current) return <UserAuth onExit={onExit} />;
 
   return (
     <main className="app">
@@ -312,190 +248,52 @@ function UserView({ onExit }: { onExit: () => void }) {
         <h1>VenCura</h1>
         <span style={{ marginLeft: 'auto' }} className="account signed-in">
           <span>{current.email}</span>{' '}
-          <button type="button" onClick={signOut} title="Switch to another account">
-            Switch account
+          <button type="button" onClick={signOut} title="Sign out">
+            Sign out
           </button>{' '}
           <button type="button" className="link" onClick={onExit}>
             ← Home
           </button>
         </span>
       </header>
-      <StatusBar />
-      <Venmo />
+      <StatusBar lastUpdated={lastUpdated} onRefresh={() => void refresh()} />
+      <h2 className="cap">Your wallets</h2>
+      <p className="bal-sub">
+        Create as many wallets as you like — each can hold ETH and tokens, send, and sign.
+      </p>
+      <WalletsTab wallets={wallets} onChange={refresh} />
     </main>
   );
 }
 
-// Auto-refreshing native-ETH available balance for one wallet.
-// One initial fetch always runs; recurring interval only when live polling is ON.
-const BLOCK_MS = 12_000; // Sepolia block time
-function usePolledBalance(walletId: string | undefined) {
-  const { live } = usePolling();
-  const [line, setLine] = useState<BalanceLine | null>(null);
-  const [updated, setUpdated] = useState('');
-  useEffect(() => {
-    if (!walletId) return;
-    let active = true;
-    const tick = () =>
-      api
-        .getBalance(walletId)
-        .then((b) => {
-          if (!active) return;
-          setLine(b.balances.find((l) => l.asset === 'ETH') ?? null);
-          setUpdated(new Date().toLocaleTimeString());
-        })
-        .catch(() => undefined);
-    void tick();
-    if (!live) return () => { active = false; };
-    const t = setInterval(tick, BLOCK_MS);
-    return () => {
-      active = false;
-      clearInterval(t);
-    };
-  }, [walletId, live]);
-  return { line, updated };
-}
-
-// The Venmo user experience: one wallet (provisioned + funded on sign-in), a big balance,
-// a people-picker Send card, and an activity feed. The engineering surfaces live in Admin.
-function Venmo() {
-  const [wallet, setWallet] = useState<Wallet | null>(null);
-  const [error, setError] = useState('');
-  const [refreshKey, setRefreshKey] = useState(0);
-  const { line, updated } = usePolledBalance(wallet?.id);
-
-  // One wallet per account: provision (create + master-fund) it on entry; idempotent server-side.
-  useEffect(() => {
-    let active = true;
-    api
-      .provisionWallet()
-      .then((w) => active && setWallet(w))
-      .catch((e) => active && setError((e as Error).message));
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  if (error) return <p role="alert">{error}</p>;
-  if (!wallet) return <p className="bal-sub">Setting up your wallet…</p>;
-
-  const onSent = () => setRefreshKey((k) => k + 1);
-
-  return (
-    <section>
-      <div className="bal-grid">
-        <div className="bal-line">
-          <span className="bal-label">Available balance</span>
-          <span className="bal-hero" title={line ? `${line.available} wei` : undefined}>
-            {line ? toEth(line.available) : '—'}
-            <span className="unit">ETH</span>
-          </span>
-          <span className="bal-sub">
-            <a href={explorerAddress(wallet.address)} target="_blank" rel="noreferrer" title={wallet.address}>
-              <code>{shortHex(wallet.address)}</code> ↗
-            </a>
-            <CopyButton value={wallet.address} label="⧉" />
-            {updated && ` · updated ${updated}`}
-          </span>
-        </div>
-      </div>
-      {line && BigInt(line.available) === 0n && (
-        <p className="hint">
-          Your wallet is empty — fund it from the{' '}
-          <a href={FAUCET_URL} target="_blank" rel="noreferrer">
-            Sepolia faucet ↗
-          </a>
-          <CopyButton value={wallet.address} label="copy address" />
-        </p>
-      )}
-
-      <h2 className="cap">Pay someone</h2>
-      <VenmoSend wallet={wallet} onSent={onSent} />
-
-      <h2 className="cap">Activity</h2>
-      <ActivityFeed wallet={wallet} refreshKey={refreshKey} />
-
-      <ContractPanel wallet={wallet} />
-    </section>
-  );
-}
-
-// Venmo-style send: pick a person (annotated allowed ✓ / blocked + inline Allow), enter ETH.
-// "Allow" appends them to this wallet's policy allowlist (setPolicy) so the send can proceed.
-function VenmoSend({ wallet, onSent }: { wallet: Wallet; onSent: () => void }) {
-  const [people, setPeople] = useState<Person[]>([]);
-  const [policy, setPolicy] = useState<Policy | null>(null);
-  const [recipient, setRecipient] = useState(CUSTOM);
-  const [custom, setCustom] = useState('');
-  const [amount, setAmount] = useState('');
+// Single-user auth: register the one account if none exists yet, otherwise log in to it. Real
+// credentials (the user chooses a password) — not the shared admin demo password.
+function UserAuth({ onExit }: { onExit: () => void }) {
+  const { loginUser, registerUser } = useAuth();
+  const [existing, setExisting] = useState<Account | null | undefined>(undefined); // undefined = loading
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  // Two-step send: validate → review panel → confirm. `alsoAllow` makes allowlisting a deliberate,
-  // separate choice instead of a side effect of Pay (audit #7).
-  const [confirm, setConfirm] = useState<{ to: string; wei: bigint } | null>(null);
-  const [alsoAllow, setAlsoAllow] = useState(false);
 
-  const loadPolicy = useCallback(
-    () => api.getPolicy(wallet.id).then(setPolicy).catch(() => undefined),
-    [wallet.id],
-  );
   useEffect(() => {
-    api.listPeople().then(setPeople).catch(() => undefined);
-    void loadPolicy();
-  }, [loadPolicy]);
+    api
+      .singleUser()
+      .then((u) => {
+        setExisting(u);
+        if (u) setEmail(u.email);
+      })
+      .catch(() => setExisting(null));
+  }, []);
 
-  const allow = (policy?.allowlist ?? []).map((a) => a.toLowerCase());
-  const to = recipient === CUSTOM ? custom.trim() : recipient;
-  const isAllowed = (addr: string) => allow.length === 0 || allow.includes(addr.toLowerCase());
-
-  // Append `addr` to the wallet's allowlist (preserving limits), then refresh the local policy.
-  const allowAddress = async (addr: string) => {
-    setError('');
-    try {
-      const next = Array.from(new Set([...(policy?.allowlist ?? []), addr]));
-      await api.setPolicy(wallet.id, {
-        allowlist: next,
-        perTxLimit: policy?.perTxLimit ?? null,
-        dailyLimit: policy?.dailyLimit ?? null,
-      });
-      await loadPolicy();
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  };
-
-  // Step 1: validate and open the review panel (no funds move yet).
-  const review = (e: FormEvent) => {
+  const mode = existing ? 'login' : 'register';
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
-    setError('');
-    try {
-      if (!to) throw new Error('Pick a recipient.');
-      if (!isAddress(to)) throw new Error('Enter a valid 0x address.');
-      let wei: bigint;
-      try {
-        wei = parseEther(amount);
-      } catch {
-        throw new Error('Enter a valid amount.');
-      }
-      if (wei <= 0n) throw new Error('Amount must be greater than 0.');
-      setAlsoAllow(false);
-      setConfirm({ to, wei });
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  };
-
-  // Step 2: confirm. Allowlisting only happens if the user explicitly opted in (alsoAllow).
-  const confirmPay = async () => {
-    if (!confirm) return;
     setError('');
     setBusy(true);
     try {
-      if (!isAllowed(confirm.to) && alsoAllow) await allowAddress(confirm.to);
-      await api.send(wallet.id, { to: confirm.to, asset: 'ETH', amount: confirm.wei.toString() });
-      setAmount('');
-      setConfirm(null);
-      onSent();
+      if (mode === 'login') await loginUser(email.trim(), password);
+      else await registerUser(email.trim().toLowerCase(), password);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -504,93 +302,54 @@ function VenmoSend({ wallet, onSent }: { wallet: Wallet; onSent: () => void }) {
   };
 
   return (
-    <form onSubmit={review}>
-      <div className="form-grid">
-        <label className="field" htmlFor={`pay-${wallet.id}`}>
-          <span>To</span>
-          <select id={`pay-${wallet.id}`} value={recipient} onChange={(e) => setRecipient(e.target.value)}>
-            <optgroup label="People">
-              {people.map((p) => (
-                <option key={p.accountId} value={p.address}>
-                  {isAllowed(p.address) ? '✓ ' : '🔒 '}
-                  {p.email}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="Custom">
-              <option value={CUSTOM}>custom address…</option>
-            </optgroup>
-          </select>
-        </label>
-
-        {recipient === CUSTOM && (
-          <label className="field">
-            <span>Custom address</span>
-            <input
-              aria-label="custom recipient address"
-              placeholder="0x…"
-              value={custom}
-              onChange={(e) => setCustom(e.target.value)}
-            />
-          </label>
-        )}
-
-        <label className="field" htmlFor={`amt-${wallet.id}`}>
-          <span>Amount (ETH)</span>
-          <input
-            id={`amt-${wallet.id}`}
-            type="number"
-            step="any"
-            min="0"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-        </label>
-
-        <button type="submit" disabled={amount.length === 0 || !!confirm}>
-          Review payment
+    <main className="app">
+      <header>
+        <h1>VenCura · User</h1>
+        <button type="button" className="link" style={{ marginLeft: 'auto' }} onClick={onExit}>
+          ← Home
         </button>
-      </div>
-      {to && isAddress(to) && !isAllowed(to) && !confirm && (
-        <p className="hint">
-          🔒 {shortHex(to)} isn't on your allowlist yet —{' '}
-          <button type="button" className="copybtn" onClick={() => void allowAddress(to)}>
-            Allow
-          </button>{' '}
-          to enable paying them.
-        </p>
-      )}
-      {confirm && (
-        <div className="hint" role="group" aria-label="Confirm payment">
-          <div>
-            Send <strong>{toEth(confirm.wei.toString())} ETH</strong> to{' '}
-            <code>{shortHex(confirm.to)}</code>?
-          </div>
-          {!isAllowed(confirm.to) && (
-            <label style={{ display: 'flex', flexDirection: 'row', gap: 6, textTransform: 'none' }}>
-              <input type="checkbox" checked={alsoAllow} onChange={(e) => setAlsoAllow(e.target.checked)} />
-              Also add this recipient to the allowlist
+      </header>
+      <section className="picker">
+        <h3>{existing === undefined ? 'Loading…' : mode === 'login' ? 'Log in' : 'Create your account'}</h3>
+        {existing !== undefined && (
+          <form onSubmit={submit} className="form-grid">
+            <label className="field" htmlFor="user-email">
+              <span>Email</span>
+              <input
+                id="user-email"
+                type="email"
+                autoComplete="username"
+                value={email}
+                readOnly={mode === 'login'}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </label>
-          )}
-          {!isAllowed(confirm.to) && !alsoAllow && (
-            <p className="preflight bad" style={{ margin: '4px 0 0' }}>
-              ✗ not on the allowlist — the send will be blocked by policy unless you allow them
-            </p>
-          )}
-          <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-            <button type="button" onClick={confirmPay} disabled={busy}>
-              {busy ? 'Sending…' : 'Confirm & pay'}
+            <label className="field" htmlFor="user-pass">
+              <span>Password</span>
+              <input
+                id="user-pass"
+                type="password"
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </label>
+            <button type="submit" disabled={busy || !email || !password}>
+              {busy ? '…' : mode === 'login' ? 'Log in' : 'Register'}
             </button>
-            <button type="button" className="copybtn" onClick={() => setConfirm(null)} disabled={busy}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-      {error && <p role="alert">{error}</p>}
-    </form>
+          </form>
+        )}
+        <p className="bal-sub">
+          {mode === 'login'
+            ? 'This demo has one user account — log in to manage your wallets.'
+            : 'No user yet — register the single demo user. After this, registration is closed.'}
+        </p>
+        {error && <p role="alert">{error}</p>}
+      </section>
+    </main>
   );
 }
+
 
 const CUSTOM = '__custom__';
 
@@ -616,13 +375,10 @@ function SendForm({
   const [busy, setBusy] = useState(false);
 
   const to = recipient === CUSTOM ? custom.trim() : recipient;
-  // Client mirror of the server policy (allowlist + per-tx) for a live pre-flight verdict.
-  // The daily limit is server-enforced (needs today's spend), so it isn't previewed here.
+  // Client mirror of the server per-tx limit for a live pre-flight verdict. The daily limit is
+  // server-enforced (needs today's spend), so it isn't previewed here.
   const preflight = (() => {
     if (!policy || !to || !isAddress(to)) return null;
-    const allow = policy.allowlist.map((a) => a.toLowerCase());
-    if (allow.length > 0 && !allow.includes(to.toLowerCase()))
-      return { ok: false, msg: 'recipient not on allowlist' };
     if (asset === 'ETH' && policy.perTxLimit && amount) {
       try {
         if (parseEther(amount) > BigInt(policy.perTxLimit))
@@ -1150,6 +906,7 @@ function WalletItem({
   const [signature, setSignature] = useState('');
   const [verifyOut, setVerifyOut] = useState('');
   const [nick, setNick] = useState(nicknames.get(wallet.id));
+  const [editNick, setEditNick] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -1209,13 +966,12 @@ function WalletItem({
       .filter((b) => b.asset !== 'ETH')
       .map((b) => ({ value: b.asset, label: b.symbol })),
   ];
-  // Recipient dropdown: the user's other wallets + this wallet's policy allowlist.
-  const recipientOptions = [
-    ...otherWallets.map((w) => ({ value: w.address, label: walletLabel(w.id, w.address), group: 'Your wallets' })),
-    ...(policy?.allowlist ?? [])
-      .filter((a) => !otherWallets.some((w) => w.address.toLowerCase() === a.toLowerCase()))
-      .map((a) => ({ value: a, label: shortHex(a), group: 'Allowlisted' })),
-  ];
+  // Recipient dropdown: the user's own other wallets (plus a custom 0x address in the form).
+  const recipientOptions = otherWallets.map((w) => ({
+    value: w.address,
+    label: walletLabel(w.id, w.address),
+    group: 'Your wallets',
+  }));
 
   // Native-ETH availability drives the fund hint + gating the concurrency demo (needs gas).
   const ethBal = balances?.find((b) => b.asset === 'ETH');
@@ -1225,26 +981,39 @@ function WalletItem({
 
   return (
     <li className={highlight ? 'flash' : undefined}>
-      <div style={{ marginBottom: 8 }}>
-        <input
-          className="nick"
-          aria-label="wallet nickname"
-          placeholder="nickname"
-          value={nick}
-          style={{ width: 150 }}
-          onChange={(e) => {
-            setNick(e.target.value);
-            nicknames.set(wallet.id, e.target.value);
-          }}
-        />{' '}
+      <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        {editNick ? (
+          <input
+            className="nick"
+            aria-label="wallet nickname"
+            placeholder="nickname"
+            autoFocus
+            value={nick}
+            style={{ width: 150 }}
+            onChange={(e) => {
+              setNick(e.target.value);
+              nicknames.set(wallet.id, e.target.value);
+            }}
+            onBlur={() => setEditNick(false)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') setEditNick(false);
+            }}
+          />
+        ) : (
+          <>
+            <span className="nick">{nick || 'Unnamed wallet'}</span>
+            <button type="button" className="copybtn" onClick={() => setEditNick(true)}>
+              Edit nickname…
+            </button>
+          </>
+        )}
         <a href={explorerAddress(wallet.address)} target="_blank" rel="noreferrer" title={wallet.address}>
           <code>{wallet.address}</code> ↗
         </a>
         <CopyButton value={wallet.address} label="⧉" />
       </div>
-      {policy && (policy.allowlist.length > 0 || policy.perTxLimit || policy.dailyLimit) && (
+      {policy && (policy.perTxLimit || policy.dailyLimit) && (
         <div className="badges">
-          {policy.allowlist.length > 0 && <span className="badge">Allowlist: {policy.allowlist.length}</span>}
           {policy.perTxLimit && <span className="badge">Per-tx ≤ {toEth(policy.perTxLimit)} ETH</span>}
           {policy.dailyLimit && <span className="badge">Daily ≤ {toEth(policy.dailyLimit)} ETH</span>}
         </div>
@@ -1389,11 +1158,9 @@ function WalletsTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => 
   );
 }
 
-/** Edit one wallet's policy as a self-contained card: allowlist (one address per line) + per-tx
- *  and daily limits (entered in ETH). Labels sit directly above their field; save is disabled
- *  until something changes (audit #2). */
+/** Edit one wallet's spending limits as a self-contained card: per-tx + daily caps (entered in
+ *  ETH). Labels sit directly above their field; save is disabled until something changes. */
 function PolicyEditor({ wallet }: { wallet: Wallet }) {
-  const [allowlist, setAllowlist] = useState('');
   const [perTxLimit, setPerTxLimit] = useState('');
   const [dailyLimit, setDailyLimit] = useState('');
   const [loaded, setLoaded] = useState<Policy | null>(null);
@@ -1404,7 +1171,6 @@ function PolicyEditor({ wallet }: { wallet: Wallet }) {
     api
       .getPolicy(wallet.id)
       .then((p) => {
-        setAllowlist(p.allowlist.join('\n'));
         setPerTxLimit(p.perTxLimit ? toEth(p.perTxLimit) : '');
         setDailyLimit(p.dailyLimit ? toEth(p.dailyLimit) : '');
         setLoaded(p);
@@ -1412,23 +1178,16 @@ function PolicyEditor({ wallet }: { wallet: Wallet }) {
       .catch((e) => setError((e as Error).message));
   }, [wallet.id]);
 
-  // Dirty check vs the loaded policy so Save only lights up on a real change.
+  // Dirty check vs the loaded limits so Save only lights up on a real change.
   const dirty =
     !!loaded &&
-    (allowlist !== loaded.allowlist.join('\n') ||
-      perTxLimit !== (loaded.perTxLimit ? toEth(loaded.perTxLimit) : '') ||
+    (perTxLimit !== (loaded.perTxLimit ? toEth(loaded.perTxLimit) : '') ||
       dailyLimit !== (loaded.dailyLimit ? toEth(loaded.dailyLimit) : ''));
 
-  const badAddr = allowlist
-    .split('\n')
-    .map((a) => a.trim())
-    .filter(Boolean)
-    .some((a) => !isAddress(a));
-
   const cur = loaded
-    ? loaded.allowlist.length === 0 && !loaded.perTxLimit && !loaded.dailyLimit
-      ? 'No limits set — any recipient, any amount.'
-      : `${loaded.allowlist.length} allowed · per-tx ${loaded.perTxLimit ? `≤ ${toEth(loaded.perTxLimit)} ETH` : '∞'} · daily ${loaded.dailyLimit ? `≤ ${toEth(loaded.dailyLimit)} ETH` : '∞'}`
+    ? !loaded.perTxLimit && !loaded.dailyLimit
+      ? 'No limits set — any amount.'
+      : `per-tx ${loaded.perTxLimit ? `≤ ${toEth(loaded.perTxLimit)} ETH` : '∞'} · daily ${loaded.dailyLimit ? `≤ ${toEth(loaded.dailyLimit)} ETH` : '∞'}`
     : 'Loading…';
 
   const save = async (e: FormEvent) => {
@@ -1437,10 +1196,6 @@ function PolicyEditor({ wallet }: { wallet: Wallet }) {
     setStatus('');
     try {
       const next: Policy = {
-        allowlist: allowlist
-          .split('\n')
-          .map((a) => a.trim())
-          .filter(Boolean),
         // Limits are entered in ETH; persist as wei base units to match the backend.
         perTxLimit: perTxLimit.trim() ? parseEther(perTxLimit.trim()).toString() : null,
         dailyLimit: dailyLimit.trim() ? parseEther(dailyLimit.trim()).toString() : null,
@@ -1463,48 +1218,36 @@ function PolicyEditor({ wallet }: { wallet: Wallet }) {
         <CopyButton value={wallet.address} label="⧉" />
       </header>
       <p className="cur">Currently: {cur}</p>
-      <div className="policy-grid">
-        <label htmlFor={`allow-${wallet.id}`}>
-          Allowlist (one address per line — empty = any)
-          <textarea
-            id={`allow-${wallet.id}`}
-            aria-label={`allowlist for ${wallet.address}`}
-            value={allowlist}
-            onChange={(e) => setAllowlist(e.target.value)}
+      <div className="policy-limits">
+        <label htmlFor={`pertx-${wallet.id}`}>
+          Per-tx limit (ETH)
+          <input
+            id={`pertx-${wallet.id}`}
+            type="number"
+            step="any"
+            min="0"
+            placeholder="∞"
+            value={perTxLimit}
+            onChange={(e) => setPerTxLimit(e.target.value)}
           />
         </label>
-        <div className="policy-limits">
-          <label htmlFor={`pertx-${wallet.id}`}>
-            Per-tx limit (ETH)
-            <input
-              id={`pertx-${wallet.id}`}
-              type="number"
-              step="any"
-              min="0"
-              placeholder="∞"
-              value={perTxLimit}
-              onChange={(e) => setPerTxLimit(e.target.value)}
-            />
-          </label>
-          <label htmlFor={`daily-${wallet.id}`}>
-            Daily limit (ETH)
-            <input
-              id={`daily-${wallet.id}`}
-              type="number"
-              step="any"
-              min="0"
-              placeholder="∞"
-              value={dailyLimit}
-              onChange={(e) => setDailyLimit(e.target.value)}
-            />
-          </label>
-        </div>
+        <label htmlFor={`daily-${wallet.id}`}>
+          Daily limit (ETH)
+          <input
+            id={`daily-${wallet.id}`}
+            type="number"
+            step="any"
+            min="0"
+            placeholder="∞"
+            value={dailyLimit}
+            onChange={(e) => setDailyLimit(e.target.value)}
+          />
+        </label>
       </div>
-      {badAddr && <p className="preflight bad">✗ allowlist has an invalid 0x address</p>}
       <div className="save-row">
         {status && <span className="bal-sub">{status}</span>}
-        <button type="submit" disabled={!dirty || badAddr}>
-          Save policy
+        <button type="submit" disabled={!dirty}>
+          Save limits
         </button>
       </div>
       {error && <p role="alert">{error}</p>}
@@ -1944,7 +1687,7 @@ function SettingsTab({ onChange }: { onChange: () => void }) {
 const ADMIN_TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'wallets', label: 'Wallets' },
-  { id: 'policies', label: 'Policies' },
+  { id: 'limits', label: 'Limits' },
   { id: 'activity', label: 'Activity' },
   { id: 'settings', label: 'Settings' },
 ];
@@ -1974,7 +1717,7 @@ function AdminView({ onExit }: { onExit: () => void }) {
       <div role="tabpanel" aria-labelledby={`tab-${tab}`}>
         {tab === 'overview' && <OverviewTab wallets={wallets} onGoWallets={() => setTab('wallets')} />}
         {tab === 'wallets' && <WalletsTab wallets={wallets} onChange={refresh} />}
-        {tab === 'policies' && <PoliciesTab wallets={wallets} />}
+        {tab === 'limits' && <PoliciesTab wallets={wallets} />}
         {tab === 'activity' && <ActivityTab wallets={wallets} />}
         {tab === 'settings' && <SettingsTab onChange={refresh} />}
       </div>

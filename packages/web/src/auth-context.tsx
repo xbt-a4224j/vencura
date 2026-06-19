@@ -4,14 +4,19 @@ import { type Account, api, DEMO_PASSWORD, tokenStore } from './api';
 // Remember the last-used account so a reload restores the session without a prompt.
 const LAST_KEY = 'vencura.accountId';
 
+type AuthResultLike = { accessToken: string; user: Account };
+
 interface AuthCtx {
   accounts: Account[]; // every account — the User-view picker + the Admin list
   current: Account | null; // the signed-in account
   ready: boolean; // initial account list + session restore finished
-  signIn: (account: Account) => Promise<void>; // one-click login with the shared demo password
+  signIn: (account: Account) => Promise<void>; // Admin one-click login with the shared demo password
   signOut: () => void;
   createAccount: (email: string) => Promise<Account>; // Admin: register with the shared password
   reload: () => Promise<Account[]>; // refetch the account list (e.g. after seed/reset)
+  // User side: real credentials (the single self-registered account chooses its own password).
+  loginUser: (email: string, password: string) => Promise<void>;
+  registerUser: (email: string, password: string) => Promise<void>;
 }
 const Ctx = createContext<AuthCtx | null>(null);
 
@@ -52,6 +57,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [reload],
   );
 
+  // User side: the single self-registered account, with its own chosen password.
+  const enter = (res: AuthResultLike) => {
+    tokenStore.set(res.accessToken);
+    localStorage.setItem(LAST_KEY, res.user.id);
+    setCurrent(res.user);
+  };
+  const loginUser = useCallback(async (email: string, password: string) => {
+    enter(await api.login(email, password));
+  }, []);
+  const registerUser = useCallback(async (email: string, password: string) => {
+    enter(await api.register(email, password));
+  }, []);
+
   // On load: fetch the account list and best-effort restore the last-used session (no prompt).
   useEffect(() => {
     void (async () => {
@@ -63,7 +81,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [reload, signIn]);
 
   return (
-    <Ctx.Provider value={{ accounts, current, ready, signIn, signOut, createAccount, reload }}>
+    <Ctx.Provider
+      value={{ accounts, current, ready, signIn, signOut, createAccount, reload, loginUser, registerUser }}
+    >
       {children}
     </Ctx.Provider>
   );

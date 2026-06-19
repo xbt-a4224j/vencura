@@ -118,7 +118,6 @@ export interface LogLine {
 
 export interface Policy {
   walletId?: string;
-  allowlist: string[];
   perTxLimit: string | null;
   dailyLimit: string | null;
 }
@@ -126,11 +125,6 @@ export interface SendInput {
   to: string;
   asset: string;
   amount: string; // base units (wei / token units)
-}
-export interface Person {
-  accountId: string;
-  email: string;
-  address: string;
 }
 export interface SeedResult {
   email: string;
@@ -142,6 +136,8 @@ export const api = {
   // Account picker (User view) + real credentialed auth. Sign-in uses the shared demo password
   // (DEMO_PASSWORD), prepopulated client-side, so there is no typed login form anywhere.
   listAccounts: () => call<Account[]>('/auth/accounts'),
+  // The single self-registered user (or null) — drives User-view register-vs-login.
+  singleUser: () => call<Account | null>('/auth/user'),
   login: (email: string, password: string) =>
     call<AuthResult>('/auth/login', { method: 'POST', body: { email, password } }),
   register: (email: string, password: string) =>
@@ -152,8 +148,6 @@ export const api = {
   // One wallet per account: returns the user's wallet, creating + master-funding it on first call.
   provisionWallet: () => call<Wallet>('/wallets/provision', { method: 'POST', auth: true }),
   listWallets: () => call<Wallet[]>('/wallets', { auth: true }),
-  // Venmo-style recipient directory: other accounts with a payable wallet address.
-  listPeople: () => call<Person[]>('/people', { auth: true }),
   getBalance: (walletId: string) => call<BalanceView>(`/wallets/${walletId}/balance`, { auth: true }),
   signMessage: (walletId: string, message: string) =>
     call<{ signature: string }>(`/wallets/${walletId}/messages`, {
