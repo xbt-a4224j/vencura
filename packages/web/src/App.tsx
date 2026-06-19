@@ -103,12 +103,16 @@ function StatusBar({ onRefresh }: { lastUpdated?: string; onRefresh?: () => void
 }
 
 // Loads the signed-in account's wallets (re-fetches whenever the session changes).
-function useWallets(enabled: boolean) {
+// Keyed on the ACCOUNT id (not a boolean): when the signed-in account changes — e.g. admin → a
+// freshly-registered user — the wallet list re-fetches. Keying on `!!current` was a bug: both are
+// truthy across an admin→user switch, so the effect never re-fired and the User view showed the
+// admin's wallets (→ "wallet not found" on calls). `undefined` = not signed in → empty.
+function useWallets(accountId: string | undefined) {
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [error, setError] = useState('');
   const [lastUpdated, setLastUpdated] = useState('');
   const refresh = useCallback(() => {
-    if (!enabled) {
+    if (!accountId) {
       setWallets([]);
       return Promise.resolve();
     }
@@ -120,7 +124,7 @@ function useWallets(enabled: boolean) {
         setLastUpdated(new Date().toLocaleTimeString());
       })
       .catch((err) => setError((err as Error).message));
-  }, [enabled]);
+  }, [accountId]);
   useEffect(() => {
     void refresh();
   }, [refresh]);
@@ -228,7 +232,10 @@ function Landing({ onPick }: { onPick: (view: 'user' | 'admin') => void }) {
 // your own wallets. No account picker — one user, arbitrarily many wallets.
 function UserView({ onExit }: { onExit: () => void }) {
   const { current, signOut } = useAuth();
-  const { wallets, refresh, lastUpdated } = useWallets(!!current);
+  // Only the non-admin user's wallets (the admin session never drives the User view).
+  const { wallets, refresh, lastUpdated } = useWallets(
+    current && current.email !== ADMIN_EMAIL ? current.id : undefined,
+  );
 
   // The admin (a shared session) must not render as "the user" — the User view is for the
   // self-registered, non-admin account only.
@@ -1554,7 +1561,7 @@ function AdminView({ onExit }: { onExit: () => void }) {
   useEffect(() => {
     if (!actingAsAdmin && accounts.length > 0) void signIn(accounts[0]).catch(() => undefined);
   }, [actingAsAdmin, accounts, signIn]);
-  const { wallets, refresh, lastUpdated, error } = useWallets(actingAsAdmin);
+  const { wallets, refresh, lastUpdated, error } = useWallets(actingAsAdmin ? current?.id : undefined);
   const [tab, setTab] = useHashTab('overview');
 
   return (
