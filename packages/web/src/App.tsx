@@ -12,6 +12,7 @@ import {
   type Wallet,
 } from './api';
 import { AuthProvider, useAuth } from './auth-context';
+import { looksLikeEns, resolveEns } from './ens';
 import { explorerAddress, explorerTx, FAUCET_URL } from './explorer';
 import { shortHex, toEth } from './format';
 
@@ -377,12 +378,46 @@ function SendForm({
   const [amount, setAmount] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  // Recipient may be a 0x address OR an ENS name (resolved on mainnet). `resolved` holds the 0x we
+  // actually send to (+ the typed name, for the hints). `sent` is the last broadcast tx, surfaced
+  // as a prominent "track on Etherscan" link so it isn't lost in the activity feed.
+  const [resolved, setResolved] = useState<{ address: string; name?: string } | null>(null);
+  const [resolving, setResolving] = useState(false);
+  const [sent, setSent] = useState<{ txHash: string; name?: string } | null>(null);
 
-  const addr = to.trim();
+  // A 0x address passes through; an ENS name resolves via mainnet (debounced).
+  useEffect(() => {
+    const v = to.trim();
+    if (!v) {
+      setResolved(null);
+      return;
+    }
+    if (isAddress(v)) {
+      setResolved({ address: v });
+      return;
+    }
+    if (!looksLikeEns(v)) {
+      setResolved(null);
+      return;
+    }
+    let active = true;
+    setResolving(true);
+    const t = setTimeout(() => {
+      resolveEns(v)
+        .then((a) => active && setResolved(a ? { address: a, name: v } : null))
+        .finally(() => active && setResolving(false));
+    }, 400);
+    return () => {
+      active = false;
+      clearTimeout(t);
+    };
+  }, [to]);
+
+  const addr = resolved?.address ?? '';
   // Client mirror of the server per-tx limit for a live pre-flight verdict. The daily limit is
   // server-enforced (needs today's spend), so it isn't previewed here.
   const preflight = (() => {
-    if (!policy || !addr || !isAddress(addr)) return null;
+    if (!policy || !addr) return null;
     if (asset === 'ETH' && policy.perTxLimit && amount) {
       try {
         if (parseEther(amount) > BigInt(policy.perTxLimit))
@@ -399,8 +434,7 @@ function SendForm({
     setError('');
     setBusy(true);
     try {
-      if (!addr) throw new Error('Recipient is required.');
-      if (!isAddress(addr)) throw new Error('Enter a valid 0x address.');
+      if (!addr) throw new Error(resolving ? 'Resolving recipient…' : 'Enter a valid 0x address or ENS name.');
       // Amount is entered in ETH decimals; convert to wei base units before POST (ERC-20s
       // here are demo-only and also use 18 decimals, so parseEther is fine for the demo).
       let wei: bigint;
@@ -410,8 +444,10 @@ function SendForm({
         throw new Error('Enter a valid amount.');
       }
       if (wei <= 0n) throw new Error('Amount must be greater than 0.');
-      await api.send(wallet.id, { to: addr, asset, amount: wei.toString() });
+      const tx = await api.send(wallet.id, { to: addr, asset, amount: wei.toString() });
+      if (tx.txHash) setSent({ txHash: tx.txHash, name: resolved?.name });
       setAmount('');
+      setTo('');
       onSent();
     } catch (err) {
       setError((err as Error).message);
@@ -435,8 +471,13 @@ function SendForm({
         </label>
 
         <label className="field" htmlFor={`to-${wallet.id}`}>
-          <span>Recipient address</span>
-          <input id={`to-${wallet.id}`} placeholder="0x…" value={to} onChange={(e) => setTo(e.target.value)} />
+          <span>Recipient (0x or ENS)</span>
+          <input
+            id={`to-${wallet.id}`}
+            placeholder="0x… or vitalik.eth"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+          />
         </label>
 
         <label className="field" htmlFor={`amount-${wallet.id}`}>
@@ -451,13 +492,31 @@ function SendForm({
           />
         </label>
 
-        <button type="submit" disabled={busy || amount.length === 0}>
+        <button type="submit" disabled={busy || amount.length === 0 || !addr}>
           {busy ? 'Sending…' : 'Send'}
         </button>
       </div>
+      {resolving && <p className="bal-sub">resolving ENS…</p>}
+      {resolved?.name && (
+        <p className="bal-sub">
+          {resolved.name} → <code>{shortHex(resolved.address)}</code> ✓
+        </p>
+      )}
+      {to.trim() && !resolving && !resolved && (
+        <p className="preflight bad">✗ enter a valid 0x address or ENS name</p>
+      )}
       {preflight && (
         <p className={`preflight ${preflight.ok ? 'ok' : 'bad'}`}>
           {preflight.ok ? '✓ within policy' : `✗ would be blocked: ${preflight.msg}`}
+        </p>
+      )}
+      {sent && (
+        <p className="hint">
+          ✓ Sent{sent.name ? ` to ${sent.name}` : ''} — track your transaction:{' '}
+          <a href={explorerTx(sent.txHash)} target="_blank" rel="noreferrer">
+            on Etherscan ↗
+          </a>
+          <CopyButton value={sent.txHash} label="copy tx" />
         </p>
       )}
       {error && <p role="alert">{error}</p>}
