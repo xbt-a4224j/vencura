@@ -374,8 +374,9 @@ function Venmo() {
       <div className="bal-grid">
         <div className="bal-line">
           <span className="bal-label">Available balance</span>
-          <span className="bal-amt" title={line ? `${line.available} wei` : undefined}>
-            {line ? toEth(line.available) : '—'} ETH
+          <span className="bal-hero" title={line ? `${line.available} wei` : undefined}>
+            {line ? toEth(line.available) : '—'}
+            <span className="unit">ETH</span>
           </span>
           <span className="bal-sub">
             <a href={explorerAddress(wallet.address)} target="_blank" rel="noreferrer" title={wallet.address}>
@@ -396,10 +397,10 @@ function Venmo() {
         </p>
       )}
 
-      <h4>Pay someone</h4>
+      <h2 className="cap">Pay someone</h2>
       <VenmoSend wallet={wallet} onSent={onSent} />
 
-      <h4>Activity</h4>
+      <h2 className="cap">Activity</h2>
       <ActivityFeed wallet={wallet} refreshKey={refreshKey} />
 
       <ContractPanel wallet={wallet} />

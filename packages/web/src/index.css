@@ -286,3 +286,6 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
 .logconsole .error { color: #ff8b8b; }
 
 .pill.audit { color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+
+/* Section caption used on a proper heading level (semantic h2) without the large default size. */
+.cap { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; margin: 18px 0 8px; }

@@ -2,6 +2,7 @@ import { ConflictException, Injectable, Logger, UnauthorizedException } from '@n
 import { JwtService } from '@nestjs/jwt';
 import type { Account, LoginInput, RegisterInput } from '@vencura/shared';
 import * as argon2 from 'argon2';
+import { isDemoMode } from '../common/demo-mode';
 import { PrismaService } from '../infra/prisma/prisma.service';
 
 export interface AuthResult {
@@ -40,7 +41,10 @@ export class AuthService {
 
   /** Accounts for the User-view picker — id + email only, never any secret. Login still
    *  goes through `login()` with the shared demo password; this just populates the dropdown. */
-  listAccounts(): Promise<Account[]> {
+  async listAccounts(): Promise<Account[]> {
+    // The cross-account picker exists only for the one-click demo; a real deployment uses the
+    // register/login path, so don't enumerate accounts when DEMO_MODE is off.
+    if (!isDemoMode()) return [];
     return this.prisma.user.findMany({
       select: { id: true, email: true },
       orderBy: { createdAt: 'asc' },
