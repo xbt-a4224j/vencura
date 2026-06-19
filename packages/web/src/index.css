@@ -107,6 +107,22 @@ p[role="alert"] { color: var(--fail); }
 
 details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
 
+/* Corner account menu (sign-in dropdown / signed-in switch-user) */
+.account { font-size: 13px; color: var(--muted); }
+.account.signed-in { display: inline-flex; align-items: center; gap: 8px; }
+.account > summary {
+  list-style: none; display: inline-block; padding: 6px 12px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--ink);
+}
+.account > summary::-webkit-details-marker { display: none; }
+.account[open] { position: relative; }
+.account-form {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; min-width: 250px;
+  display: flex; flex-direction: column; gap: 6px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px 16px; box-shadow: 0 10px 30px rgba(0,0,0,.45);
+}
+
 /* Status pills */
 .pill {
   display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase;

@@ -11,7 +11,8 @@ import {
 import { AuthProvider, useAuth } from './auth-context';
 import { explorerAddress, explorerTx, FAUCET_URL } from './explorer';
 
-function AuthForm() {
+// Compact sign-in / register, shown as a corner dropdown — never a full-page gate.
+function SignInMenu() {
   const { authenticate } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,40 +34,63 @@ function AuthForm() {
   };
 
   return (
-    <main className="app">
-      <header>
-        <h1>VenCura Admin</h1>
-      </header>
-      <form onSubmit={submit}>
+    <details className="account">
+      <summary>Sign in / Register</summary>
+      <form onSubmit={submit} className="account-form">
         <label htmlFor="email">Email</label>
         <input
           id="email"
           type="email"
           autoComplete="email"
+          placeholder="you@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <label htmlFor="password">Password</label>
+        <label htmlFor="password">Password (8+ characters)</label>
         <input
           id="password"
           type="password"
-          autoComplete="current-password"
+          autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+          placeholder="••••••••"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
         <button type="submit" disabled={busy}>
-          {busy ? 'Working…' : mode}
+          {busy ? 'Working…' : mode === 'register' ? 'Create account' : 'Log in'}
         </button>
         <button type="button" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
-          switch to {mode === 'login' ? 'register' : 'login'}
+          {mode === 'login' ? 'Need an account? Register' : 'Already have an account? Log in'}
         </button>
         {error && <p role="alert">{error}</p>}
       </form>
+    </details>
+  );
+}
+
+// Corner account control: signed in → email + switch-user; signed out → the sign-in dropdown.
+function AccountMenu() {
+  const { email, logout } = useAuth();
+  if (!email) return <SignInMenu />;
+  return (
+    <span className="account signed-in">
+      <span>{email}</span>{' '}
+      <button onClick={logout} title="Sign out / switch to another account">
+        Switch user
+      </button>
+    </span>
+  );
+}
+
+// Landing body when signed out — the app is reachable; the gate is gone.
+function Welcome() {
+  return (
+    <section>
+      <h3>Welcome to VenCura</h3>
       <p>
-        New here? Use the <strong>Seed demo data</strong> button after registering — or seed first,
-        then log in as <code>demo@vencura.local</code> / <code>demo-password</code>.
+        Custodial Ethereum wallets on Sepolia. <strong>Sign in or create an account</strong> from the menu in
+        the top-right — then create a wallet, check its balance, sign a message, and send ETH or ERC-20 tokens.
       </p>
-    </main>
+    </section>
   );
 }
 
@@ -793,19 +817,25 @@ function AdminTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => vo
   );
 }
 
-function Dashboard() {
-  const { email, logout } = useAuth();
+// The app shell ALWAYS renders — no login gate. Signed in → wallets/admin tabs;
+// signed out → a welcome body. Auth lives in the corner AccountMenu.
+function Shell() {
+  const { email } = useAuth();
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [tab, setTab] = useState<'wallets' | 'admin'>('wallets');
   const [error, setError] = useState('');
 
   const refresh = useCallback(() => {
+    if (!email) {
+      setWallets([]);
+      return Promise.resolve();
+    }
     setError('');
     return api
       .listWallets()
       .then(setWallets)
       .catch((err) => setError((err as Error).message));
-  }, []);
+  }, [email]);
 
   useEffect(() => {
     void refresh();
@@ -814,31 +844,33 @@ function Dashboard() {
   return (
     <main className="app">
       <header>
-        <h1>VenCura Admin</h1>
-        <span style={{ marginLeft: 'auto' }}>{email}</span>{' '}
-        <button onClick={logout}>logout</button>
+        <h1>VenCura</h1>
+        <span style={{ marginLeft: 'auto' }}>
+          <AccountMenu />
+        </span>
       </header>
-      <nav className="tabs">
-        <button onClick={() => setTab('wallets')} disabled={tab === 'wallets'}>
-          Wallets
-        </button>
-        <button onClick={() => setTab('admin')} disabled={tab === 'admin'}>
-          Admin
-        </button>
-      </nav>
-      {error && <p role="alert">{error}</p>}
-      {tab === 'wallets' ? (
-        <WalletsTab wallets={wallets} onChange={refresh} />
+      {email ? (
+        <>
+          <nav className="tabs">
+            <button onClick={() => setTab('wallets')} disabled={tab === 'wallets'}>
+              Wallets
+            </button>
+            <button onClick={() => setTab('admin')} disabled={tab === 'admin'}>
+              Admin
+            </button>
+          </nav>
+          {error && <p role="alert">{error}</p>}
+          {tab === 'wallets' ? (
+            <WalletsTab wallets={wallets} onChange={refresh} />
+          ) : (
+            <AdminTab wallets={wallets} onChange={refresh} />
+          )}
+        </>
       ) : (
-        <AdminTab wallets={wallets} onChange={refresh} />
+        <Welcome />
       )}
     </main>
   );
-}
-
-function Shell() {
-  const { email } = useAuth();
-  return email ? <Dashboard /> : <AuthForm />;
 }
 
 export function App() {
