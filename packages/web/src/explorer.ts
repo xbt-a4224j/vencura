@@ -5,4 +5,4 @@ export const explorerAddress = (address: string) => `${BASE}/address/${address}`
 export const explorerTx = (hash: string) => `${BASE}/tx/${hash}`;
 
 // A public Sepolia faucet for funding demo wallets (the one human step for live sends).
-export const FAUCET_URL = 'https://www.alchemy.com/faucets/ethereum-sepolia';
+export const FAUCET_URL = 'https://cloud.google.com/application/web3/faucet/ethereum/sepolia';
