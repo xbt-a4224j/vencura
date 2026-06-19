@@ -138,6 +138,7 @@ feature. Keep modules small and domain-named; a reader should infer a module's j
   **Reference the GitHub issue number so it auto-closes** — e.g. `feat(api): create-wallet endpoint (#10)` or a `Closes #10` footer (use the `#N`, not the `T-###` id).
   **Do NOT add `Co-Authored-By` lines** (per user's global rule; git config handles authorship).
 - **Versioning:** **semantic-release** from Block 1. Each block ships a minor bump (v0.1.0 → … → v1.0.0 at the end).
+- **GitHub issues are self-contained.** Each issue body = **Background** (what/why) + **Requirements tie-in** (which `docs/REQUIREMENTS.md` item, or *beyond-brief* + why) + **Acceptance criteria** (concrete, testable checkboxes) [+ **Depends on** `#N`]. The §14 Definition of Done is the *workflow* standard for finishing a ticket — do **not** append it (or any global-DoD boilerplate) to issue bodies. Map issue ↔ ticket by the `T-###` **in the title**, not by `#N` (issue numbers have drifted from the `T-###` ids).
 
 ## 8. UI-is-load-bearing rule
 Every user-facing capability has a control in `packages/web`. The admin must be able to, from the browser:
@@ -229,9 +230,9 @@ Some steps need *you* (the agent can't create accounts or fund wallets). Flag th
 - **Generated secrets** — `MASTER_ENCRYPTION_KEY` (32-byte random), `JWT_SECRET`, DB URL. `.env.example` lists them all; never commit real values.
 
 ## 18. Repository & privacy (opsec)
-- **This repo is PRIVATE.** Create it with `gh repo create vencura --private` (never public). To submit, **invite the reviewer as a collaborator** on the private repo — do not flip it public.
+- **Repository hygiene.** Keep the repo clean and self-contained.
 - **Never commit secrets.** `.env` / `.env.*` are gitignored; only `.env.example` (placeholders) is committed.
-- No employer/interview/identifying references anywhere in code, commits, README, or docs — keep it a clean standalone project.
+- No identifying references anywhere in code, commits, README, or docs — keep it a clean standalone project.
 
 ## 19. Teaching mode (verbose by design — for the author's learning)
 While building, **over-explain**: narrate the reasoning behind each decision, define any unfamiliar concept inline
