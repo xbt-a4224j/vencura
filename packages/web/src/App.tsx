@@ -308,7 +308,17 @@ function ContractPanel({ wallet }: { wallet: Wallet }) {
         functionName: 'approve',
         args: [spender, parseEther(approveAmt || '0').toString()],
       });
-      setApMsg(`✓ approve sent (nonce ${tx.nonce})`);
+      setApMsg(`✓ approve sent (nonce ${tx.nonce}) — once it confirms, click "Check allowance"`);
+    } catch (e) {
+      setApMsg((e as Error).message);
+    }
+  };
+
+  // The proof an approve worked: read allowance(owner, spender) back from the token.
+  const checkAllowance = async () => {
+    try {
+      const allowance = await readErc20('allowance', [wallet.address, spender]);
+      setApMsg(`allowance(this wallet → ${spender.slice(0, 8)}…) = ${allowance}`);
     } catch (e) {
       setApMsg((e as Error).message);
     }
@@ -331,6 +341,9 @@ function ContractPanel({ wallet }: { wallet: Wallet }) {
       <input value={approveAmt} placeholder="amount (ETH units)" onChange={(e) => setApproveAmt(e.target.value)} />{' '}
       <button onClick={approve} disabled={!token || !spender}>
         Approve
+      </button>{' '}
+      <button onClick={checkAllowance} disabled={!token || !spender}>
+        Check allowance
       </button>
       {apMsg && <p>{apMsg}</p>}
 
