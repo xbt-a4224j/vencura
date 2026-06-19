@@ -14,6 +14,12 @@ export const adminKeyStore = {
   set: (k: string) => localStorage.setItem(ADMIN_KEY, k),
 };
 
+// Shared demo password — every account uses it, so the User view signs in with one click (it's
+// prepopulated, never typed). The web is a static SPA behind Vercel Auth, so this is a known demo
+// credential, not a secret. Mirrors DEMO_PASSWORD in packages/shared (used by the API seed) —
+// duplicated here to avoid pulling a workspace build dependency into the SPA for one constant.
+export const DEMO_PASSWORD = 'demo-password';
+
 async function call<T>(
   path: string,
   options: { method?: string; body?: unknown; auth?: boolean; admin?: boolean } = {},
@@ -48,6 +54,10 @@ async function call<T>(
 interface AuthResult {
   accessToken: string;
   user: { id: string; email: string };
+}
+export interface Account {
+  id: string;
+  email: string;
 }
 export interface Wallet {
   id: string;
@@ -107,10 +117,13 @@ export interface SeedResult {
 }
 
 export const api = {
-  register: (email: string, password: string) =>
-    call<AuthResult>('/auth/register', { method: 'POST', body: { email, password } }),
+  // Account picker (User view) + real credentialed auth. Sign-in uses the shared demo password
+  // (DEMO_PASSWORD), prepopulated client-side, so there is no typed login form anywhere.
+  listAccounts: () => call<Account[]>('/auth/accounts'),
   login: (email: string, password: string) =>
     call<AuthResult>('/auth/login', { method: 'POST', body: { email, password } }),
+  register: (email: string, password: string) =>
+    call<AuthResult>('/auth/register', { method: 'POST', body: { email, password } }),
   // Public chain head for the status-bar heartbeat (block height + gas), no auth.
   chainHead: () => call<{ network: string; blockNumber: number; gasGwei: number }>('/chain/head'),
   createWallet: () => call<Wallet>('/wallets', { method: 'POST', auth: true }),

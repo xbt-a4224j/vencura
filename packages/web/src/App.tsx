@@ -5,6 +5,7 @@ import {
   adminKeyStore,
   api,
   type BalanceLine,
+  DEMO_PASSWORD,
   type Policy,
   type Wallet,
 } from './api';
@@ -43,21 +44,120 @@ function HashLink({ value, href }: { value: string; href: string }) {
   );
 }
 
-// Compact sign-in / register, shown as a corner dropdown — never a full-page gate.
-function SignInMenu() {
-  const { authenticate } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [mode, setMode] = useState<'login' | 'register'>('login'); // most opens are returning users
+// Polls the chain head for the status-bar heartbeat (block height + gas), no auth.
+function useChainHead() {
+  const [head, setHead] = useState<{ blockNumber: number; gasGwei: number } | null>(null);
+  useEffect(() => {
+    let active = true;
+    const tick = () =>
+      api
+        .chainHead()
+        .then((h) => active && setHead(h))
+        .catch(() => undefined);
+    void tick();
+    const t = setInterval(tick, 6000);
+    return () => {
+      active = false;
+      clearInterval(t);
+    };
+  }, []);
+  return head;
+}
+
+// Shared status bar: network, live block/gas heartbeat, last refresh.
+function StatusBar({ lastUpdated, onRefresh }: { lastUpdated?: string; onRefresh?: () => void }) {
+  const head = useChainHead();
+  return (
+    <div className="statusbar">
+      <span className="net">
+        <span className="dot" aria-hidden /> Sepolia
+      </span>
+      {head && (
+        <>
+          <span>
+            block <strong>{head.blockNumber.toLocaleString()}</strong>
+          </span>
+          <span>gas {head.gasGwei} gwei</span>
+        </>
+      )}
+      {lastUpdated && <span>updated {lastUpdated}</span>}
+      {onRefresh && (
+        <button type="button" className="copybtn" onClick={onRefresh}>
+          Refresh
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Loads the signed-in account's wallets (re-fetches whenever the session changes).
+function useWallets(enabled: boolean) {
+  const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [error, setError] = useState('');
+  const [lastUpdated, setLastUpdated] = useState('');
+  const refresh = useCallback(() => {
+    if (!enabled) {
+      setWallets([]);
+      return Promise.resolve();
+    }
+    setError('');
+    return api
+      .listWallets()
+      .then((w) => {
+        setWallets(w);
+        setLastUpdated(new Date().toLocaleTimeString());
+      })
+      .catch((err) => setError((err as Error).message));
+  }, [enabled]);
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+  return { wallets, refresh, lastUpdated, error };
+}
+
+// Root landing page: two tiles — User (use wallets) and Admin (manage accounts / demo data).
+function Landing({ onPick }: { onPick: (view: 'user' | 'admin') => void }) {
+  return (
+    <main className="app landing">
+      <header className="landing-head">
+        <h1>VenCura</h1>
+        <p className="tagline">the Venmo of wallets</p>
+      </header>
+      <div className="tiles">
+        <button type="button" className="tile" onClick={() => onPick('user')}>
+          <span className="tile-emoji" aria-hidden>
+            👛
+          </span>
+          <h2>User</h2>
+          <p>Pick an account and use your wallets — balances, send ETH or tokens, sign messages.</p>
+        </button>
+        <button type="button" className="tile" onClick={() => onPick('admin')}>
+          <span className="tile-emoji" aria-hidden>
+            🛠️
+          </span>
+          <h2>Admin</h2>
+          <p>Create accounts, seed or reset demo data, set policies, and inspect the chain.</p>
+        </button>
+      </div>
+    </main>
+  );
+}
+
+// User experience: pick an account (password prepopulated → one click), then drive your wallets.
+function UserView({ onExit }: { onExit: () => void }) {
+  const { accounts, current, signIn, signOut } = useAuth();
+  const { wallets, refresh, lastUpdated, error: walletsError } = useWallets(!!current);
+  const [selected, setSelected] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
+  const enter = async () => {
+    const acct = accounts.find((a) => a.id === (selected || accounts[0]?.id));
+    if (!acct) return;
     setError('');
     setBusy(true);
     try {
-      await authenticate(mode, email, password);
+      await signIn(acct);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -65,64 +165,67 @@ function SignInMenu() {
     }
   };
 
-  return (
-    <details className="account">
-      <summary>Sign in / Register</summary>
-      <form onSubmit={submit} className="account-form">
-        <label htmlFor="email">Email</label>
-        <input
-          id="email"
-          type="email"
-          autoComplete="email"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <label htmlFor="password">Password (8+ characters)</label>
-        <input
-          id="password"
-          type="password"
-          autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-          placeholder="••••••••"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <button type="submit" disabled={busy}>
-          {busy ? 'Working…' : mode === 'register' ? 'Create account' : 'Log in'}
-        </button>
-        <button type="button" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
-          {mode === 'login' ? 'Need an account? Register' : 'Already have an account? Log in'}
-        </button>
-        {error && <p role="alert">{error}</p>}
-      </form>
-    </details>
-  );
-}
+  if (!current) {
+    return (
+      <main className="app">
+        <header>
+          <h1>VenCura · User</h1>
+          <button type="button" className="link" style={{ marginLeft: 'auto' }} onClick={onExit}>
+            ← Home
+          </button>
+        </header>
+        <section className="picker">
+          <h3>Choose an account</h3>
+          {accounts.length === 0 ? (
+            <p>
+              No accounts yet — open the <strong>Admin</strong> view to seed demo data or create one.
+            </p>
+          ) : (
+            <>
+              <label htmlFor="user-account">Account</label>{' '}
+              <select
+                id="user-account"
+                value={selected || accounts[0]?.id}
+                onChange={(e) => setSelected(e.target.value)}
+              >
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.email}
+                  </option>
+                ))}
+              </select>
+              <p className="bal-sub">
+                Password is prepopulated (<code>{DEMO_PASSWORD}</code>) — just continue.
+              </p>
+              <button type="button" onClick={enter} disabled={busy}>
+                {busy ? 'Signing in…' : 'Continue'}
+              </button>
+              {error && <p role="alert">{error}</p>}
+            </>
+          )}
+        </section>
+      </main>
+    );
+  }
 
-// Corner account control: signed in → email + switch-user; signed out → the sign-in dropdown.
-function AccountMenu() {
-  const { email, logout } = useAuth();
-  if (!email) return <SignInMenu />;
   return (
-    <span className="account signed-in">
-      <span>{email}</span>{' '}
-      <button onClick={logout} title="Sign out / switch to another account">
-        Switch user
-      </button>
-    </span>
-  );
-}
-
-// Landing body when signed out — the app is reachable; the gate is gone.
-function Welcome() {
-  return (
-    <section>
-      <h3>Welcome to VenCura</h3>
-      <p>
-        Custodial Ethereum wallets on Sepolia. <strong>Sign in or create an account</strong> from the menu in
-        the top-right — then create a wallet, check its balance, sign a message, and send ETH or ERC-20 tokens.
-      </p>
-    </section>
+    <main className="app">
+      <header>
+        <h1>VenCura</h1>
+        <span style={{ marginLeft: 'auto' }} className="account signed-in">
+          <span>{current.email}</span>{' '}
+          <button type="button" onClick={signOut} title="Switch to another account">
+            Switch account
+          </button>{' '}
+          <button type="button" className="link" onClick={onExit}>
+            ← Home
+          </button>
+        </span>
+      </header>
+      <StatusBar lastUpdated={lastUpdated} onRefresh={() => void refresh()} />
+      {walletsError && <p role="alert">{walletsError}</p>}
+      <WalletsTab wallets={wallets} onChange={refresh} />
+    </main>
   );
 }
 
@@ -907,7 +1010,25 @@ function AdminTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => vo
   const [busy, setBusy] = useState(false);
   const [adminKey, setAdminKey] = useState(adminKeyStore.get());
   const [txLookup, setTxLookup] = useState('');
-  const { logout } = useAuth();
+  const [newEmail, setNewEmail] = useState('');
+  const [accountMsg, setAccountMsg] = useState('');
+  const { accounts, createAccount, reload, signOut } = useAuth();
+
+  const addAccount = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setAccountMsg('');
+    setBusy(true);
+    try {
+      const acct = await createAccount(newEmail.trim().toLowerCase());
+      setNewEmail('');
+      setAccountMsg(`Created ${acct.email} — it now appears in the User view's account picker.`);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const seed = async () => {
     setError('');
@@ -916,9 +1037,9 @@ function AdminTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => vo
     try {
       const res = await api.seedDemo();
       const funded = res.wallets.filter((w) => w.funded).length;
-      setSeedMsg(
-        `Seeded ${res.email} (password: ${res.password}) — ${res.wallets.length} wallets, ${funded} funded. Log in as the demo user to drive them.`,
-      );
+      await reload(); // demo account now appears in the User-view picker
+      onChange(); // refresh the wallet-scoped panels
+      setSeedMsg(`Seeded ${res.email} — ${res.wallets.length} wallets, ${funded} funded.`);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -927,15 +1048,16 @@ function AdminTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => vo
   };
 
   const startOver = async () => {
-    // Reset wipes ALL users, including the one we're logged in as — confirm, then log out.
+    // Reset wipes ALL accounts and re-seeds the demo — the active account is replaced.
     if (!window.confirm('Wipe ALL data and re-seed the demo? This cannot be undone.')) return;
     setError('');
     setSeedMsg('');
     setBusy(true);
     try {
       const res = await api.resetDemo();
-      logout();
-      window.alert(`Reset complete. Log in as ${res.email} / ${res.password}.`);
+      signOut(); // the old session's account no longer exists
+      await reload(); // AdminView re-signs in as the fresh demo account
+      setSeedMsg(`Reset complete — re-seeded ${res.email}.`);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -959,6 +1081,34 @@ function AdminTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => vo
           }}
         />
       </label>
+
+      <h3>Accounts</h3>
+      <p className="bal-sub">
+        Accounts you create here appear in the <strong>User</strong> view's picker and sign in with
+        the shared demo password.
+      </p>
+      <form onSubmit={addAccount}>
+        <label htmlFor="new-account-email">New account email</label>{' '}
+        <input
+          id="new-account-email"
+          type="email"
+          autoComplete="email"
+          placeholder="name@demo.local"
+          value={newEmail}
+          onChange={(e) => setNewEmail(e.target.value)}
+        />{' '}
+        <button type="submit" disabled={busy || !newEmail.trim()}>
+          {busy ? 'Working…' : 'Create account'}
+        </button>
+      </form>
+      {accountMsg && <p>{accountMsg}</p>}
+      {accounts.length > 0 && (
+        <ul>
+          {accounts.map((a) => (
+            <li key={a.id}>{a.email}</li>
+          ))}
+        </ul>
+      )}
 
       <h3>Demo data</h3>
       <button onClick={seed} disabled={busy}>
@@ -1020,104 +1170,47 @@ function AdminTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => vo
   );
 }
 
-// The app shell ALWAYS renders — no login gate. Signed in → wallets/admin tabs;
-// signed out → a welcome body. Auth lives in the corner AccountMenu.
-function Shell() {
-  const { email } = useAuth();
-  const [wallets, setWallets] = useState<Wallet[]>([]);
-  const [tab, setTab] = useState<'wallets' | 'admin'>('wallets');
-  const [error, setError] = useState('');
-  const [lastUpdated, setLastUpdated] = useState('');
-  const [head, setHead] = useState<{ blockNumber: number; gasGwei: number } | null>(null);
-
-  const refresh = useCallback(() => {
-    if (!email) {
-      setWallets([]);
-      return Promise.resolve();
-    }
-    setError('');
-    return api
-      .listWallets()
-      .then((w) => {
-        setWallets(w);
-        setLastUpdated(new Date().toLocaleTimeString());
-      })
-      .catch((err) => setError((err as Error).message));
-  }, [email]);
-
+// Admin experience: account + demo-data management. It signs in as an account (the demo user by
+// default) so the wallet-scoped panels (policies, addresses) resolve; seed/reset use the admin key.
+function AdminView({ onExit }: { onExit: () => void }) {
+  const { accounts, current, signIn } = useAuth();
+  // Act as an account so the wallet/policy panels work; default to the first (demo) account.
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  // Ambient heartbeat: poll the chain head so the status bar shows the block ticking + gas.
-  useEffect(() => {
-    let active = true;
-    const tick = () =>
-      api
-        .chainHead()
-        .then((h) => active && setHead(h))
-        .catch(() => undefined);
-    void tick();
-    const t = setInterval(tick, 6000);
-    return () => {
-      active = false;
-      clearInterval(t);
-    };
-  }, []);
+    if (!current && accounts.length > 0) void signIn(accounts[0]).catch(() => undefined);
+  }, [current, accounts, signIn]);
+  const { wallets, refresh, lastUpdated, error } = useWallets(!!current);
 
   return (
     <main className="app">
       <header>
-        <h1>VenCura</h1>
-        <span style={{ marginLeft: 'auto' }}>
-          <AccountMenu />
+        <h1>VenCura · Admin</h1>
+        <span style={{ marginLeft: 'auto' }} className="account signed-in">
+          {current ? <span>acting as {current.email}</span> : <span>no account yet</span>}{' '}
+          <button type="button" className="link" onClick={onExit}>
+            ← Home
+          </button>
         </span>
       </header>
-      {email ? (
-        <>
-          <div className="statusbar">
-            <span className="net">
-              <span className="dot" aria-hidden /> Sepolia
-            </span>
-            {head && (
-              <>
-                <span>
-                  block <strong>{head.blockNumber.toLocaleString()}</strong>
-                </span>
-                <span>gas {head.gasGwei} gwei</span>
-              </>
-            )}
-            <span>{lastUpdated ? `updated ${lastUpdated}` : 'connecting…'}</span>
-            <button type="button" className="copybtn" onClick={() => void refresh()}>
-              Refresh
-            </button>
-          </div>
-          <nav className="tabs">
-            <button onClick={() => setTab('wallets')} disabled={tab === 'wallets'}>
-              Wallets
-            </button>
-            <button onClick={() => setTab('admin')} disabled={tab === 'admin'}>
-              Admin
-            </button>
-          </nav>
-          {error && <p role="alert">{error}</p>}
-          {tab === 'wallets' ? (
-            <WalletsTab wallets={wallets} onChange={refresh} />
-          ) : (
-            <AdminTab wallets={wallets} onChange={refresh} />
-          )}
-        </>
-      ) : (
-        <Welcome />
-      )}
+      <StatusBar lastUpdated={lastUpdated} onRefresh={() => void refresh()} />
+      {error && <p role="alert">{error}</p>}
+      <AdminTab wallets={wallets} onChange={refresh} />
     </main>
   );
+}
+
+// Two experiences behind a simple landing page. Plain state-based routing — a two-view app
+// doesn't need a router dependency.
+function Root() {
+  const [view, setView] = useState<'landing' | 'user' | 'admin'>('landing');
+  if (view === 'user') return <UserView onExit={() => setView('landing')} />;
+  if (view === 'admin') return <AdminView onExit={() => setView('landing')} />;
+  return <Landing onPick={setView} />;
 }
 
 export function App() {
   return (
     <AuthProvider>
-      <Shell />
+      <Root />
     </AuthProvider>
   );
 }

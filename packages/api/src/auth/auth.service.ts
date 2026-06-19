@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import type { LoginInput, RegisterInput } from '@vencura/shared';
+import type { Account, LoginInput, RegisterInput } from '@vencura/shared';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../infra/prisma/prisma.service';
 
@@ -36,6 +36,15 @@ export class AuthService {
     }
     this.logger.log(`login succeeded: ${user.id}`);
     return this.issue(user);
+  }
+
+  /** Accounts for the User-view picker — id + email only, never any secret. Login still
+   *  goes through `login()` with the shared demo password; this just populates the dropdown. */
+  listAccounts(): Promise<Account[]> {
+    return this.prisma.user.findMany({
+      select: { id: true, email: true },
+      orderBy: { createdAt: 'asc' },
+    });
   }
 
   private issue(user: { id: string; email: string }): AuthResult {

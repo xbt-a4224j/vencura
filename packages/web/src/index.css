@@ -189,6 +189,29 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
 .statusbar .net { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ink); }
 .statusbar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 20%, transparent); }
 
+/* Landing page — two tiles (User / Admin) */
+.landing { text-align: center; }
+.landing-head h1 { font-size: 30px; margin: 40px 0 4px; }
+.landing .tagline { color: var(--muted); margin: 0 0 28px; }
+.tiles { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
+.tile {
+  flex: 1 1 280px; max-width: 360px; text-align: left; background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--radius); padding: 22px 24px;
+  display: flex; flex-direction: column; gap: 6px; box-shadow: 0 6px 20px rgba(16, 24, 40, .06);
+}
+.tile:hover:not(:disabled) { filter: none; border-color: var(--accent); }
+.tile .tile-emoji { font-size: 30px; }
+.tile h2 { margin: 6px 0 0; font-size: 18px; text-transform: none; letter-spacing: 0; color: var(--ink); }
+.tile p { margin: 0; font-size: 13px; color: var(--muted); }
+
+/* Account picker (User view) */
+.picker label { display: inline; }
+.picker select { min-width: 240px; }
+
+/* Inline link-style button (← Home, etc.) */
+.link { background: transparent; color: var(--accent-ink); border: none; padding: 4px 6px; font-size: 13px; }
+.link:hover:not(:disabled) { filter: none; text-decoration: underline; }
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }

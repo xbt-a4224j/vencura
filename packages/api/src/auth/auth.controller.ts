@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto, RegisterDto } from './dto';
@@ -17,5 +17,12 @@ export class AuthController {
   @HttpCode(200)
   login(@Body() dto: LoginDto) {
     return this.auth.login(dto);
+  }
+
+  // Accounts for the User-view picker (id + email only). The web has no typed login: it lists
+  // accounts here and signs in with the shared demo password. register/login are the real path.
+  @Get('accounts')
+  listAccounts() {
+    return this.auth.listAccounts();
   }
 }

@@ -4,11 +4,10 @@ import type { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { createTestClient, http, parseEther } from 'viem';
 import { generatePrivateKey, privateKeyToAddress } from 'viem/accounts';
-import type { Hex } from '@vencura/shared';
+import { DEMO_PASSWORD, type Hex } from '@vencura/shared';
 import { encrypt } from '../signer/aes-256-gcm';
 
 const DEMO_EMAIL = 'demo@vencura.local';
-const DEMO_PASSWORD = 'demo-password'; // ≥8 chars; demo-only, never a real credential.
 const WALLET_COUNT = 3;
 // A well-known recipient (vitalik.eth) so the allowlist dropdown has an external option.
 const KNOWN_RECIPIENT = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';

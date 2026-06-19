@@ -9,6 +9,7 @@ import { AuthService } from '@/auth/auth.service';
 const prismaMock = {
   user: {
     findUnique: vi.fn(),
+    findMany: vi.fn(),
     create: vi.fn(),
   },
 };
@@ -56,5 +57,16 @@ describe('AuthService', () => {
     await expect(
       service.login({ email: 'a@b.com', password: 'wrong-pass' }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  // The User-view picker lists accounts; login still uses the shared demo password.
+  it('listAccounts returns id + email only (no secrets), oldest first', async () => {
+    prismaMock.user.findMany.mockResolvedValue([{ id: 'u1', email: 'a@b.com' }]);
+    const accounts = await service.listAccounts();
+    expect(prismaMock.user.findMany.mock.calls[0][0]).toMatchObject({
+      select: { id: true, email: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    expect(accounts).toEqual([{ id: 'u1', email: 'a@b.com' }]);
   });
 });

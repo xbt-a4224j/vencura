@@ -662,6 +662,15 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 
 ---
 
+## Block 5 · Landing page + User/Admin split, shared-password account picker    (UX)
+**What & why** — Replace the login gate with a Venmo-style two-experience app: a root landing with **User** / **Admin** tiles. No typed login — the deployment is gated by Vercel Auth; every account uses a shared demo password (`DEMO_PASSWORD`) so sign-in is one click.
+**How it works** — Backend reverted to real `register`/`login` (dropped the passwordless `/auth/sessions` mint + random-hash accounts); only `GET /auth/accounts` (list) is added. Admin "create account" = `register(email, DEMO_PASSWORD)` → appears in the User picker; User sign-in = `login(email, DEMO_PASSWORD)`. AdminView signs in as the demo account so wallet/policy panels resolve.
+**Files touched** — [auth.controller.ts](packages/api/src/auth/auth.controller.ts) · [auth.service.ts](packages/api/src/auth/auth.service.ts) · [auth.schema.ts](packages/shared/src/auth.schema.ts) · [seed.ts](packages/api/src/admin/seed.ts); [App.tsx](packages/web/src/App.tsx) (Landing/UserView/AdminView/Root) · [auth-context.tsx](packages/web/src/auth-context.tsx) · [api.ts](packages/web/src/api.ts) · [index.css](packages/web/src/index.css).
+**Tests** — [auth.service.spec.ts](packages/api/test/auth/auth.service.spec.ts) `listAccounts`; full suite green (api 87 / web 2 / shared 3).
+**Gotchas** — shared demo password is a known credential (demo only; Vercel is the real boundary), duplicated in web `api.ts` to avoid a workspace build dep.
+
+---
+
 ## v0.6.0 · Block 6 · Rate limiting (abuse control for a shared app)    ([commit](https://github.com/xbt-a4224j/vencura/commit/ee51023))
 **What & why** — The app is meant to be shared (open registration), so add per-IP abuse control without locking anyone out. Security model stays: per-user JWT isolation + AES-GCM custody + Sepolia; this just caps request volume.
 **How it works** — `@nestjs/throttler` global guard (`APP_GUARD`) at 100 req/60s; `/auth/*` tightened to 10/60s via `@Throttle` to slow credential-stuffing. In-memory (no Redis — matches the lock's Postgres-only stance; Redis storage is the documented multi-node path). `trust proxy=1` in [main.ts](packages/api/src/main.ts) so the limiter keys on the real client IP from X-Forwarded-For, not Railway/Vercel's edge.
