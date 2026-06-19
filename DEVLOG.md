@@ -872,3 +872,21 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Tests / verify.** Smoke (structure change, no behavior): **same count** — 84 unit pass + 3 gated (lock/policy-race/happy-path) — typecheck/lint/build green, 9/9 turbo tasks, and CI green incl. `db-tests` hitting the new `test/` paths and the e2e resolving `@/app.module` from `test/transactions/`. `src/` has zero remaining spec files.
 
 **Gotchas** — (1) the `@` alias must be set in all three configs or it resolves in one tool but not another (a green `pnpm test` with a red `tsc`, or vice-versa). (2) `rootDir` had to move from the shared tsconfig into the build-only one — keeping it in the shared config would error once `test/` files (outside `src/`) were included. (3) the migration is a one-time move — doing it before later batches would have meant re-moving newly-added specs.
+
+---
+
+### Block 6 recap — SDK, examples & deploy → **v0.6.0** ✅
+
+**Shipped:** a typed **`VencuraClient`** (hand-written, not OpenAPI-generated — small surface) plus **5 runnable example scripts** (create-wallet, get-balance, sign-message+EIP-191 recovery, send-transaction, concurrency) verified live against the deployed API (T-025/T-026); and the **full live deployment** (T-027) — React web on **Vercel**, NestJS API in a multi-stage **Docker** image on **Railway**, **Neon** Postgres, Infura **Sepolia** RPC. The web reaches the API same-origin via a `/api/*` Vercel rewrite; `prisma migrate deploy` runs on container boot; `/admin/*` is hardened behind a timing-safe `x-admin-key`. **How to demo:** open **vencura-alpha.vercel.app**, register, create a wallet, sign a message — or run the SDK examples with `VENCURA_API_URL` pointed at the live API. The deploy was pulled forward (it depends only on CI), which surfaced and fixed a cluster of real-world gotchas — stale `origin/main` builds, Neon pooled-vs-direct host, Railway `PORT`/`targetPort`, the `x-vercel-forwarded-for` client IP. Issues #26–#28 closed.
+
+---
+
+### Block 7 recap — nice-to-haves & bonus → **v0.7.0** ✅ (selective)
+
+**Shipped (the high-signal subset):** the **★ ShamirSigner bonus** (T-035) — a 2-of-2 Shamir key split that drops in behind the `Signer` seam with zero caller changes (`SIGNER=shamir`), proving custody is pluggable; the **institutional dark UI theme** (T-040) — token-driven, monospace chain data, status pills, AA-accessible, no behavior change; the **smart-wallet design spike** (T-034) — a doc reasoning about ERC-4337 vs EIP-7702 vs our EOA custody and how either slots into the seam; and **test/source separation** (T-041) — all specs into a `test/` mirror with a `@/*` alias. **Deliberately left optional** (per the simplicity directive — these are tangential to the custody story): T-028 many-accounts, T-029 account↔account transfers, T-030 shared access, T-032 contract read/write, T-033 XMTP. (T-031 on/off-chain history was satisfied during Block 5 via the activity reader.) Issues #34, #35, #41, #42 closed; #29–#33 left open as scoped-out stretch.
+
+---
+
+### Block 8 recap — hardening, writeup & README → **v1.0.0** ✅
+
+**Shipped:** the **security & custody writeup** (T-036, `docs/SECURITY.md`) — threat model, the encrypted-key → Shamir → MPC → non-custodial spectrum, honest weaknesses, and the documented scale path (the home for everything cut as "documented, not built"); the **E2E happy-path test** (T-037) — real `AppModule` + Postgres + anvil, create → fund → send → confirmed, with anvil wired into CI; the **README with Mermaid system + sequence diagrams** (T-038); and **final polish** (T-039) — readability sweep (no TODOs/dead code), these block recaps, and a demo dry-run. Mid-stream this block also ran the **simplification sweep** — removing rate limiting and the tamper-evident audit-log design in favor of the requirement-true activity history — making the late codebase net-*smaller* while mapping tighter to `REQUIREMENTS.md`. Issues #37, #38 (+#39, #40) closed. **v1.0.0.**
