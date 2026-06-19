@@ -633,27 +633,36 @@ function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: numb
     );
   return (
     <ul>
-      {items.map((it) =>
-        it.kind === 'transaction' ? (
+      {items.map((it) => {
+        if (it.kind === 'transaction')
+          return (
+            <li key={it.id}>
+              <span className={`pill ${it.status}`}>{it.status}</span> · sent{' '}
+              <strong>{toEth(it.amount)}</strong> {it.asset === 'ETH' ? 'ETH' : 'tokens'} →{' '}
+              <HashLink value={it.to} href={explorerAddress(it.to)} />
+              {it.txHash && (
+                <>
+                  {' '}
+                  · tx <HashLink value={it.txHash} href={explorerTx(it.txHash)} />
+                </>
+              )}
+            </li>
+          );
+        if (it.kind === 'signature')
+          return (
+            <li key={it.id}>
+              <span className="pill signed">signed</span> · “{it.message}” →{' '}
+              <code>{shortHex(it.signature)}</code>
+              <CopyButton value={it.signature} label="⧉" />
+            </li>
+          );
+        // audit: a durable governance event (policy.changed, wallet.created, admin.*)
+        return (
           <li key={it.id}>
-            <span className={`pill ${it.status}`}>{it.status}</span> · sent{' '}
-            <strong>{toEth(it.amount)}</strong> {it.asset === 'ETH' ? 'ETH' : 'tokens'} →{' '}
-            <HashLink value={it.to} href={explorerAddress(it.to)} />
-            {it.txHash && (
-              <>
-                {' '}
-                · tx <HashLink value={it.txHash} href={explorerTx(it.txHash)} />
-              </>
-            )}
+            <span className="pill audit">{it.type}</span>
           </li>
-        ) : (
-          <li key={it.id}>
-            <span className="pill signed">signed</span> · “{it.message}” →{' '}
-            <code>{shortHex(it.signature)}</code>
-            <CopyButton value={it.signature} label="⧉" />
-          </li>
-        ),
-      )}
+        );
+      })}
     </ul>
   );
 }

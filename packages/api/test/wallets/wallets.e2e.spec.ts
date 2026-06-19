@@ -4,6 +4,7 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ChainService } from '@/infra/chain/chain.service';
+import { EventsService } from '@/infra/events/events.service';
 import { LOCK } from '@/infra/lock/lock';
 import { PrismaModule } from '@/infra/prisma/prisma.module';
 import { PrismaService } from '@/infra/prisma/prisma.service';
@@ -15,15 +16,18 @@ const prismaMock = { wallet: { create: vi.fn(), findMany: vi.fn() } };
 // minimal doubles so ProvisioningService (which injects them) can be constructed.
 const chainMock = {};
 const lockMock = { withWalletLock: <T>(_id: string, fn: () => Promise<T>) => fn() };
+const eventsMock = { record: vi.fn().mockResolvedValue(undefined), emit: vi.fn() };
 
-// Stand in for the app's @Global ChainModule + LockModule so ProvisioningService resolves.
+// Stand in for the app's @Global ChainModule + LockModule + EventsModule so the services that
+// inject them (ProvisioningService, WalletsService) resolve.
 @Global()
 @Module({
   providers: [
     { provide: ChainService, useValue: chainMock },
     { provide: LOCK, useValue: lockMock },
+    { provide: EventsService, useValue: eventsMock },
   ],
-  exports: [ChainService, LOCK],
+  exports: [ChainService, LOCK, EventsService],
 })
 class GlobalInfraMock {}
 const signerMock = {

@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../infra/prisma/prisma.service';
+import { EventsService } from '../infra/events/events.service';
 import { SIGNER, type Signer } from '../signer/signer';
 
 @Injectable()
@@ -9,6 +10,7 @@ export class WalletsService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(SIGNER) private readonly signer: Signer,
+    private readonly events: EventsService,
   ) {}
 
   async create(userId: string): Promise<{ id: string; address: string }> {
@@ -20,6 +22,13 @@ export class WalletsService {
       select: { id: true, address: true },
     });
     this.logger.log(`wallet created: ${wallet.address} (user ${userId})`);
+    await this.events.record({
+      userId,
+      walletId: wallet.id,
+      type: 'wallet.created',
+      detail: { address: wallet.address },
+      msg: `wallet created: ${wallet.address}`,
+    });
     return wallet;
   }
 

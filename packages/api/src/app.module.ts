@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { BalancesModule } from './balances/balances.module';
 import { HealthModule } from './health/health.module';
 import { ChainModule } from './infra/chain/chain.module';
+import { EventsModule } from './infra/events/events.module';
 import { LockModule } from './infra/lock/lock.module';
 import { PrismaModule } from './infra/prisma/prisma.module';
 import { PolicyModule } from './policy/policy.module';
@@ -19,6 +20,7 @@ import { WalletsModule } from './wallets/wallets.module';
     ScheduleModule.forRoot(),
     PrismaModule,
     ChainModule,
+    EventsModule,
     LockModule,
     AuthModule,
     SignerModule,

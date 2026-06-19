@@ -110,3 +110,20 @@ model WalletBalance {
   @@unique([walletId, asset])
   @@map("wallet_balances")
 }
+
+// Durable governance/audit record (the "audit_log" of §4). Captures sensitive ACTIONS that
+// don't already live in `transactions`/`signed_messages` — policy changes, wallet creation,
+// admin reset/seed — so the unified Activity view is a true, queryable audit trail. Standalone
+// (no relations): an audit row outlives the wallet/user it references, so we keep ids as plain
+// columns and never cascade-delete history.
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  walletId  String?
+  type      String // policy.changed | wallet.created | admin.seed | admin.reset
+  detail    Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("audit_log")
+}

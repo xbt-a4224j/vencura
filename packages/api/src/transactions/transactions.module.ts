@@ -4,7 +4,7 @@ import { BalancesModule } from '../balances/balances.module';
 import { PolicyModule } from '../policy/policy.module';
 import { SignerModule } from '../signer/signer.module';
 import { WalletsModule } from '../wallets/wallets.module';
-import { ActivityController } from './activity.controller';
+import { ActivityController, UserActivityController } from './activity.controller';
 import { ActivityService } from './activity.service';
 import { ConfirmationWatcher } from './confirmation-watcher.service';
 import { ContractsController } from './contracts.controller';
@@ -22,6 +22,7 @@ import { TransfersController } from './transfers.controller';
     MessagesController,
     TransactionsController,
     ActivityController,
+    UserActivityController,
     TransfersController,
     ContractsController,
   ],

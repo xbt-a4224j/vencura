@@ -9,6 +9,7 @@ import { PrismaService } from '@/infra/prisma/prisma.service';
 import { ChainModule } from '@/infra/chain/chain.module';
 import { ChainService } from '@/infra/chain/chain.service';
 import { LockModule } from '@/infra/lock/lock.module';
+import { EventsModule } from '@/infra/events/events.module';
 import { SIGNER } from '@/signer/signer';
 import { TransactionsModule } from '@/transactions/transactions.module';
 
@@ -25,7 +26,7 @@ describe('Messages HTTP', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [PrismaModule, ChainModule, LockModule, TransactionsModule],
+      imports: [PrismaModule, ChainModule, LockModule, EventsModule, TransactionsModule],
     })
       .overrideProvider(PrismaService)
       .useValue(prismaMock)

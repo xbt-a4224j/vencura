@@ -85,7 +85,7 @@ export interface Transaction {
   nonce: number | null;
   createdAt: string;
 }
-// Unified on/off-chain activity item (GET /wallets/:id/activity).
+// Unified on/off-chain + audit activity item (GET /wallets/:id/activity · GET /activity).
 export type ActivityItem =
   | {
       kind: 'transaction';
@@ -95,9 +95,26 @@ export type ActivityItem =
       amount: string;
       to: string;
       txHash: string | null;
+      walletId?: string;
       createdAt: string;
     }
-  | { kind: 'signature'; id: string; message: string; signature: string; createdAt: string };
+  | { kind: 'signature'; id: string; message: string; signature: string; walletId?: string; createdAt: string }
+  | {
+      kind: 'audit';
+      id: string;
+      type: string;
+      detail: unknown;
+      walletId: string | null;
+      createdAt: string;
+    };
+
+// One line of the live "system log" ring buffer (GET /events?after=seq).
+export interface LogLine {
+  seq: number;
+  at: string;
+  level: 'info' | 'warn' | 'error';
+  msg: string;
+}
 
 export interface Policy {
   walletId?: string;
@@ -164,6 +181,10 @@ export const api = {
     call<Transaction[]>(`/wallets/${walletId}/transactions`, { auth: true }),
   listActivity: (walletId: string) =>
     call<ActivityItem[]>(`/wallets/${walletId}/activity`, { auth: true }),
+  // Cross-wallet unified activity (audit trail) for the signed-in user.
+  listAllActivity: () => call<ActivityItem[]>('/activity', { auth: true }),
+  // Live system-log ring buffer; poll with the last-seen seq as a cursor.
+  events: (after = 0) => call<{ lines: LogLine[]; seq: number }>(`/events?after=${after}`, { auth: true }),
   getPolicy: (walletId: string) => call<Policy>(`/wallets/${walletId}/policy`, { auth: true }),
   setPolicy: (walletId: string, policy: Policy) =>
     call<Policy>(`/wallets/${walletId}/policy`, { method: 'PUT', body: policy, auth: true }),

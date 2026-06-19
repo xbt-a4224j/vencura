@@ -1,6 +1,8 @@
-// Unifies the two activity sources into one newest-first stream: on-chain
-// transactions (sends) + off-chain signatures (signMessage). This is the literal
-// "transaction history (on/off-chain)" requirement — two reads, merged by time.
+// Unifies the activity sources into one newest-first stream: on-chain transactions (sends),
+// off-chain signatures (signMessage), and durable governance/audit events (policy changes,
+// wallet creation, admin actions). This is the "transaction history (on/off-chain)" requirement
+// plus the audit trail — reads merged by time. `walletId` lets a unified, cross-wallet view
+// (GET /activity) attribute each row to its wallet.
 
 export interface TxRow {
   id: string;
@@ -9,20 +11,42 @@ export interface TxRow {
   amount: string;
   toAddress: string;
   txHash: string | null;
+  walletId?: string;
   createdAt: Date;
 }
 export interface SigRow {
   id: string;
   message: string;
   signature: string;
+  walletId?: string;
+  createdAt: Date;
+}
+// Durable governance events (policy.changed, wallet.created, admin.*) — the audit half of the
+// trail, alongside the on-chain (tx) and off-chain (signature) halves.
+export interface AuditRow {
+  id: string;
+  type: string;
+  walletId: string | null;
+  detail: unknown;
   createdAt: Date;
 }
 
 export type ActivityItem =
-  | { kind: 'transaction'; id: string; status: string; asset: string; amount: string; to: string; txHash: string | null; createdAt: Date }
-  | { kind: 'signature'; id: string; message: string; signature: string; createdAt: Date };
+  | {
+      kind: 'transaction';
+      id: string;
+      status: string;
+      asset: string;
+      amount: string;
+      to: string;
+      txHash: string | null;
+      walletId?: string;
+      createdAt: Date;
+    }
+  | { kind: 'signature'; id: string; message: string; signature: string; walletId?: string; createdAt: Date }
+  | { kind: 'audit'; id: string; type: string; detail: unknown; walletId: string | null; createdAt: Date };
 
-export function mergeActivity(txs: TxRow[], sigs: SigRow[]): ActivityItem[] {
+export function mergeActivity(txs: TxRow[], sigs: SigRow[], audits: AuditRow[] = []): ActivityItem[] {
   const items: ActivityItem[] = [
     ...txs.map((t): ActivityItem => ({
       kind: 'transaction',
@@ -32,6 +56,7 @@ export function mergeActivity(txs: TxRow[], sigs: SigRow[]): ActivityItem[] {
       amount: t.amount,
       to: t.toAddress,
       txHash: t.txHash,
+      walletId: t.walletId,
       createdAt: t.createdAt,
     })),
     ...sigs.map((s): ActivityItem => ({
@@ -39,7 +64,16 @@ export function mergeActivity(txs: TxRow[], sigs: SigRow[]): ActivityItem[] {
       id: s.id,
       message: s.message,
       signature: s.signature,
+      walletId: s.walletId,
       createdAt: s.createdAt,
+    })),
+    ...audits.map((a): ActivityItem => ({
+      kind: 'audit',
+      id: a.id,
+      type: a.type,
+      detail: a.detail,
+      walletId: a.walletId,
+      createdAt: a.createdAt,
     })),
   ];
   return items.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());

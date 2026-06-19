@@ -8,6 +8,7 @@ import { PrismaService } from '@/infra/prisma/prisma.service';
 import { ChainModule } from '@/infra/chain/chain.module';
 import { ChainService } from '@/infra/chain/chain.service';
 import { LOCK } from '@/infra/lock/lock';
+import { EventsService } from '@/infra/events/events.service';
 import { BalancesModule } from '@/balances/balances.module';
 
 const prismaMock = {
@@ -21,11 +22,15 @@ const chainMock = {
   getErc20Balance: vi.fn(),
 };
 
-// BalancesModule → WalletsModule → ProvisioningService needs LOCK (a @Global in the app).
+// BalancesModule → WalletsModule → ProvisioningService/WalletsService need LOCK + EventsService
+// (both @Global in the app).
 @Global()
 @Module({
-  providers: [{ provide: LOCK, useValue: { withWalletLock: <T>(_id: string, fn: () => Promise<T>) => fn() } }],
-  exports: [LOCK],
+  providers: [
+    { provide: LOCK, useValue: { withWalletLock: <T>(_id: string, fn: () => Promise<T>) => fn() } },
+    { provide: EventsService, useValue: { record: vi.fn().mockResolvedValue(undefined), emit: vi.fn() } },
+  ],
+  exports: [LOCK, EventsService],
 })
 class GlobalLockMock {}
 

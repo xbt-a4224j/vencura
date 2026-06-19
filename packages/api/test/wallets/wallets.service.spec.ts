@@ -1,10 +1,12 @@
 import { Test } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '@/infra/prisma/prisma.service';
+import { EventsService } from '@/infra/events/events.service';
 import { SIGNER } from '@/signer/signer';
 import { WalletsService } from '@/wallets/wallets.service';
 
 const prismaMock = { wallet: { create: vi.fn(), findMany: vi.fn() } };
+const eventsMock = { record: vi.fn().mockResolvedValue(undefined), emit: vi.fn() };
 const signerMock = {
   createKey: vi.fn(),
   getAddress: vi.fn(),
@@ -22,6 +24,7 @@ describe('WalletsService', () => {
         WalletsService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: SIGNER, useValue: signerMock },
+        { provide: EventsService, useValue: eventsMock },
       ],
     }).compile();
     service = moduleRef.get(WalletsService);
