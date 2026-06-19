@@ -12,6 +12,7 @@ import {
   type Wallet,
 } from './api';
 import { AuthProvider, useAuth } from './auth-context';
+import { PollingProvider, usePolling } from './polling-context';
 import { explorerAddress, explorerTx, FAUCET_URL } from './explorer';
 import { nicknames, shortHex, toEth, walletLabel } from './format';
 
@@ -47,7 +48,9 @@ function HashLink({ value, href }: { value: string; href: string }) {
 }
 
 // Polls the chain head for the status-bar heartbeat (block height + gas), no auth.
+// One initial fetch always runs; recurring interval only when live polling is ON.
 function useChainHead() {
+  const { live } = usePolling();
   const [head, setHead] = useState<{ blockNumber: number; gasGwei: number } | null>(null);
   useEffect(() => {
     let active = true;
@@ -57,12 +60,13 @@ function useChainHead() {
         .then((h) => active && setHead(h))
         .catch(() => undefined);
     void tick();
+    if (!live) return () => { active = false; };
     const t = setInterval(tick, 6000);
     return () => {
       active = false;
       clearInterval(t);
     };
-  }, []);
+  }, [live]);
   return head;
 }
 
@@ -322,10 +326,11 @@ function UserView({ onExit }: { onExit: () => void }) {
   );
 }
 
-// Auto-refreshing native-ETH available balance for one wallet. Polls every BLOCK_MS so the
-// "updated" stamp ticks on its own — no manual Refresh button (CLAUDE.md §8 demoability).
+// Auto-refreshing native-ETH available balance for one wallet.
+// One initial fetch always runs; recurring interval only when live polling is ON.
 const BLOCK_MS = 12_000; // Sepolia block time
 function usePolledBalance(walletId: string | undefined) {
+  const { live } = usePolling();
   const [line, setLine] = useState<BalanceLine | null>(null);
   const [updated, setUpdated] = useState('');
   useEffect(() => {
@@ -341,12 +346,13 @@ function usePolledBalance(walletId: string | undefined) {
         })
         .catch(() => undefined);
     void tick();
+    if (!live) return () => { active = false; };
     const t = setInterval(tick, BLOCK_MS);
     return () => {
       active = false;
       clearInterval(t);
     };
-  }, [walletId]);
+  }, [walletId, live]);
   return { line, updated };
 }
 
@@ -732,7 +738,9 @@ function SendForm({
 
 /** Polls the wallet's recent transactions and shows status + hash. */
 // Unified on/off-chain history: on-chain sends + off-chain signatures, newest-first.
+// One initial fetch always runs; recurring interval only when live polling is ON.
 function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: number }) {
+  const { live } = usePolling();
   const [items, setItems] = useState<ActivityItem[]>([]);
 
   useEffect(() => {
@@ -742,13 +750,14 @@ function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: numb
         .listActivity(wallet.id)
         .then((rows) => active && setItems(rows))
         .catch(() => undefined);
-    load();
+    void load();
+    if (!live) return () => { active = false; };
     const timer = setInterval(load, 4000); // poll pending → confirmed/failed
     return () => {
       active = false;
       clearInterval(timer);
     };
-  }, [wallet.id, refreshKey]);
+  }, [wallet.id, refreshKey, live]);
 
   if (items.length === 0)
     return (
@@ -1734,6 +1743,39 @@ function ActivityTab({ wallets }: { wallets: Wallet[] }) {
   );
 }
 
+function PollingToggle() {
+  const { live, setLive, ready } = usePolling();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const toggle = async () => {
+    setError('');
+    setBusy(true);
+    try {
+      await setLive(!live);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={toggle}
+        disabled={busy || !ready}
+        aria-pressed={live}
+      >
+        {busy ? 'Updating…' : `Live blockchain polling: ${live ? 'ON' : 'OFF'}`}
+      </button>
+      <p className="bal-sub">OFF by default to conserve RPC quota. Turn ON to enable auto-refresh of balances, confirmations, and activity.</p>
+      {error && <p role="alert">{error}</p>}
+    </div>
+  );
+}
+
 // Settings / Dev tools: the low-frequency, environment-level, or destructive controls — one tab
 // deep on purpose (audit #1/#10). Admin key shown as a status, never as the value.
 function SettingsTab({ onChange }: { onChange: () => void }) {
@@ -1862,6 +1904,9 @@ function SettingsTab({ onChange }: { onChange: () => void }) {
       {seedMsg && <p>{seedMsg}</p>}
       {error && <p role="alert">{error}</p>}
 
+      <h3>Live blockchain polling</h3>
+      <PollingToggle />
+
       <h3>Chain inspector</h3>
       <p>
         <a href={FAUCET_URL} target="_blank" rel="noreferrer">
@@ -1949,7 +1994,9 @@ function Root() {
 export function App() {
   return (
     <AuthProvider>
-      <Root />
+      <PollingProvider>
+        <Root />
+      </PollingProvider>
     </AuthProvider>
   );
 }

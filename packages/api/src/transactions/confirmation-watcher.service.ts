@@ -4,6 +4,7 @@ import type { Hex } from '@vencura/shared';
 import { ChainService } from '../infra/chain/chain.service';
 import { PrismaService } from '../infra/prisma/prisma.service';
 import { BalancesService } from '../balances/balances.service';
+import { PollingStateService } from '../infra/chain/polling-state.service';
 
 // Confirmations required before finalizing. Default 1 (anvil instant-mine = confirm once
 // the tx is in a block); a public network raises it via the CONFIRMATIONS env var.
@@ -16,10 +17,12 @@ export class ConfirmationWatcher {
     private readonly prisma: PrismaService,
     private readonly chain: ChainService,
     private readonly balances: BalancesService,
+    private readonly polling: PollingStateService,
   ) {}
 
   @Interval(5_000)
   async reconcile(): Promise<void> {
+    if (!this.polling.isLive()) return;
     const pending = await this.prisma.transaction.findMany({
       where: { status: 'pending', txHash: { not: null } },
     });

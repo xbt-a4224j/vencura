@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '@/infra/prisma/prisma.service';
+import type { PollingStateService } from '@/infra/chain/polling-state.service';
 import { AdminController } from '@/admin/admin.controller';
 import * as seed from '@/admin/seed';
 
@@ -9,12 +10,13 @@ const seedResult = { email: 'demo@vencura.local', password: 'demo-password', wal
 
 describe('AdminController.reset', () => {
   const prisma = { user: { deleteMany: vi.fn() } } as unknown as PrismaService;
+  const polling = { isLive: vi.fn().mockReturnValue(false), setLive: vi.fn() } as unknown as PollingStateService;
   let controller: AdminController;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(seed, 'seedDemo').mockResolvedValue(seedResult);
-    controller = new AdminController(prisma);
+    controller = new AdminController(prisma, polling);
   });
 
   it('wipes all users (cascades to wallets/txs/balances/policies) then re-seeds', async () => {

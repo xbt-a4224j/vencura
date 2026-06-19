@@ -1,14 +1,16 @@
 import { Body, ConflictException, Controller, Logger, Post, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
-import { DEMO_PASSWORD } from '@vencura/shared';
+import { DEMO_PASSWORD, PollingSchema } from '@vencura/shared';
 import * as argon2 from 'argon2';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { PollingStateService } from '../infra/chain/polling-state.service';
 import { PrismaService } from '../infra/prisma/prisma.service';
 import { AdminGuard } from './admin.guard';
 import * as seed from './seed';
 
 class CreateDemoAccountDto extends createZodDto(z.object({ email: z.string().email() })) {}
+class SetPollingDto extends createZodDto(PollingSchema) {}
 
 // Dev/demo controls. Gated by AdminGuard (x-admin-key === ADMIN_API_KEY) in every
 // environment, so the deployed demo can seed/reset but randoms can't. Reset wipes ALL
@@ -19,7 +21,10 @@ class CreateDemoAccountDto extends createZodDto(z.object({ email: z.string().ema
 @Controller('admin')
 export class AdminController {
   private readonly logger = new Logger(AdminController.name);
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly polling: PollingStateService,
+  ) {}
 
   @Post('seed')
   async seed() {
@@ -45,6 +50,13 @@ export class AdminController {
     });
     this.logger.log(`admin created demo account: ${email}`);
     return user;
+  }
+
+  @Post('polling')
+  setPolling(@Body() dto: SetPollingDto) {
+    this.polling.setLive(dto.live);
+    this.logger.log(`live polling → ${dto.live}`);
+    return { live: this.polling.isLive() };
   }
 
   @Post('reset')

@@ -988,3 +988,12 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Files touched** — schema + migration · auth.service.ts · seed.ts · admin.controller.ts (+ dto) · web api.ts/auth-context.tsx · UserView clearer 401 hint.
 **Tests** — 96 api pass; web green.
 **Gotchas** — Post-deploy the picker shows only `demo@vencura.local` (junk hidden, not deleted); alice/bob appear after a reset/seed (admin key). Admin create-account now needs the admin key set (it's an admin action).
+
+---
+
+## v0.x.0 · Block 5 · Live-polling toggle, OFF by default    (no issue · commit TBD)
+**What & why** — Backend pollers (ConfirmationWatcher, BalanceRefresher) and web pollers (chain head, balance, activity feed) were hitting the Infura RPC 24/7. A single `PollingStateService` boolean (default `false`) gates all of them, slashing idle RPC usage.
+**How it works** — [PollingStateService](packages/api/src/infra/chain/polling-state.service.ts) is a global singleton in ChainModule. Pollers check `isLive()` as their first line and return early if off. `GET /chain/polling` (public) reads state; `POST /admin/polling` (admin-gated, Zod-validated) flips it. Web hooks do one initial fetch then start `setInterval` only when `live === true`.
+**Files touched** — polling-state.service.ts (new) · chain.module.ts · chain.controller.ts · admin.controller.ts · balance-refresher.service.ts · confirmation-watcher.service.ts · polling-context.tsx (new) · api.ts · App.tsx (useChainHead, usePolledBalance, ActivityFeed, PollingToggle, App root).
+**Tests** — Added no-op tests for both pollers when OFF; admin.controller.spec updated. 98 passed.
+**Gotchas** — In-memory singleton: restart resets to OFF (desired safe default). Multi-instance deploys get independent state — acceptable for single-node Railway target.

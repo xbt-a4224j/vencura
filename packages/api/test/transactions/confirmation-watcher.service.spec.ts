@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChainService } from '@/infra/chain/chain.service';
 import { PrismaService } from '@/infra/prisma/prisma.service';
 import { BalancesService } from '@/balances/balances.service';
+import { PollingStateService } from '@/infra/chain/polling-state.service';
 import { ConfirmationWatcher } from '@/transactions/confirmation-watcher.service';
 
 const prismaMock = {
@@ -11,6 +12,7 @@ const prismaMock = {
 };
 const chainMock = { getBlockNumber: vi.fn(), getTransactionReceipt: vi.fn() };
 const balancesMock = { refresh: vi.fn() };
+const pollingMock = { isLive: vi.fn().mockReturnValue(true), setLive: vi.fn() };
 
 const pendingTx = { id: 'tx1', walletId: 'w1', txHash: '0xhash' };
 
@@ -18,6 +20,7 @@ describe('ConfirmationWatcher', () => {
   let watcher: ConfirmationWatcher;
   beforeEach(async () => {
     vi.clearAllMocks();
+    pollingMock.isLive.mockReturnValue(true);
     prismaMock.transaction.findMany.mockResolvedValue([pendingTx]);
     prismaMock.transaction.update.mockResolvedValue({});
     prismaMock.wallet.findUnique.mockResolvedValue({ address: '0xabc' });
@@ -28,9 +31,16 @@ describe('ConfirmationWatcher', () => {
         { provide: PrismaService, useValue: prismaMock },
         { provide: ChainService, useValue: chainMock },
         { provide: BalancesService, useValue: balancesMock },
+        { provide: PollingStateService, useValue: pollingMock },
       ],
     }).compile();
     watcher = moduleRef.get(ConfirmationWatcher);
+  });
+
+  it('is a no-op when polling is OFF', async () => {
+    pollingMock.isLive.mockReturnValue(false);
+    await watcher.reconcile();
+    expect(prismaMock.transaction.findMany).not.toHaveBeenCalled();
   });
 
   it('marks a successful receipt with enough confirmations as confirmed + refreshes balance', async () => {
