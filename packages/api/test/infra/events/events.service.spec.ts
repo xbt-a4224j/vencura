@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { EventsService } from './events.service';
+import { EventsService } from '@/infra/events/events.service';
 
 // PrismaService stub: only auditLog.create is exercised by record().
 function makeService() {

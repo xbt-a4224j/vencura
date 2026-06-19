@@ -42,7 +42,10 @@ export class ActivityService {
         orderBy: { createdAt: 'desc' },
         take: 100,
       }),
-      this.prisma.auditLog.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 100 }),
+      // Best-effort: if the audit_log migration hasn't applied yet, degrade to tx+sig (don't 500).
+      this.prisma.auditLog
+        .findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 100 })
+        .catch(() => []),
     ]);
     return mergeActivity(txs, sigs, audits).slice(0, 100);
   }
