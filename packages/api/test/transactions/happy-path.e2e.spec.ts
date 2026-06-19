@@ -6,6 +6,7 @@ import { createTestClient, http as viemHttp, parseEther } from 'viem';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/infra/prisma/prisma.service';
+import { PollingStateService } from '@/infra/chain/polling-state.service';
 import { ConfirmationWatcher } from '@/transactions/confirmation-watcher.service';
 
 // Full happy path against the REAL stack (local anvil + Postgres): create → fund →
@@ -22,6 +23,8 @@ describe.skipIf(!process.env.RUN_DB_TESTS)('Happy path (anvil + postgres)', () =
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(new ZodValidationPipe());
     await app.init();
+    // Confirmations only run when live polling is on (off by default since the polling-toggle).
+    app.get(PollingStateService).setLive(true);
     watcher = app.get(ConfirmationWatcher);
   });
 
