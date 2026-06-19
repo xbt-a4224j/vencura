@@ -155,6 +155,35 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
 .pill.signed { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .pill.failed { color: var(--fail); border-color: color-mix(in srgb, var(--fail) 45%, transparent); background: color-mix(in srgb, var(--fail) 12%, transparent); }
 
+/* Editable wallet nickname */
+.nick { font-weight: 600; color: var(--ink); margin-right: 6px; }
+
+/* Flash a newly-created wallet card */
+@keyframes flash { from { background: color-mix(in srgb, var(--accent) 16%, var(--panel)); } to { background: var(--panel); } }
+.flash { animation: flash 1.6s ease-out; }
+
+/* Aligned form grid: label above input, fields flow, action trails */
+.form-grid { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-end; margin: 8px 0; }
+.field { display: flex; flex-direction: column; gap: 4px; margin: 0; }
+.field > span { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.field input, .field select { min-width: 160px; }
+
+/* Policy badges on a wallet card */
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.badge { font-size: 11.5px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; }
+
+/* Live policy pre-flight verdict in the send form */
+.preflight { font-size: 12.5px; font-weight: 600; margin: 4px 0; }
+.preflight.ok { color: var(--ok); }
+.preflight.bad { color: var(--fail); }
+
+/* Concurrency visualizer — nonce-ordered rows */
+.nonce-row { display: grid; grid-template-columns: 26px 70px 1fr; gap: 10px; align-items: center; padding: 4px 0; font-size: 13px; border-bottom: 1px solid var(--line); }
+.nonce-row .lock { color: var(--accent); }
+.nonce-row .nnum { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; }
+.verdict.ok { color: var(--ok); font-weight: 700; }
+.verdict.bad { color: var(--fail); font-weight: 700; }
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }

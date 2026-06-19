@@ -1,5 +1,5 @@
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
-import { erc20Abi, isAddress, parseEther } from 'viem';
+import { erc20Abi, isAddress, parseEther, recoverMessageAddress } from 'viem';
 import {
   type ActivityItem,
   adminKeyStore,
@@ -10,7 +10,7 @@ import {
 } from './api';
 import { AuthProvider, useAuth } from './auth-context';
 import { explorerAddress, explorerTx, FAUCET_URL } from './explorer';
-import { shortHex, toEth } from './format';
+import { nicknames, shortHex, toEth, walletLabel } from './format';
 
 // Copy any value to the clipboard with brief "Copied ✓" feedback.
 function CopyButton({ value, label = 'Copy' }: { value: string; label?: string }) {
@@ -133,11 +133,13 @@ function SendForm({
   wallet,
   assets,
   recipients,
+  policy,
   onSent,
 }: {
   wallet: Wallet;
   assets: { value: string; label: string }[];
   recipients: { value: string; label: string; group?: string }[];
+  policy: Policy | null;
   onSent: () => void;
 }) {
   const [asset, setAsset] = useState('ETH');
@@ -147,12 +149,30 @@ function SendForm({
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const to = recipient === CUSTOM ? custom.trim() : recipient;
+  // Client mirror of the server policy (allowlist + per-tx) for a live pre-flight verdict.
+  // The daily limit is server-enforced (needs today's spend), so it isn't previewed here.
+  const preflight = (() => {
+    if (!policy || !to || !isAddress(to)) return null;
+    const allow = policy.allowlist.map((a) => a.toLowerCase());
+    if (allow.length > 0 && !allow.includes(to.toLowerCase()))
+      return { ok: false, msg: 'recipient not on allowlist' };
+    if (asset === 'ETH' && policy.perTxLimit && amount) {
+      try {
+        if (parseEther(amount) > BigInt(policy.perTxLimit))
+          return { ok: false, msg: `exceeds per-tx limit (${toEth(policy.perTxLimit)} ETH)` };
+      } catch {
+        /* invalid amount — the submit guard handles it */
+      }
+    }
+    return { ok: true, msg: 'within policy' };
+  })();
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setBusy(true);
     try {
-      const to = recipient === CUSTOM ? custom.trim() : recipient;
       if (!to) throw new Error('Recipient is required.');
       if (!isAddress(to)) throw new Error('Enter a valid 0x address.');
       // Amount is entered in ETH decimals; convert to wei base units before POST (ERC-20s
@@ -176,56 +196,75 @@ function SendForm({
 
   return (
     <form onSubmit={submit}>
-      <label htmlFor={`asset-${wallet.id}`}>Asset</label>
-      <select id={`asset-${wallet.id}`} value={asset} onChange={(e) => setAsset(e.target.value)}>
-        {assets.map((a) => (
-          <option key={a.value} value={a.value}>
-            {a.label}
-          </option>
-        ))}
-      </select>
-
-      <label htmlFor={`to-${wallet.id}`}>Recipient</label>
-      <select id={`to-${wallet.id}`} value={recipient} onChange={(e) => setRecipient(e.target.value)}>
-        {Object.entries(
-          recipients.reduce<Record<string, { value: string; label: string }[]>>((acc, r) => {
-            (acc[r.group ?? 'Recipients'] ??= []).push(r);
-            return acc;
-          }, {}),
-        ).map(([group, opts]) => (
-          <optgroup key={group} label={group}>
-            {opts.map((r) => (
-              <option key={r.value} value={r.value}>
-                {r.label}
+      <div className="form-grid">
+        <label className="field" htmlFor={`asset-${wallet.id}`}>
+          <span>Asset</span>
+          <select id={`asset-${wallet.id}`} value={asset} onChange={(e) => setAsset(e.target.value)}>
+            {assets.map((a) => (
+              <option key={a.value} value={a.value}>
+                {a.label}
               </option>
             ))}
-          </optgroup>
-        ))}
-        <optgroup label="Custom">
-          <option value={CUSTOM}>custom address…</option>
-        </optgroup>
-      </select>
-      {recipient === CUSTOM && (
-        <input
-          aria-label="custom recipient address"
-          placeholder="0x…"
-          value={custom}
-          onChange={(e) => setCustom(e.target.value)}
-        />
-      )}
+          </select>
+        </label>
 
-      <label htmlFor={`amount-${wallet.id}`}>Amount (ETH)</label>
-      <input
-        id={`amount-${wallet.id}`}
-        type="number"
-        step="any"
-        min="0"
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-      />
-      <button type="submit" disabled={busy || amount.length === 0}>
-        {busy ? 'Sending…' : 'Send'}
-      </button>
+        <label className="field" htmlFor={`to-${wallet.id}`}>
+          <span>Recipient</span>
+          <select id={`to-${wallet.id}`} value={recipient} onChange={(e) => setRecipient(e.target.value)}>
+            {Object.entries(
+              recipients.reduce<Record<string, { value: string; label: string }[]>>((acc, r) => {
+                (acc[r.group ?? 'Recipients'] ??= []).push(r);
+                return acc;
+              }, {}),
+            ).map(([group, opts]) => (
+              <optgroup key={group} label={group}>
+                {opts.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+            <optgroup label="Custom">
+              <option value={CUSTOM}>custom address…</option>
+            </optgroup>
+          </select>
+        </label>
+
+        {recipient === CUSTOM && (
+          <label className="field">
+            <span>Custom address</span>
+            <input
+              aria-label="custom recipient address"
+              placeholder="0x…"
+              value={custom}
+              onChange={(e) => setCustom(e.target.value)}
+            />
+          </label>
+        )}
+
+        <label className="field" htmlFor={`amount-${wallet.id}`}>
+          <span>Amount (ETH)</span>
+          <input
+            id={`amount-${wallet.id}`}
+            type="number"
+            step="any"
+            min="0"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+        </label>
+
+        <button type="submit" disabled={busy || amount.length === 0}>
+          {busy ? 'Sending…' : 'Send'}
+        </button>
+      </div>
+      {preflight && (
+        <p className={`preflight ${preflight.ok ? 'ok' : 'bad'}`}>
+          {preflight.ok ? '✓ ' : '✗ '}
+          {preflight.ok ? 'within policy' : `would be blocked: ${preflight.msg}`}
+        </p>
+      )}
       {error && <p role="alert">{error}</p>}
     </form>
   );
@@ -531,24 +570,54 @@ function ConcurrencyDemo({
           <button onClick={fire} disabled={busy}>
             {busy ? 'Firing…' : `Fire ${n} concurrent sends`}
           </button>
-          {nonces.length > 0 && (
-            <p>
-              nonces: <code>{sorted.join(', ')}</code> ·{' '}
-              <strong>{unique && monotonic ? '✓ unique + consecutive' : '✗ collision!'}</strong>
-            </p>
+          {results.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              {[...results]
+                .sort((a, b) => (a.nonce ?? Number.MAX_SAFE_INTEGER) - (b.nonce ?? Number.MAX_SAFE_INTEGER))
+                .map((r, i) => (
+                  <div className="nonce-row" key={i}>
+                    <span className="lock" aria-hidden>
+                      🔒
+                    </span>
+                    <span className="nnum">{r.nonce != null ? `nonce ${r.nonce}` : '—'}</span>
+                    <span>
+                      {r.error ? (
+                        <span className="pill failed">failed</span>
+                      ) : (
+                        <span className="pill pending">broadcast</span>
+                      )}
+                      {r.error ? ` ${r.error}` : ''}
+                    </span>
+                  </div>
+                ))}
+              <p className={`verdict ${unique && monotonic && errors.length === 0 ? 'ok' : 'bad'}`}>
+                {errors.length === 0
+                  ? `${nonces.length}/${results.length} serialized — unique, consecutive nonces ✓`
+                  : `${errors.length}/${results.length} failed (${errors[0].error})`}
+              </p>
+            </div>
           )}
-          {errors.length > 0 && <p role="alert">{errors.length} failed: {errors[0].error}</p>}
         </>
       )}
     </details>
   );
 }
 
-function WalletItem({ wallet, otherWallets }: { wallet: Wallet; otherWallets: Wallet[] }) {
+function WalletItem({
+  wallet,
+  otherWallets,
+  highlight,
+}: {
+  wallet: Wallet;
+  otherWallets: Wallet[];
+  highlight?: boolean;
+}) {
   const [balances, setBalances] = useState<BalanceLine[] | null>(null);
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [message, setMessage] = useState('');
   const [signature, setSignature] = useState('');
+  const [verifyOut, setVerifyOut] = useState('');
+  const [nick, setNick] = useState(nicknames.get(wallet.id));
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -581,8 +650,20 @@ function WalletItem({ wallet, otherWallets }: { wallet: Wallet; otherWallets: Wa
 
   const sign = (e: FormEvent) => {
     e.preventDefault();
+    setVerifyOut('');
     return guard(async () => setSignature((await api.signMessage(wallet.id, message)).signature));
   };
+
+  // Sign → verify loop: recover the signer from (message, signature) and prove it's this wallet.
+  const verify = () =>
+    guard(async () => {
+      const signer = await recoverMessageAddress({ message, signature: signature as `0x${string}` });
+      setVerifyOut(
+        signer.toLowerCase() === wallet.address.toLowerCase()
+          ? `✓ verified — recovered ${shortHex(signer)} = this wallet`
+          : `✗ mismatch — recovered ${shortHex(signer)}`,
+      );
+    });
 
   const onSent = () => {
     setRefreshKey((k) => k + 1);
@@ -598,7 +679,7 @@ function WalletItem({ wallet, otherWallets }: { wallet: Wallet; otherWallets: Wa
   ];
   // Recipient dropdown: the user's other wallets + this wallet's policy allowlist.
   const recipientOptions = [
-    ...otherWallets.map((w) => ({ value: w.address, label: shortHex(w.address), group: 'Your wallets' })),
+    ...otherWallets.map((w) => ({ value: w.address, label: walletLabel(w.id, w.address), group: 'Your wallets' })),
     ...(policy?.allowlist ?? [])
       .filter((a) => !otherWallets.some((w) => w.address.toLowerCase() === a.toLowerCase()))
       .map((a) => ({ value: a, label: shortHex(a), group: 'Allowlisted' })),
@@ -611,13 +692,31 @@ function WalletItem({ wallet, otherWallets }: { wallet: Wallet; otherWallets: Wa
   const ethZero = !!balances && ethAvailable === 0n;
 
   return (
-    <li>
+    <li className={highlight ? 'flash' : undefined}>
       <div style={{ marginBottom: 8 }}>
+        <input
+          className="nick"
+          aria-label="wallet nickname"
+          placeholder="nickname"
+          value={nick}
+          style={{ width: 150 }}
+          onChange={(e) => {
+            setNick(e.target.value);
+            nicknames.set(wallet.id, e.target.value);
+          }}
+        />{' '}
         <a href={explorerAddress(wallet.address)} target="_blank" rel="noreferrer" title={wallet.address}>
           <code>{wallet.address}</code> ↗
         </a>
         <CopyButton value={wallet.address} label="⧉" />
       </div>
+      {policy && (policy.allowlist.length > 0 || policy.perTxLimit || policy.dailyLimit) && (
+        <div className="badges">
+          {policy.allowlist.length > 0 && <span className="badge">Allowlist: {policy.allowlist.length}</span>}
+          {policy.perTxLimit && <span className="badge">Per-tx ≤ {toEth(policy.perTxLimit)} ETH</span>}
+          {policy.dailyLimit && <span className="badge">Daily ≤ {toEth(policy.dailyLimit)} ETH</span>}
+        </div>
+      )}
       <div>
         <button onClick={() => load()} disabled={busy}>
           Refresh balances
@@ -653,6 +752,7 @@ function WalletItem({ wallet, otherWallets }: { wallet: Wallet; otherWallets: Wa
         wallet={wallet}
         assets={assetOptions}
         recipients={recipientOptions}
+        policy={policy}
         onSent={onSent}
       />
 
@@ -678,7 +778,13 @@ function WalletItem({ wallet, otherWallets }: { wallet: Wallet; otherWallets: Wa
           {signature && (
             <p>
               signature: <code>{shortHex(signature)}</code>
-              <CopyButton value={signature} label="⧉" />
+              <CopyButton value={signature} label="⧉" />{' '}
+              <button type="button" className="copybtn" onClick={verify}>
+                Verify
+              </button>
+              {verifyOut && (
+                <span className={verifyOut.startsWith('✓') ? 'verdict ok' : 'verdict bad'}> {verifyOut}</span>
+              )}
             </p>
           )}
         </form>
@@ -690,10 +796,13 @@ function WalletItem({ wallet, otherWallets }: { wallet: Wallet; otherWallets: Wa
 
 function WalletsTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => void }) {
   const [error, setError] = useState('');
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   const create = async () => {
     setError('');
     try {
-      await api.createWallet();
+      const w = await api.createWallet();
+      setHighlightId(w.id);
+      setTimeout(() => setHighlightId(null), 1800);
       onChange();
     } catch (err) {
       setError((err as Error).message);
@@ -714,6 +823,7 @@ function WalletsTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => 
               key={w.id}
               wallet={w}
               otherWallets={wallets.filter((o) => o.id !== w.id)}
+              highlight={w.id === highlightId}
             />
           ))}
         </ul>
