@@ -1018,3 +1018,8 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Files** — seed.ts, wallets.controller.ts, transactions.{service,module}.ts, transfers.* (deleted), shared/transfer.schema (deleted), format.ts, App.tsx, api.ts; tests updated.
 **Tests** — api 93 pass; web typecheck/lint/build green.
 **Gotchas** — No new migration (WALLET_COUNT is seed-only); a reset is needed to bring an already-multi-wallet admin down to one wallet. The demo_token row survives reset (standalone table) so the deployed token persists.
+
+## v0.x.0 · Block 5 · Post-churn cleanup (local; not deployed)
+**What & why** — Removed residue from the single-wallet/one-user simplification.
+**Changes** — (1) dead CSS deleted: `.wrow-head/.wrow-detail/.caret` (accordion gone), `.flash`/`@keyframes flash`, `.bal-hero` (Venmo hero gone). (2) Renamed `PoliciesTab`→`LimitsTab`, `PolicyEditor`→`LimitsEditor` (the tab is "Limits", editor is limits-only). (3) `SendForm` collapsed to a plain recipient-address input — dropped the `recipients` prop, the grouping/`reduce`, and the `CUSTOM` sentinel. (4) Removed `ContractPanel` + `RawContractCall` from `WalletItem` — the ERC-20/approve surface is the dedicated Token tab now. (5) Reviewed `assetOptions` (ETH + tracked tokens — kept; latent ERC-20-send capability) and the DemoBanner-in-both-views (intentional) — no change.
+**Verify** — web typecheck + lint + build green; bundle 250→246 kB. Not pushed (per request).

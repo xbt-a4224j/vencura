@@ -158,9 +158,6 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
 /* Editable wallet nickname */
 .nick { font-weight: 600; color: var(--ink); margin-right: 6px; }
 
-/* Flash a newly-created wallet card */
-@keyframes flash { from { background: color-mix(in srgb, var(--accent) 16%, var(--panel)); } to { background: var(--panel); } }
-.flash { animation: flash 1.6s ease-out; }
 
 /* Aligned form grid: label above input, fields flow, action trails */
 .form-grid { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-end; margin: 8px 0; }
@@ -244,22 +241,7 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
 .stat .stat-num { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
 .stat .stat-label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 
-/* ── Balance hero (visual hierarchy: the number dominates) ───────────────────────── */
-.bal-hero { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1.1; }
-.bal-hero .unit { font-size: 16px; font-weight: 600; color: var(--muted); margin-left: 6px; }
-
-/* ── Wallets tab: accordion rows (one expanded at a time) ────────────────────────── */
-.wrow-head {
-  display: grid; grid-template-columns: 1.2fr 1.4fr 1fr auto; gap: 12px; align-items: center;
-  width: 100%; text-align: left; background: var(--panel); color: var(--ink);
-  border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; margin: 8px 0 0;
-}
-.wrow-head:hover:not(:disabled) { filter: none; border-color: var(--accent); }
-.wrow-head[aria-expanded="true"] { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-color: var(--accent); }
-.wrow-head .caret { color: var(--muted); }
-.wrow-detail { border: 1px solid var(--accent); border-top: none; border-radius: 0 0 var(--radius) var(--radius); padding: 4px 16px 14px; margin: 0 0 8px; }
-
-/* ── Policy cards (clear per-wallet separation; labels above fields) ──────────────── */
+/* ── Limit cards (clear per-wallet separation; labels above fields) ───────────────── */
 .policy-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin: 12px 0; }
 .policy-card > header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .policy-card .cur { font-size: 12.5px; color: var(--muted); margin: 0 0 12px; }

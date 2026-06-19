@@ -352,34 +352,29 @@ function UserAuth({ onExit }: { onExit: () => void }) {
 }
 
 
-const CUSTOM = '__custom__';
-
-/** Send native ETH or an ERC-20, with asset + recipient dropdowns and ETH-decimal amount entry. */
+/** Send native ETH (or an ERC-20 by address) to a recipient address, with a live per-tx pre-flight. */
 function SendForm({
   wallet,
   assets,
-  recipients,
   policy,
   onSent,
 }: {
   wallet: Wallet;
   assets: { value: string; label: string }[];
-  recipients: { value: string; label: string; group?: string }[];
   policy: Policy | null;
   onSent: () => void;
 }) {
   const [asset, setAsset] = useState('ETH');
-  const [recipient, setRecipient] = useState(recipients[0]?.value ?? CUSTOM);
-  const [custom, setCustom] = useState('');
+  const [to, setTo] = useState('');
   const [amount, setAmount] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const to = recipient === CUSTOM ? custom.trim() : recipient;
+  const addr = to.trim();
   // Client mirror of the server per-tx limit for a live pre-flight verdict. The daily limit is
   // server-enforced (needs today's spend), so it isn't previewed here.
   const preflight = (() => {
-    if (!policy || !to || !isAddress(to)) return null;
+    if (!policy || !addr || !isAddress(addr)) return null;
     if (asset === 'ETH' && policy.perTxLimit && amount) {
       try {
         if (parseEther(amount) > BigInt(policy.perTxLimit))
@@ -396,8 +391,8 @@ function SendForm({
     setError('');
     setBusy(true);
     try {
-      if (!to) throw new Error('Recipient is required.');
-      if (!isAddress(to)) throw new Error('Enter a valid 0x address.');
+      if (!addr) throw new Error('Recipient is required.');
+      if (!isAddress(addr)) throw new Error('Enter a valid 0x address.');
       // Amount is entered in ETH decimals; convert to wei base units before POST (ERC-20s
       // here are demo-only and also use 18 decimals, so parseEther is fine for the demo).
       let wei: bigint;
@@ -407,7 +402,7 @@ function SendForm({
         throw new Error('Enter a valid amount.');
       }
       if (wei <= 0n) throw new Error('Amount must be greater than 0.');
-      await api.send(wallet.id, { to, asset, amount: wei.toString() });
+      await api.send(wallet.id, { to: addr, asset, amount: wei.toString() });
       setAmount('');
       onSent();
     } catch (err) {
@@ -432,39 +427,9 @@ function SendForm({
         </label>
 
         <label className="field" htmlFor={`to-${wallet.id}`}>
-          <span>Recipient</span>
-          <select id={`to-${wallet.id}`} value={recipient} onChange={(e) => setRecipient(e.target.value)}>
-            {Object.entries(
-              recipients.reduce<Record<string, { value: string; label: string }[]>>((acc, r) => {
-                (acc[r.group ?? 'Recipients'] ??= []).push(r);
-                return acc;
-              }, {}),
-            ).map(([group, opts]) => (
-              <optgroup key={group} label={group}>
-                {opts.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-            <optgroup label="Custom">
-              <option value={CUSTOM}>custom address…</option>
-            </optgroup>
-          </select>
+          <span>Recipient address</span>
+          <input id={`to-${wallet.id}`} placeholder="0x…" value={to} onChange={(e) => setTo(e.target.value)} />
         </label>
-
-        {recipient === CUSTOM && (
-          <label className="field">
-            <span>Custom address</span>
-            <input
-              aria-label="custom recipient address"
-              placeholder="0x…"
-              value={custom}
-              onChange={(e) => setCustom(e.target.value)}
-            />
-          </label>
-        )}
 
         <label className="field" htmlFor={`amount-${wallet.id}`}>
           <span>Amount (ETH)</span>
@@ -484,8 +449,7 @@ function SendForm({
       </div>
       {preflight && (
         <p className={`preflight ${preflight.ok ? 'ok' : 'bad'}`}>
-          {preflight.ok ? '✓ ' : '✗ '}
-          {preflight.ok ? 'within policy' : `would be blocked: ${preflight.msg}`}
+          {preflight.ok ? '✓ within policy' : `✗ would be blocked: ${preflight.msg}`}
         </p>
       )}
       {error && <p role="alert">{error}</p>}
@@ -557,170 +521,6 @@ function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: numb
 }
 
 
-// #32: generic contract read/write, with a friendly ERC-20 front door + a raw "advanced" panel.
-function ContractPanel({ wallet }: { wallet: Wallet }) {
-  const [token, setToken] = useState('');
-  const [info, setInfo] = useState('');
-  const [spender, setSpender] = useState('');
-  const [approveAmt, setApproveAmt] = useState('');
-  const [apMsg, setApMsg] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  const readErc20 = (functionName: string, args: unknown[] = []) =>
-    api.contractRead({ address: token, abi: erc20Abi, functionName, args }).then((r) => r.result);
-
-  const inspect = async () => {
-    setBusy(true);
-    setInfo('');
-    try {
-      const [name, symbol, decimals, bal] = await Promise.all([
-        readErc20('name'),
-        readErc20('symbol'),
-        readErc20('decimals'),
-        readErc20('balanceOf', [wallet.address]),
-      ]);
-      setInfo(`${name} (${symbol}) · decimals ${decimals} · your balance ${bal}`);
-    } catch (e) {
-      setInfo((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const approve = async () => {
-    setApMsg('');
-    try {
-      const tx = await api.contractWrite(wallet.id, {
-        address: token,
-        abi: erc20Abi,
-        functionName: 'approve',
-        args: [spender, parseEther(approveAmt || '0').toString()],
-      });
-      setApMsg(`✓ approve sent (nonce ${tx.nonce}) — once it confirms, click "Check allowance"`);
-    } catch (e) {
-      setApMsg((e as Error).message);
-    }
-  };
-
-  // The proof an approve worked: read allowance(owner, spender) back from the token.
-  const checkAllowance = async () => {
-    try {
-      const allowance = await readErc20('allowance', [wallet.address, spender]);
-      setApMsg(`allowance(this wallet → ${spender.slice(0, 8)}…) = ${allowance}`);
-    } catch (e) {
-      setApMsg((e as Error).message);
-    }
-  };
-
-  return (
-    <details>
-      <summary>Contracts (ERC-20)</summary>
-      <label>
-        Token address
-        <input
-          aria-label="ERC-20 token contract address"
-          value={token}
-          placeholder="0x… ERC-20 contract"
-          onChange={(e) => setToken(e.target.value)}
-        />
-      </label>{' '}
-      <button onClick={inspect} disabled={busy || !token}>
-        {busy ? 'Reading…' : 'Inspect token'}
-      </button>
-      {info && <p>{info}</p>}
-
-      <h4>Approve a spender</h4>
-      <input
-        aria-label="spender address"
-        value={spender}
-        placeholder="spender 0x…"
-        onChange={(e) => setSpender(e.target.value)}
-      />{' '}
-      <input
-        aria-label="approve amount in token units"
-        value={approveAmt}
-        placeholder="amount (ETH units)"
-        onChange={(e) => setApproveAmt(e.target.value)}
-      />{' '}
-      <button onClick={approve} disabled={!token || !spender}>
-        Approve
-      </button>{' '}
-      <button onClick={checkAllowance} disabled={!token || !spender}>
-        Check allowance
-      </button>
-      {apMsg && <p>{apMsg}</p>}
-
-      <RawContractCall wallet={wallet} />
-    </details>
-  );
-}
-
-// The fully-generic capability (any ABI / function / args) — power-user surface.
-function RawContractCall({ wallet }: { wallet: Wallet }) {
-  const [address, setAddress] = useState('');
-  const [abi, setAbi] = useState('');
-  const [fn, setFn] = useState('');
-  const [args, setArgs] = useState('[]');
-  const [out, setOut] = useState('');
-
-  const run = async (write: boolean) => {
-    setOut('');
-    try {
-      const parsedAbi = JSON.parse(abi);
-      const parsedArgs = JSON.parse(args || '[]');
-      if (write) {
-        const tx = await api.contractWrite(wallet.id, { address, abi: parsedAbi, functionName: fn, args: parsedArgs });
-        setOut(`✓ write sent (nonce ${tx.nonce})`);
-      } else {
-        const r = await api.contractRead({ address, abi: parsedAbi, functionName: fn, args: parsedArgs });
-        setOut(`result: ${JSON.stringify(r.result)}`);
-      }
-    } catch (e) {
-      setOut((e as Error).message);
-    }
-  };
-
-  return (
-    <details>
-      <summary>Developer tools — raw contract call (any ABI)</summary>
-      <p className="hint">
-        ⚠ Power-user surface: sends an arbitrary contract call from this custodial wallet. Use the
-        curated Send / Approve controls above for normal operations.
-      </p>
-      <input
-        aria-label="raw call contract address"
-        value={address}
-        placeholder="contract 0x…"
-        onChange={(e) => setAddress(e.target.value)}
-      />
-      <textarea
-        aria-label="raw call ABI JSON"
-        value={abi}
-        placeholder='ABI JSON, e.g. [{"type":"function",...}]'
-        onChange={(e) => setAbi(e.target.value)}
-      />
-      <input
-        aria-label="raw call function name"
-        value={fn}
-        placeholder="functionName"
-        onChange={(e) => setFn(e.target.value)}
-      />{' '}
-      <input
-        aria-label="raw call arguments JSON"
-        value={args}
-        placeholder='args JSON, e.g. ["0x..",123]'
-        onChange={(e) => setArgs(e.target.value)}
-      />{' '}
-      <button onClick={() => run(false)} disabled={!address || !fn}>
-        Read
-      </button>{' '}
-      <button onClick={() => run(true)} disabled={!address || !fn}>
-        Write
-      </button>
-      {out && <p>{out}</p>}
-    </details>
-  );
-}
 
 // Fires N sends at one wallet simultaneously to demonstrate the per-wallet nonce lock:
 // despite racing, every send gets a unique, consecutive nonce (no collisions, no gaps).
@@ -945,12 +745,11 @@ function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
       </div>
 
       <h4>Send</h4>
-      <SendForm wallet={wallet} assets={assetOptions} recipients={[]} policy={policy} onSent={onSent} />
+      <SendForm wallet={wallet} assets={assetOptions} policy={policy} onSent={onSent} />
 
       {/* One wallet per account → no internal "your wallets" recipients; the concurrency demo
-          fires repeated self-sends to prove the nonce lock. */}
+          fires repeated self-sends to prove the nonce lock. ERC-20 / approve lives in the Token tab. */}
       <ConcurrencyDemo wallet={wallet} recipient={wallet.address} canSend={canSend} />
-      <ContractPanel wallet={wallet} />
 
       <h4>Activity (on-chain + signatures)</h4>
       <ActivityFeed wallet={wallet} refreshKey={refreshKey} />
@@ -1014,7 +813,7 @@ function WalletsTab({ wallets, onChange, email }: { wallets: Wallet[]; onChange:
 
 /** Edit one wallet's spending limits as a self-contained card: per-tx + daily caps (entered in
  *  ETH). Labels sit directly above their field; save is disabled until something changes. */
-function PolicyEditor({ wallet }: { wallet: Wallet }) {
+function LimitsEditor({ wallet }: { wallet: Wallet }) {
   const [perTxLimit, setPerTxLimit] = useState('');
   const [dailyLimit, setDailyLimit] = useState('');
   const [loaded, setLoaded] = useState<Policy | null>(null);
@@ -1220,7 +1019,7 @@ function OverviewTab({ wallets, onGoWallets }: { wallets: Wallet[]; onGoWallets:
 }
 
 // Policies tab: one card per wallet, separate from wallet operation (audit #1/#2).
-function PoliciesTab({ wallets }: { wallets: Wallet[] }) {
+function LimitsTab({ wallets }: { wallets: Wallet[] }) {
   if (wallets.length === 0)
     return (
       <section>
@@ -1230,7 +1029,7 @@ function PoliciesTab({ wallets }: { wallets: Wallet[] }) {
   return (
     <section>
       {wallets.map((w) => (
-        <PolicyEditor key={w.id} wallet={w} />
+        <LimitsEditor key={w.id} wallet={w} />
       ))}
     </section>
   );
@@ -1805,7 +1604,7 @@ function AdminView({ onExit }: { onExit: () => void }) {
       <div role="tabpanel" aria-labelledby={`tab-${tab}`}>
         {tab === 'overview' && <OverviewTab wallets={wallets} onGoWallets={() => setTab('wallets')} />}
         {tab === 'wallets' && <WalletsTab wallets={wallets} onChange={refresh} email={current?.email ?? ''} />}
-        {tab === 'limits' && <PoliciesTab wallets={wallets} />}
+        {tab === 'limits' && <LimitsTab wallets={wallets} />}
         {tab === 'token' && <TokenTab wallets={wallets} />}
         {tab === 'activity' && <ActivityTab wallets={wallets} />}
         {tab === 'settings' && <SettingsTab onChange={refresh} />}
