@@ -188,6 +188,9 @@ export const api = {
   getPolicy: (walletId: string) => call<Policy>(`/wallets/${walletId}/policy`, { auth: true }),
   setPolicy: (walletId: string, policy: Policy) =>
     call<Policy>(`/wallets/${walletId}/policy`, { method: 'PUT', body: policy, auth: true }),
+  // Admin-gated: creates a demo account (shared password + isDemo) so it appears in the picker.
+  createDemoAccount: (email: string) =>
+    call<Account>('/admin/accounts', { method: 'POST', body: { email }, admin: true }),
   seedDemo: () => call<SeedResult>('/admin/seed', { method: 'POST', admin: true }),
   resetDemo: () => call<SeedResult>('/admin/reset', { method: 'POST', admin: true }),
 };

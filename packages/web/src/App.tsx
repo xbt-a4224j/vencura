@@ -246,7 +246,13 @@ function UserView({ onExit }: { onExit: () => void }) {
     try {
       await signIn(acct);
     } catch (err) {
-      setError((err as Error).message);
+      const m = (err as Error).message;
+      // The shared demo password only works for demo accounts; real/test registrations 401.
+      setError(
+        /invalid email or password/i.test(m)
+          ? `${m} — this account uses its own password. Pick the demo account (top of the list).`
+          : m,
+      );
     } finally {
       setBusy(false);
     }

@@ -44,9 +44,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const createAccount = useCallback(
     async (email: string) => {
-      const res = await api.register(email, DEMO_PASSWORD);
+      // Admin-gated demo-account creation (shared password + isDemo) so it shows in the picker.
+      const account = await api.createDemoAccount(email);
       await reload();
-      return res.user;
+      return account;
     },
     [reload],
   );

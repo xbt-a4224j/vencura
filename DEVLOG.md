@@ -981,3 +981,10 @@ overridable after a live 5432 clash (T-003a); seeding `v0.0.0` so the first rele
 **Files touched** — auth.service.ts (inject + record); test wiring (auth.service.spec, auth.e2e) given an EventsService/EventsModule.
 **Tests** — 96 api tests pass.
 **Gotchas** — EventsModule imports AuthModule and AuthService injects EventsService (a global provider) — fine because it's not an `imports` cycle, only a global-provider injection.
+
+## v0.x.0 · Block 5 · Picker lists only demo accounts (login bug fix)
+**What & why** — Root cause: the User picker listed EVERY user, but each account has its own password; only the seeded `demo@vencura.local` uses the shared `demo-password`, so picking any test/audit registration 401'd. Fix: an `isDemo` flag — the picker shows only demo accounts (all shared-password), so pick-and-click always works.
+**How it works** — `users.isDemo` ([schema](packages/api/prisma/schema.prisma); migration backfills the existing demo account). [listAccounts](packages/api/src/auth/auth.service.ts) filters `isDemo:true`, demo first. [seed](packages/api/src/admin/seed.ts) marks the demo account + adds peer accounts alice/bob (unfunded, shared password) so switching + "pay someone" have real accounts. Admin "create account" now goes through admin-gated [POST /admin/accounts](packages/api/src/admin/admin.controller.ts) (demo-password + isDemo) instead of public register.
+**Files touched** — schema + migration · auth.service.ts · seed.ts · admin.controller.ts (+ dto) · web api.ts/auth-context.tsx · UserView clearer 401 hint.
+**Tests** — 96 api pass; web green.
+**Gotchas** — Post-deploy the picker shows only `demo@vencura.local` (junk hidden, not deleted); alice/bob appear after a reset/seed (admin key). Admin create-account now needs the admin key set (it's an admin action).

@@ -14,6 +14,10 @@ model User {
   id           String   @id @default(uuid())
   email        String   @unique
   passwordHash String
+  // Demo accounts (seed + admin-created) all use the shared demo password, so the one-click
+  // User-view picker lists ONLY these — real/test registrations (their own passwords) never
+  // appear and so can never 401 the picker.
+  isDemo       Boolean  @default(false)
   createdAt    DateTime @default(now())
 
   wallets Wallet[]

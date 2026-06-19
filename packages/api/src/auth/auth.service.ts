@@ -54,10 +54,16 @@ export class AuthService {
     // The cross-account picker exists only for the one-click demo; a real deployment uses the
     // register/login path, so don't enumerate accounts when DEMO_MODE is off.
     if (!isDemoMode()) return [];
-    return this.prisma.user.findMany({
+    // ONLY demo accounts (seed + admin-created) — they all use the shared demo password, so every
+    // entry the picker shows signs in on click. Real/test registrations (isDemo=false, their own
+    // passwords) are excluded so they can never 401 the picker. Demo account first as the default.
+    const users = await this.prisma.user.findMany({
+      where: { isDemo: true },
       select: { id: true, email: true },
       orderBy: { createdAt: 'asc' },
     });
+    const DEMO_EMAIL = 'demo@vencura.local';
+    return [...users].sort((a, b) => Number(b.email === DEMO_EMAIL) - Number(a.email === DEMO_EMAIL));
   }
 
   private issue(user: { id: string; email: string }): AuthResult {
