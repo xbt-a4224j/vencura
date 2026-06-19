@@ -3,9 +3,9 @@
 > The plan, as GitHub issues. **Blocks = GitHub milestones.** Work one block at a time; at the end of
 > each block: commit directly to `main`, CI green, semantic-release version bump (per `CLAUDE.md` §11).
 >
-> **Every ticket inherits the global Definition of Done** (`CLAUDE.md` §14): TDD (test first), lint/types/build
-> green, **UI surface if user-facing**, **logs** at demo points, **error handling**, and a **`DEVLOG.md` entry**.
-> To avoid repetition, individual tickets list only their *specific* acceptance criteria + dependencies.
+> **Each GitHub issue is self-contained** — its own *background*, *requirements tie-in*, and concrete *acceptance
+> criteria* (testable outcomes). The global engineering standards (TDD, lint/types/build green, logs, error handling,
+> a `DEVLOG.md` entry) are *how we work* — they live in `CLAUDE.md` §11/§14 and are **not** copied into issue bodies.
 >
 > Suggested labels: `block-N`, `type:feat|chore|test|docs`, `area:api|web|sdk|chain|infra`, `bonus`, `stretch`.
 

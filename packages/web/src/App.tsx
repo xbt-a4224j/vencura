@@ -1,5 +1,5 @@
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
-import { erc20Abi, parseEther } from 'viem';
+import { erc20Abi, isAddress, parseEther } from 'viem';
 import {
   type ActivityItem,
   adminKeyStore,
@@ -10,13 +10,45 @@ import {
 } from './api';
 import { AuthProvider, useAuth } from './auth-context';
 import { explorerAddress, explorerTx, FAUCET_URL } from './explorer';
+import { shortHex, toEth } from './format';
+
+// Copy any value to the clipboard with brief "Copied ✓" feedback.
+function CopyButton({ value, label = 'Copy' }: { value: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="copybtn"
+      aria-label={`Copy ${value}`}
+      onClick={() => {
+        void navigator.clipboard?.writeText(value);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1200);
+      }}
+    >
+      {copied ? 'Copied ✓' : label}
+    </button>
+  );
+}
+
+// A truncated, monospace address/hash that deep-links to Etherscan and is copyable.
+function HashLink({ value, href }: { value: string; href: string }) {
+  return (
+    <span>
+      <a href={href} target="_blank" rel="noreferrer" title={value}>
+        <code>{shortHex(value)}</code> ↗
+      </a>
+      <CopyButton value={value} label="⧉" />
+    </span>
+  );
+}
 
 // Compact sign-in / register, shown as a corner dropdown — never a full-page gate.
 function SignInMenu() {
   const { authenticate } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [mode, setMode] = useState<'login' | 'register'>('register');
+  const [mode, setMode] = useState<'login' | 'register'>('login'); // most opens are returning users
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -105,7 +137,7 @@ function SendForm({
 }: {
   wallet: Wallet;
   assets: { value: string; label: string }[];
-  recipients: { value: string; label: string }[];
+  recipients: { value: string; label: string; group?: string }[];
   onSent: () => void;
 }) {
   const [asset, setAsset] = useState('ETH');
@@ -121,11 +153,18 @@ function SendForm({
     setBusy(true);
     try {
       const to = recipient === CUSTOM ? custom.trim() : recipient;
-      if (!to) throw new Error('recipient is required');
+      if (!to) throw new Error('Recipient is required.');
+      if (!isAddress(to)) throw new Error('Enter a valid 0x address.');
       // Amount is entered in ETH decimals; convert to wei base units before POST (ERC-20s
       // here are demo-only and also use 18 decimals, so parseEther is fine for the demo).
-      const wei = parseEther(amount).toString();
-      await api.send(wallet.id, { to, asset, amount: wei });
+      let wei: bigint;
+      try {
+        wei = parseEther(amount);
+      } catch {
+        throw new Error('Enter a valid amount.');
+      }
+      if (wei <= 0n) throw new Error('Amount must be greater than 0.');
+      await api.send(wallet.id, { to, asset, amount: wei.toString() });
       setAmount('');
       onSent();
     } catch (err) {
@@ -148,12 +187,23 @@ function SendForm({
 
       <label htmlFor={`to-${wallet.id}`}>Recipient</label>
       <select id={`to-${wallet.id}`} value={recipient} onChange={(e) => setRecipient(e.target.value)}>
-        {recipients.map((r) => (
-          <option key={r.value} value={r.value}>
-            {r.label}
-          </option>
+        {Object.entries(
+          recipients.reduce<Record<string, { value: string; label: string }[]>>((acc, r) => {
+            (acc[r.group ?? 'Recipients'] ??= []).push(r);
+            return acc;
+          }, {}),
+        ).map(([group, opts]) => (
+          <optgroup key={group} label={group}>
+            {opts.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
+          </optgroup>
         ))}
-        <option value={CUSTOM}>custom address…</option>
+        <optgroup label="Custom">
+          <option value={CUSTOM}>custom address…</option>
+        </optgroup>
       </select>
       {recipient === CUSTOM && (
         <input
@@ -201,31 +251,30 @@ function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: numb
     };
   }, [wallet.id, refreshKey]);
 
-  if (items.length === 0) return <p>No activity yet.</p>;
+  if (items.length === 0)
+    return (
+      <p className="bal-sub">No transactions or signatures yet — sign a message or send to get started.</p>
+    );
   return (
     <ul>
       {items.map((it) =>
         it.kind === 'transaction' ? (
           <li key={it.id}>
-            <span className={`pill ${it.status}`}>{it.status}</span> · sent {it.amount}{' '}
-            {it.asset === 'ETH' ? 'wei' : 'units'} →{' '}
-            <a href={explorerAddress(it.to)} target="_blank" rel="noreferrer">
-              <code>{it.to}</code>
-            </a>
+            <span className={`pill ${it.status}`}>{it.status}</span> · sent{' '}
+            <strong>{toEth(it.amount)}</strong> {it.asset === 'ETH' ? 'ETH' : 'tokens'} →{' '}
+            <HashLink value={it.to} href={explorerAddress(it.to)} />
             {it.txHash && (
               <>
                 {' '}
-                · tx{' '}
-                <a href={explorerTx(it.txHash)} target="_blank" rel="noreferrer">
-                  <code>{it.txHash}</code>
-                </a>
+                · tx <HashLink value={it.txHash} href={explorerTx(it.txHash)} />
               </>
             )}
           </li>
         ) : (
           <li key={it.id}>
             <span className="pill signed">signed</span> · “{it.message}” →{' '}
-            <code>{it.signature.slice(0, 20)}…</code>
+            <code>{shortHex(it.signature)}</code>
+            <CopyButton value={it.signature} label="⧉" />
           </li>
         ),
       )}
@@ -421,7 +470,15 @@ function RawContractCall({ wallet }: { wallet: Wallet }) {
 
 // Fires N sends at one wallet simultaneously to demonstrate the per-wallet nonce lock:
 // despite racing, every send gets a unique, consecutive nonce (no collisions, no gaps).
-function ConcurrencyDemo({ wallet, recipient }: { wallet: Wallet; recipient?: string }) {
+function ConcurrencyDemo({
+  wallet,
+  recipient,
+  canSend,
+}: {
+  wallet: Wallet;
+  recipient?: string;
+  canSend?: boolean;
+}) {
   const [n, setN] = useState(5);
   const [results, setResults] = useState<{ nonce: number | null; error?: string }[]>([]);
   const [busy, setBusy] = useState(false);
@@ -449,8 +506,16 @@ function ConcurrencyDemo({ wallet, recipient }: { wallet: Wallet; recipient?: st
   return (
     <details>
       <summary>Concurrency demo (nonce lock)</summary>
-      {!recipient ? (
-        <p>Needs a recipient — add one to the policy allowlist or create another wallet.</p>
+      <p className="bal-sub">
+        Fires N sends at one wallet at once — proof the per-wallet nonce lock serializes them into
+        unique, consecutive nonces (no collisions). Needs a funded wallet and a recipient.
+      </p>
+      {!recipient || !canSend ? (
+        <p className="hint">
+          {!recipient
+            ? 'Add a recipient (another wallet or an allowlist entry) to run this.'
+            : 'This wallet is unfunded — fund it (Sepolia faucet) to run the demo.'}
+        </p>
       ) : (
         <>
           <label>
@@ -533,28 +598,53 @@ function WalletItem({ wallet, otherWallets }: { wallet: Wallet; otherWallets: Wa
   ];
   // Recipient dropdown: the user's other wallets + this wallet's policy allowlist.
   const recipientOptions = [
-    ...otherWallets.map((w) => ({ value: w.address, label: `wallet ${w.address.slice(0, 10)}…` })),
+    ...otherWallets.map((w) => ({ value: w.address, label: shortHex(w.address), group: 'Your wallets' })),
     ...(policy?.allowlist ?? [])
       .filter((a) => !otherWallets.some((w) => w.address.toLowerCase() === a.toLowerCase()))
-      .map((a) => ({ value: a, label: `allowlist ${a.slice(0, 10)}…` })),
+      .map((a) => ({ value: a, label: shortHex(a), group: 'Allowlisted' })),
   ];
+
+  // Native-ETH availability drives the fund hint + gating the concurrency demo (needs gas).
+  const ethBal = balances?.find((b) => b.asset === 'ETH');
+  const ethAvailable = ethBal ? BigInt(ethBal.available) : 0n;
+  const canSend = ethAvailable > 0n;
+  const ethZero = !!balances && ethAvailable === 0n;
 
   return (
     <li>
-      <code>{wallet.address}</code>
+      <div style={{ marginBottom: 8 }}>
+        <a href={explorerAddress(wallet.address)} target="_blank" rel="noreferrer" title={wallet.address}>
+          <code>{wallet.address}</code> ↗
+        </a>
+        <CopyButton value={wallet.address} label="⧉" />
+      </div>
       <div>
         <button onClick={() => load()} disabled={busy}>
           Refresh balances
         </button>
         {balances && (
-          <ul>
+          <div className="bal-grid">
             {balances.map((b) => (
-              <li key={b.asset}>
-                {b.symbol}: available <strong>{b.available}</strong> (confirmed {b.confirmed}, block{' '}
-                {b.asOfBlock ?? '—'})
-              </li>
+              <div className="bal-line" key={b.asset}>
+                <span className="bal-label">{b.symbol} available</span>
+                <span className="bal-amt" title={`${b.available} wei`}>
+                  {toEth(b.available)} {b.symbol}
+                </span>
+                <span className="bal-sub">
+                  confirmed {toEth(b.confirmed)} {b.symbol} · block {b.asOfBlock ?? '—'}
+                </span>
+              </div>
             ))}
-          </ul>
+          </div>
+        )}
+        {ethZero && (
+          <p className="hint">
+            This wallet is unfunded — fund it to send.{' '}
+            <a href={FAUCET_URL} target="_blank" rel="noreferrer">
+              Sepolia faucet ↗
+            </a>
+            <CopyButton value={wallet.address} label="copy address" />
+          </p>
         )}
       </div>
 
@@ -566,7 +656,7 @@ function WalletItem({ wallet, otherWallets }: { wallet: Wallet; otherWallets: Wa
         onSent={onSent}
       />
 
-      <ConcurrencyDemo wallet={wallet} recipient={recipientOptions[0]?.value} />
+      <ConcurrencyDemo wallet={wallet} recipient={recipientOptions[0]?.value} canSend={canSend} />
       <TransferForm wallet={wallet} otherWallets={otherWallets} onSent={onSent} />
       <ContractPanel wallet={wallet} />
 
@@ -587,7 +677,8 @@ function WalletItem({ wallet, otherWallets }: { wallet: Wallet; otherWallets: Wa
           </button>
           {signature && (
             <p>
-              signature: <code>{signature}</code>
+              signature: <code>{shortHex(signature)}</code>
+              <CopyButton value={signature} label="⧉" />
             </p>
           )}
         </form>
@@ -644,8 +735,8 @@ function PolicyEditor({ wallet }: { wallet: Wallet }) {
       .getPolicy(wallet.id)
       .then((p) => {
         setAllowlist(p.allowlist.join('\n'));
-        setPerTxLimit(p.perTxLimit ?? '');
-        setDailyLimit(p.dailyLimit ?? '');
+        setPerTxLimit(p.perTxLimit ? toEth(p.perTxLimit) : '');
+        setDailyLimit(p.dailyLimit ? toEth(p.dailyLimit) : '');
       })
       .catch((e) => setError((e as Error).message));
   }, [wallet.id]);
@@ -660,10 +751,11 @@ function PolicyEditor({ wallet }: { wallet: Wallet }) {
           .split('\n')
           .map((a) => a.trim())
           .filter(Boolean),
-        perTxLimit: perTxLimit.trim() || null,
-        dailyLimit: dailyLimit.trim() || null,
+        // Limits are entered in ETH; persist as wei base units to match the backend.
+        perTxLimit: perTxLimit.trim() ? parseEther(perTxLimit.trim()).toString() : null,
+        dailyLimit: dailyLimit.trim() ? parseEther(dailyLimit.trim()).toString() : null,
       });
-      setStatus('saved');
+      setStatus(`✓ saved ${new Date().toLocaleTimeString()}`);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -680,13 +772,13 @@ function PolicyEditor({ wallet }: { wallet: Wallet }) {
         value={allowlist}
         onChange={(e) => setAllowlist(e.target.value)}
       />
-      <label htmlFor={`pertx-${wallet.id}`}>Per-tx limit (wei; blank = none)</label>
+      <label htmlFor={`pertx-${wallet.id}`}>Per-tx limit (ETH; blank = none)</label>
       <input
         id={`pertx-${wallet.id}`}
         value={perTxLimit}
         onChange={(e) => setPerTxLimit(e.target.value)}
       />
-      <label htmlFor={`daily-${wallet.id}`}>Daily limit (wei; blank = none)</label>
+      <label htmlFor={`daily-${wallet.id}`}>Daily limit (ETH; blank = none)</label>
       <input
         id={`daily-${wallet.id}`}
         value={dailyLimit}
@@ -745,8 +837,8 @@ function AdminTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => vo
     <section>
       <h3>Admin key</h3>
       <label>
-        x-admin-key (gates seed/reset — get it from the deploy env; locally{' '}
-        <code>dev-admin-key</code>)
+        x-admin-key — gates only seed/reset (creating wallets, sending, and policy do not need
+        it). From the deploy env; locally it is <code>dev-admin-key</code>.
         <input
           type="password"
           value={adminKey}
@@ -806,9 +898,10 @@ function AdminTab({ wallets, onChange }: { wallets: Wallet[]; onChange: () => vo
       <ul>
         {wallets.map((w) => (
           <li key={w.id}>
-            <a href={explorerAddress(w.address)} target="_blank" rel="noreferrer">
-              <code>{w.address}</code>
+            <a href={explorerAddress(w.address)} target="_blank" rel="noreferrer" title={w.address}>
+              <code>{w.address}</code> ↗
             </a>
+            <CopyButton value={w.address} label="⧉" />
           </li>
         ))}
       </ul>

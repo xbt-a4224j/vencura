@@ -29,7 +29,13 @@ async function call<T>(
   if (!res.ok) {
     // The API's global filter emits RFC-7807 `{ detail }`; fall back to `message` / status.
     const body = (await res.json().catch(() => ({}))) as { detail?: string; message?: string };
-    throw new Error(body.detail ?? body.message ?? `HTTP ${res.status}`);
+    const detail = body.detail ?? body.message;
+    // 4xx details are meaningful (policy violation, insufficient funds, bad address); surface them.
+    // For a 5xx, never leak a bare "Internal server error" — give a friendly, retryable message.
+    if (res.status >= 500 && (!detail || /internal server error/i.test(detail))) {
+      throw new Error(`Something went wrong on the server (${res.status}). Please try again.`);
+    }
+    throw new Error(detail ?? `HTTP ${res.status}`);
   }
   return res.json() as Promise<T>;
 }

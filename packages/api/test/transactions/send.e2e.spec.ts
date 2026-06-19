@@ -27,7 +27,7 @@ const prismaMock = {
 };
 const chainMock = {
   getPendingNonce: vi.fn().mockResolvedValue(0),
-  prepareTransaction: vi.fn().mockResolvedValue({ to: '0xRecipient', value: 1n }),
+  prepareTransaction: vi.fn().mockResolvedValue({ to: '0x000000000000000000000000000000000000dEaD', value: 1n }),
   sendRawTransaction: vi.fn().mockResolvedValue('0xhash'),
 };
 const signerMock = { signTransaction: vi.fn().mockResolvedValue('0xraw') };
@@ -71,7 +71,7 @@ describe('Send HTTP', () => {
     const res = await request(app.getHttpServer())
       .post('/wallets/w1/transactions')
       .set('Authorization', `Bearer ${token}`)
-      .send({ to: '0xRecipient', asset: 'ETH', amount: '1' });
+      .send({ to: '0x000000000000000000000000000000000000dEaD', asset: 'ETH', amount: '1' });
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({ txHash: '0xhash', status: 'pending' });
   });
@@ -81,14 +81,14 @@ describe('Send HTTP', () => {
     const res = await request(app.getHttpServer())
       .post('/wallets/w1/transactions')
       .set('Authorization', `Bearer ${token}`)
-      .send({ to: '0xRecipient', asset: 'ETH', amount: '1' });
+      .send({ to: '0x000000000000000000000000000000000000dEaD', asset: 'ETH', amount: '1' });
     expect(res.status).toBe(403);
   });
 
   it('401 without a token', async () => {
     const res = await request(app.getHttpServer())
       .post('/wallets/w1/transactions')
-      .send({ to: '0xRecipient', asset: 'ETH', amount: '1' });
+      .send({ to: '0x000000000000000000000000000000000000dEaD', asset: 'ETH', amount: '1' });
     expect(res.status).toBe(401);
   });
 });

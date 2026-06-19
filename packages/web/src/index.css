@@ -1,19 +1,21 @@
-/* VenCura admin — institutional dark theme (T-040). Design tokens + element styling,
-   so most surfaces are themed with no markup change; a few classes (.app, .tabs, .pill)
-   handle layout + status. Aesthetic homage to institutional custody tooling — no
-   trademarked assets. AA contrast, visible focus rings, reduced-motion respected. */
+/* VenCura admin — light enterprise theme (T-040, #41). Design tokens + element styling,
+   so most surfaces are themed with no markup change; a few classes (.app, .tabs, .pill,
+   .copybtn, .bal-*) handle layout + status. Palette = docs/study/ux-redressal.md §2.
+   AA contrast, visible focus rings, reduced-motion respected. */
 :root {
-  --bg: #0b0e14;
-  --panel: #141a23;
-  --panel-2: #1b2230;
-  --line: #262e3d;
-  --ink: #e7ebf2;
-  --muted: #8c98a9;
-  --accent: #4f7cff;
-  --accent-ink: #aebfff;
-  --ok: #2ecc8f;
-  --pending: #e0a440;
-  --fail: #ef5f6b;
+  --bg: #f7f8fa;          /* surface-base   */
+  --panel: #ffffff;       /* surface-card   */
+  --panel-2: #f0f2f5;     /* surface-subtle */
+  --line: #e2e5ea;        /* border         */
+  --ink: #1a1d23;         /* text-primary   */
+  --muted: #5b6472;       /* text-secondary */
+  --accent: #2d5bff;
+  --accent-hover: #2249d6;
+  --accent-ink: #2249d6;  /* links / accent text on light */
+  --mono-ink: #2b3245;    /* address / hash text */
+  --ok: #1e8e5a;
+  --pending: #b7791f;
+  --fail: #c2334a;
   --radius: 10px;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
@@ -24,7 +26,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font: 15px/1.55 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -43,7 +45,6 @@ body {
 .tabs button:disabled { background: var(--panel-2); color: var(--ink); border-color: var(--accent); opacity: 1; }
 
 /* Cards: wallets / sections render as <li>/<section> */
-section, li { }
 ul { list-style: none; margin: 12px 0; padding: 0; }
 section > ul > li, .app > section, li {
   background: var(--panel);
@@ -62,7 +63,7 @@ code {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
   font-size: 12.5px;
-  color: var(--accent-ink);
+  color: var(--mono-ink);
   background: var(--panel-2);
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -71,7 +72,7 @@ code {
   word-break: break-all;
 }
 
-a { color: var(--accent); text-decoration: none; }
+a { color: var(--accent-ink); text-decoration: none; }
 a:hover { text-decoration: underline; }
 strong { color: var(--ink); }
 
@@ -86,26 +87,47 @@ button {
   cursor: pointer;
   transition: filter .12s ease, background .12s ease;
 }
-button:hover:not(:disabled) { filter: brightness(1.08); }
+button:hover:not(:disabled) { filter: brightness(1.06); }
 button:disabled { opacity: .5; cursor: default; }
+
+/* Ghost button (copy, secondary) */
+.copybtn {
+  background: transparent; color: var(--muted); border: 1px solid var(--line);
+  border-radius: 6px; padding: 1px 7px; font-size: 11.5px; font-weight: 500; margin-left: 6px;
+}
+.copybtn:hover:not(:disabled) { filter: none; border-color: var(--accent); color: var(--accent); }
 
 input, textarea, select {
   font: inherit;
-  background: var(--panel-2);
+  background: #fff;
   color: var(--ink);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 7px 10px;
   margin: 2px 0;
 }
+input::placeholder, textarea::placeholder { color: #9aa3b2; }
 label { display: inline-flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); margin: 6px 0; }
 label input, label select, label textarea { color: var(--ink); }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 p[role="alert"] { color: var(--fail); }
+.hint {
+  font-size: 13px; color: var(--muted);
+  background: color-mix(in srgb, var(--pending) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pending) 30%, transparent);
+  border-radius: 8px; padding: 8px 12px; margin: 8px 0;
+}
 
 details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
+
+/* Balance block — labeled, aligned, ETH-formatted (wei lives in the tooltip) */
+.bal-grid { margin: 8px 0; }
+.bal-line { display: grid; grid-template-columns: max-content 1fr; gap: 2px 14px; align-items: baseline; margin: 6px 0; }
+.bal-label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.bal-amt { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; color: var(--ink); font-weight: 600; }
+.bal-sub { grid-column: 2; font-size: 11.5px; color: var(--muted); }
 
 /* Corner account menu (sign-in dropdown / signed-in switch-user) */
 .account { font-size: 13px; color: var(--muted); }
@@ -120,7 +142,7 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
   position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; min-width: 250px;
   display: flex; flex-direction: column; gap: 6px;
   background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-  padding: 14px 16px; box-shadow: 0 10px 30px rgba(0,0,0,.45);
+  padding: 14px 16px; box-shadow: 0 10px 30px rgba(16, 24, 40, .12);
 }
 
 /* Status pills */
@@ -129,8 +151,8 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
   letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; border: 1px solid;
 }
 .pill.confirmed { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); background: color-mix(in srgb, var(--ok) 12%, transparent); }
-.pill.pending { color: var(--pending); border-color: color-mix(in srgb, var(--pending) 45%, transparent); background: color-mix(in srgb, var(--pending) 12%, transparent); }
-.pill.failed, .pill.signed { color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.pill.pending { color: var(--pending); border-color: color-mix(in srgb, var(--pending) 45%, transparent); background: color-mix(in srgb, var(--pending) 14%, transparent); }
+.pill.signed { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .pill.failed { color: var(--fail); border-color: color-mix(in srgb, var(--fail) 45%, transparent); background: color-mix(in srgb, var(--fail) 12%, transparent); }
 
 @media (prefers-reduced-motion: reduce) {
