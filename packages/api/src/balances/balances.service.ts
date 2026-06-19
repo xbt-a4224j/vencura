@@ -8,8 +8,9 @@ import { WalletsService } from '../wallets/wallets.service';
 const STALE_MS = 15_000; // serve cache; revalidate in the background if older than this
 
 /** Fixed native buffer held back from `available` so a send always leaves room for gas.
- *  0.001 ETH — generous on Sepolia/anvil where gas is cheap; tune per network. */
-export const GAS_RESERVE_WEI = 1_000_000_000_000_000n; // 0.001 ETH
+ *  0.0002 ETH ≈ 8 ETH transfers / ~3 ERC-20 approves at ~1 gwei (Sepolia), with headroom for a
+ *  gas spike. Keeps a 0.001-provisioned wallet showing positive available; tune per network. */
+export const GAS_RESERVE_WEI = 200_000_000_000_000n; // 0.0002 ETH
 
 export interface BalanceView {
   walletId: string;

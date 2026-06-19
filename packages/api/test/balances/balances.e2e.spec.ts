@@ -68,7 +68,7 @@ describe('Balances HTTP', () => {
 
   it('returns balances for an owned wallet (available = confirmed − gas reserve)', async () => {
     prismaMock.wallet.findFirst.mockResolvedValue({ id: 'w1', address: '0xabc' });
-    const confirmed = '2000000000000000'; // 0.002 ETH, comfortably above the 0.001 reserve
+    const confirmed = '2000000000000000'; // 0.002 ETH, comfortably above the 0.0002 reserve
     prismaMock.walletBalance.findMany.mockResolvedValue([
       { walletId: 'w1', asset: 'ETH', confirmed, asOfBlock: 5, updatedAt: new Date() },
     ]);
@@ -79,7 +79,7 @@ describe('Balances HTTP', () => {
     expect(res.body.balances[0]).toMatchObject({
       asset: 'ETH',
       confirmed,
-      available: '1000000000000000', // 0.002 − 0.001 reserve
+      available: '1800000000000000', // 0.002 − 0.0002 reserve
     });
   });
 });
