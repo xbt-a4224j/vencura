@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
-/** Registration / login input. Password only needs to be non-empty for this demo (no length or
- *  complexity floor) — add a real policy for production. Email is normalized to lowercase so
- *  logins are case-insensitive. */
+/** Registration / login input. Password floor is a low 4 chars for this demo (no complexity
+ *  rule) — add a real policy for production. Email is normalized to lowercase so logins are
+ *  case-insensitive. */
 export const RegisterSchema = z.object({
   email: z.string().email().toLowerCase(),
-  password: z.string().min(1, 'password is required'),
+  password: z.string().min(4, 'password must be at least 4 characters'),
 });
 export type RegisterInput = z.infer<typeof RegisterSchema>;
 
