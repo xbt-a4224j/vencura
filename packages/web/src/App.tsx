@@ -12,7 +12,7 @@ import {
   type Wallet,
 } from './api';
 import { AuthProvider, useAuth } from './auth-context';
-import { looksLikeEns, resolveEns } from './ens';
+import { looksLikeEns, resolveEns, reverseResolveEns } from './ens';
 import { explorerAddress, explorerTx, FAUCET_URL } from './explorer';
 import { shortHex, toEth } from './format';
 
@@ -36,6 +36,27 @@ function CopyButton({ value, label = 'Copy' }: { value: string; label?: string }
 }
 
 // A truncated, monospace address/hash that deep-links to Etherscan and is copyable.
+// Module-level cache so repeated renders of the same address don't re-fetch.
+const ensNameCache = new Map<string, string | null>();
+
+/** Renders an address as a HashLink; swaps in the .eth primary name when it resolves. */
+function EnsAddress({ address }: { address: string }) {
+  const [name, setName] = useState<string | null>(ensNameCache.get(address) ?? null);
+  useEffect(() => {
+    if (ensNameCache.has(address)) return;
+    reverseResolveEns(address).then((n) => {
+      ensNameCache.set(address, n);
+      setName(n);
+    });
+  }, [address]);
+  return (
+    <span>
+      {name && <span title={address}>{name} </span>}
+      <HashLink value={address} href={explorerAddress(address)} />
+    </span>
+  );
+}
+
 function HashLink({ value, href }: { value: string; href: string }) {
   return (
     <span>
@@ -553,7 +574,7 @@ function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: numb
             <li key={it.id}>
               <span className={`pill ${it.status}`}>{it.status}</span> · sent{' '}
               <strong>{toEth(it.amount)}</strong> {it.asset === 'ETH' ? 'ETH' : 'tokens'} →{' '}
-              <HashLink value={it.to} href={explorerAddress(it.to)} />
+              <EnsAddress address={it.to} />
               {it.txHash && (
                 <>
                   {' '}
@@ -1013,7 +1034,7 @@ function ActivityTable({ items, wallets }: { items: ActivityItem[]; wallets: Wal
               {it.kind === 'transaction' && (
                 <>
                   sent <strong>{toEth(it.amount)}</strong> →{' '}
-                  <HashLink value={it.to} href={explorerAddress(it.to)} />
+                  <EnsAddress address={it.to} />
                   {it.txHash && (
                     <>
                       {' '}

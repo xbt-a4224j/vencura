@@ -20,6 +20,15 @@ export async function resolveEns(name: string): Promise<`0x${string}` | null> {
   }
 }
 
+/** Reverse-resolve a 0x address to its primary ENS name, or null if none set. */
+export async function reverseResolveEns(address: string): Promise<string | null> {
+  try {
+    return await mainnetClient.getEnsName({ address: address as `0x${string}` });
+  } catch {
+    return null;
+  }
+}
+
 /** A recipient input that looks like an ENS name (has a dot, isn't a 0x address). */
 export function looksLikeEns(input: string): boolean {
   const v = input.trim();
