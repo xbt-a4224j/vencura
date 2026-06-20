@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
+import { Prisma } from '@prisma/client';
 import type { Hex } from '@vencura/shared';
 import { ChainService } from '../infra/chain/chain.service';
 import { PrismaService } from '../infra/prisma/prisma.service';
@@ -108,8 +109,13 @@ export class IncomingWatcher {
         data: { walletId, txHash, logIndex, asset, amount, fromAddress, blockNumber, createdAt: occurredAt },
       });
       return 1;
-    } catch {
-      return 0; // @@unique(walletId,txHash,logIndex) — already indexed, idempotent re-scan
+    } catch (e) {
+      // Only a P2002 unique conflict means "already indexed" (idempotent re-scan) → skip quietly.
+      // Any other error (transient DB failure, etc.) must propagate so the tick aborts WITHOUT
+      // advancing the cursor — otherwise this block range is never re-scanned and the transfer is
+      // lost. Mirrors TransactionsService.onUniqueConflict.
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') return 0;
+      throw e;
     }
   }
 }
