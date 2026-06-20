@@ -1337,10 +1337,27 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
   useEffect(() => {
     void load();
   }, [load]);
-  // Platform wallets for the holder picker (datalist). Best-effort: the admin token flow targets a
-  // real holder, but free text still works if the list is empty/unavailable.
+  // Platform wallets for the holder picker. Retry on failure: this fires on mount and can lose the
+  // race with auth readiness or hit a cold-started API — a one-shot fetch would then leave the
+  // dropdown empty for the whole session. A successful (even empty) response is accepted; only
+  // errors retry. Free-text entry still works regardless.
   useEffect(() => {
-    api.listHolders().then(setHolders).catch(() => setHolders([]));
+    let cancelled = false;
+    (async () => {
+      for (let attempt = 0; !cancelled; attempt++) {
+        try {
+          const h = await api.listHolders();
+          if (!cancelled) setHolders(h);
+          return;
+        } catch {
+          if (attempt >= 3) return; // give up after a few tries; the field still accepts typed addresses
+          await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
   useEffect(() => {
     if (!deployFrom && wallets[0]) setDeployFrom(wallets[0].id);
