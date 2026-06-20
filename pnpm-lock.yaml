@@ -160,6 +160,9 @@ importers:
 
   packages/web:
     dependencies:
+      '@vencura/sdk':
+        specifier: workspace:*
+        version: link:../sdk
       react:
         specifier: ^19.2.7
         version: 19.2.7

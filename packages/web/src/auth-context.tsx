@@ -1,5 +1,6 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from 'react';
-import { type Account, api, DEMO_PASSWORD, tokenStore } from './api';
+import { type Account, DEMO_PASSWORD, tokenStore } from './api';
+import { v } from './vencura';
 
 // Remember the last-used account so a reload restores the session without a prompt.
 const LAST_KEY = 'vencura.accountId';
@@ -29,13 +30,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
 
   const reload = useCallback(async () => {
-    const list = await api.listAccounts();
+    const list = await v.auth.accounts();
     setAccounts(list);
     return list;
   }, []);
 
   const signIn = useCallback(async (account: Account) => {
-    const res = await api.login(account.email, DEMO_PASSWORD);
+    const res = await v.auth.login({ email: account.email, password: DEMO_PASSWORD });
     tokenStore.set(res.accessToken);
     localStorage.setItem(LAST_KEY, res.user.id);
     setCurrent(res.user);
@@ -50,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const createAccount = useCallback(
     async (email: string) => {
       // Admin-gated demo-account creation (shared password + isDemo) so it shows in the picker.
-      const account = await api.createDemoAccount(email);
+      const account = await v.admin.createAccount({ email });
       await reload();
       return account;
     },
@@ -64,10 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setCurrent(res.user);
   };
   const loginUser = useCallback(async (email: string, password: string) => {
-    enter(await api.login(email, password));
+    enter(await v.auth.login({ email, password }));
   }, []);
   const registerUser = useCallback(async (email: string, password: string) => {
-    enter(await api.register(email, password));
+    enter(await v.auth.register({ email, password }));
   }, []);
 
   // On load: fetch the account list, then restore the session straight from the persisted token
@@ -78,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await reload();
       if (!tokenStore.get()) return;
       try {
-        setCurrent(await api.me());
+        setCurrent(await v.auth.me());
       } catch {
         tokenStore.clear(); // expired/invalid — drop it so we don't send a dead bearer
         localStorage.removeItem(LAST_KEY);
