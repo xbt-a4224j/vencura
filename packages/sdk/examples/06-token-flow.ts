@@ -1,24 +1,19 @@
 /**
- * Example: the ERC-20 approve → transferFrom flow via the SDK's typed token helpers.
- *   pnpm --filter @vencura/api db:seed
+ * Example: the ERC-20 approve → allowance → transferFrom flow via the SDK's typed token helpers.
  *   pnpm --filter @vencura/sdk exec tsx examples/06-token-flow.ts
  *
- * Owner distributes the demo token to a holder; the holder approves the owner as spender; the owner
- * pulls tokens with transferFrom — gated by the on-chain allowance. We wait for each step to confirm
- * before the next, since allowance/balance must be on-chain for transferFrom to succeed.
+ * Single-wallet demo: the owner approves itself as spender, then pulls within the allowance — so it
+ * runs with one funded wallet (the deployment's admin wallet owns the token). The web UI shows the
+ * two-party version (a separate holder approves the admin). Exercises every token helper + waits for
+ * each step to confirm, since allowance/balance must be on-chain for transferFrom to succeed.
  */
 import { parseEther } from 'viem';
-import { Vencura } from '../src';
+import { aWallet, connect } from './_client';
 
 async function main() {
-  const v = new Vencura();
-  await v.auth.login({ email: 'admin@vencura.local', password: 'demo-password' });
+  const v = await connect();
+  const owner = await aWallet(v); // the deployment's admin wallet owns the demo token + supply
 
-  const wallets = await v.wallets.list();
-  if (wallets.length < 2) throw new Error('run `pnpm --filter @vencura/api db:seed` first');
-  const [owner, holder] = wallets;
-
-  // Ensure a token exists (the owner deploys + holds the full supply).
   let token = await v.tokens.get();
   if (!token) {
     const d = await v.tokens.deploy({ walletId: owner.id });
@@ -26,19 +21,14 @@ async function main() {
   }
   console.log('token:', token.address);
 
-  // Distribute 100 to the holder, and have the holder approve the owner for 50 — concurrently.
-  const dist = await v.tokens.transfer({ walletId: owner.id, token: token.address, to: holder.address, amount: parseEther('100').toString() });
-  const appr = await v.tokens.approve({ walletId: holder.id, token: token.address, spender: owner.address, amount: parseEther('50').toString() });
-  await Promise.all([
-    v.transactions.waitForConfirmation({ walletId: owner.id, txHash: dist.txHash! }),
-    v.transactions.waitForConfirmation({ walletId: holder.id, txHash: appr.txHash! }),
-  ]);
-  console.log('allowance (holder → owner):', await v.tokens.allowance({ token: token.address, owner: holder.address, spender: owner.address }));
+  // Owner approves itself as spender for 50, then pulls 50 within the allowance.
+  const appr = await v.tokens.approve({ walletId: owner.id, token: token.address, spender: owner.address, amount: parseEther('50').toString() });
+  await v.transactions.waitForConfirmation({ walletId: owner.id, txHash: appr.txHash! });
+  console.log('allowance:', await v.tokens.allowance({ token: token.address, owner: owner.address, spender: owner.address }));
 
-  // Owner pulls 50 from the holder within the allowance.
-  const pull = await v.tokens.transferFrom({ walletId: owner.id, token: token.address, from: holder.address, to: owner.address, amount: parseEther('50').toString() });
+  const pull = await v.tokens.transferFrom({ walletId: owner.id, token: token.address, from: owner.address, to: owner.address, amount: parseEther('50').toString() });
   await v.transactions.waitForConfirmation({ walletId: owner.id, txHash: pull.txHash! });
-  console.log('holder balance:', await v.tokens.balanceOf({ token: token.address, owner: holder.address }));
+  console.log('owner balance:', await v.tokens.balanceOf({ token: token.address, owner: owner.address }));
 }
 
 main().catch((e) => {

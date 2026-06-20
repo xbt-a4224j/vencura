@@ -1,28 +1,25 @@
 /**
  * Example: fire N concurrent sends at ONE wallet and prove the nonce lock holds.
- *   pnpm --filter @vencura/api db:seed
  *   pnpm --filter @vencura/sdk exec tsx examples/05-concurrency.ts
  *
- * Despite racing, the per-wallet Postgres advisory lock serializes the critical
- * section, so every send gets a unique, consecutive nonce — no collisions, no gaps.
- * This is the same invariant the API's unit tests assert, shown here as a script.
+ * Despite racing, the per-wallet Postgres advisory lock serializes the critical section, so every
+ * send gets a unique, consecutive nonce — no collisions, no gaps. Same invariant the API's unit
+ * tests assert, shown here as a script (N real 1-wei self-sends on Sepolia).
  */
-import { parseEther } from 'viem';
-import { NATIVE_ASSET, Vencura } from '../src';
+import { NATIVE_ASSET } from '../src';
+import { aWallet, connect } from './_client';
 
 const N = 5;
 
 async function main() {
-  const v = new Vencura();
-  await v.auth.login({ email: 'admin@vencura.local', password: 'demo-password' });
-  const wallets = await v.wallets.list();
-  const [sender, recipient] = wallets;
+  const v = await connect();
+  const wallet = await aWallet(v);
 
-  // Fire N sends simultaneously (Promise.all), not in sequence.
+  // Fire N self-sends simultaneously (Promise.all), not in sequence.
   const results = await Promise.all(
     Array.from({ length: N }, () =>
       v.transactions
-        .send({ walletId: sender.id, to: recipient.address, asset: NATIVE_ASSET, amount: parseEther('0.001').toString() })
+        .send({ walletId: wallet.id, to: wallet.address, asset: NATIVE_ASSET, amount: '1' })
         .then((tx) => tx.nonce)
         .catch((e) => `error: ${e.message}`),
     ),

@@ -195,11 +195,8 @@ class AuthApi {
 
 class WalletsApi {
   constructor(private readonly http: Http) {}
-  /** Create a wallet (encrypted key generated + stored server-side). */
-  create(): Promise<Wallet> {
-    return this.http.request<Wallet>('/wallets', { method: 'POST', body: {}, auth: true });
-  }
-  /** One wallet per account: returns it, creating + master-funding on first call. */
+  /** One wallet per account: returns it (encrypted key generated server-side), creating +
+   *  master-funding it on first call. This is the wallet-creation path. */
   provision(): Promise<Wallet> {
     return this.http.request<Wallet>('/wallets/provision', { method: 'POST', auth: true });
   }

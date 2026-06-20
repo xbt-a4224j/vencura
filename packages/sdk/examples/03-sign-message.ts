@@ -3,18 +3,17 @@
  *   pnpm --filter @vencura/sdk exec tsx examples/03-sign-message.ts
  *
  * Signing never exposes the private key — the server decrypts it in memory only.
- * This is "off-chain" activity: no broadcast, no tx hash. It still shows in the
- * wallet's unified activity history (see example 05's tail / GET /activity).
+ * Off-chain proof of ownership: no broadcast, no tx hash (the basis for Sign-In-With-Ethereum
+ * and gasless EIP-712 approvals).
  */
 import { recoverMessageAddress } from 'viem';
-import { Vencura } from '../src';
+import { aWallet, connect } from './_client';
 
 async function main() {
-  const v = new Vencura();
-  await v.auth.register({ email: `demo+${Date.now()}@example.com`, password: 'password123' });
-  const wallet = await v.wallets.create();
+  const v = await connect();
+  const wallet = await aWallet(v);
 
-  const message = 'I authorize this VenCura demo.';
+  const message = `I control ${wallet.address} — signed to prove ownership (off-chain, no gas).`;
   const { signature } = await v.wallets.signMessage({ walletId: wallet.id, message });
   console.log('signature:', signature);
 

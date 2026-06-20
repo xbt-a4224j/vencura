@@ -1,23 +1,18 @@
 /**
- * Example: create a custodial wallet.
+ * Example: provision a custodial wallet (one per account).
  *   pnpm --filter @vencura/sdk exec tsx examples/01-create-wallet.ts
- * Point at another API with VENCURA_API_URL (default http://localhost:3000).
+ * Runs against the live deployment by default; set VENCURA_API_URL to point elsewhere.
  */
-import { Vencura } from '../src';
+import { connect } from './_client';
 
 async function main() {
-  const v = new Vencura();
+  const v = await connect();
 
-  // A throwaway demo account — auth.register() stores the bearer token on the client.
-  const email = `demo+${Date.now()}@example.com`;
-  await v.auth.register({ email, password: 'password123' });
-  console.log('registered:', email);
-
-  // The platform generates + encrypts the private key server-side; you get an address.
-  const wallet = await v.wallets.create();
+  // The platform generates + encrypts the private key server-side and master-funds the wallet;
+  // you get an address. Idempotent — one wallet per account.
+  const wallet = await v.wallets.provision();
   console.log('wallet id:  ', wallet.id);
   console.log('address:    ', wallet.address);
-  console.log('\nFund this address from a Sepolia faucet to enable live sends.');
 }
 
 main().catch((e) => {

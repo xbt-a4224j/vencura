@@ -1,30 +1,24 @@
 /**
  * Example: send a native ETH transaction and wait for it to confirm — in one call.
- *   pnpm --filter @vencura/api db:seed          # first: seed funded demo wallets (anvil)
  *   pnpm --filter @vencura/sdk exec tsx examples/04-send-transaction.ts
  *
- * Uses the seeded demo user, whose wallets are funded on the local anvil node.
- * Amounts are ALWAYS base units (wei) as strings — never floats. `sendAndConfirm`
- * generates an idempotency key (so a retry can't double-broadcast) and polls the
- * confirmation watcher until the tx leaves `pending`.
+ * Broadcasts a real Sepolia tx from the funded demo wallet to itself (a 1-wei self-send, like the
+ * admin concurrency demo). `sendAndConfirm` generates an idempotency key (so a retry can't
+ * double-broadcast) and polls the confirmation watcher until the tx leaves `pending`.
  */
-import { parseEther } from 'viem';
-import { NATIVE_ASSET, Vencura } from '../src';
+import { NATIVE_ASSET } from '../src';
+import { aWallet, connect } from './_client';
 
 async function main() {
-  const v = new Vencura();
-  await v.auth.login({ email: 'admin@vencura.local', password: 'demo-password' });
+  const v = await connect();
+  const wallet = await aWallet(v);
 
-  const wallets = await v.wallets.list();
-  if (wallets.length < 2) throw new Error('run `pnpm --filter @vencura/api db:seed` first');
-  const [sender, recipient] = wallets;
-
-  // Broadcast 0.01 ETH (in wei) and wait for confirmation — one await.
+  // 1 wei to self — broadcast and wait for confirmation in one await.
   const tx = await v.transactions.sendAndConfirm({
-    walletId: sender.id,
-    to: recipient.address,
+    walletId: wallet.id,
+    to: wallet.address,
     asset: NATIVE_ASSET,
-    amount: parseEther('0.01').toString(),
+    amount: '1',
   });
   console.log(`confirmed: nonce=${tx.nonce} hash=${tx.txHash} status=${tx.status}`);
 }
