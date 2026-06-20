@@ -40,14 +40,47 @@ model Wallet {
   nextNonce Int      @default(0)
   createdAt DateTime @default(now())
 
-  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions   Transaction[]
   signedMessages SignedMessage[]
   balances       WalletBalance[]
   policy         WalletPolicy?
+  received       ReceivedTransfer[]
 
   @@index([userId])
   @@map("wallets")
+}
+
+// Inbound transfers (ETH + ERC-20) credited TO a wallet that VenCura did NOT initiate — e.g. a
+// faucet drip, a deposit, or another wallet sending in. The chain is the source of truth: a tx is
+// recorded under the SENDER's wallet, so without this a recipient's feed never shows funds received.
+// IncomingWatcher backfills these from chain logs/blocks so the activity feed matches the explorer.
+model ReceivedTransfer {
+  id          String   @id @default(uuid())
+  walletId    String
+  txHash      String
+  logIndex    Int      @default(0) // ERC-20 log position; -1 for a native-ETH transfer (no log)
+  asset       String // 'ETH' or the token contract address
+  amount      String // wei / token base units (bigint string)
+  fromAddress String
+  blockNumber BigInt
+  createdAt   DateTime @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@unique([walletId, txHash, logIndex]) // idempotent indexing: re-scanning a block can't double-insert
+  @@index([walletId, blockNumber])
+  @@map("received_transfers")
+}
+
+// Single-row-per-name scan cursor so the incoming-transfer watcher resumes where it left off
+// instead of re-scanning history every tick.
+model ChainCursor {
+  name      String   @id
+  value     BigInt
+  updatedAt DateTime @updatedAt
+
+  @@map("chain_cursor")
 }
 
 // Off-chain activity: persisted signMessage results (the on-chain half lives in

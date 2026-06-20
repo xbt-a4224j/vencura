@@ -19,7 +19,7 @@ export class ActivityService {
 
   async recent(walletId: string, userId: string): Promise<ActivityItem[]> {
     await this.wallets.findOwnedOrThrow(walletId, userId); // authz: caller must own the wallet
-    const [txs, sigs, audits] = await Promise.all([
+    const [txs, sigs, audits, received] = await Promise.all([
       this.prisma.transaction.findMany({ where: { walletId }, orderBy: { createdAt: 'desc' }, take: 50 }),
       this.prisma.signedMessage.findMany({ where: { walletId }, orderBy: { createdAt: 'desc' }, take: 50 }),
       // Scope audit rows to THIS wallet — account-level events (auth.login has walletId=null) would
@@ -28,8 +28,12 @@ export class ActivityService {
       this.prisma.auditLog
         .findMany({ where: { walletId }, orderBy: { createdAt: 'desc' }, take: 50 })
         .catch(() => []),
+      // Inbound transfers (funds received) — recorded by IncomingWatcher, not the send path.
+      this.prisma.receivedTransfer
+        .findMany({ where: { walletId }, orderBy: { createdAt: 'desc' }, take: 50 })
+        .catch(() => []),
     ]);
-    return mergeActivity(txs, sigs, audits);
+    return mergeActivity(txs, sigs, audits, received);
   }
 
   /** Cross-wallet audit trail for one user: every send, signature, and governance event across
@@ -37,7 +41,7 @@ export class ActivityService {
   async recentForUser(userId: string): Promise<ActivityItem[]> {
     const owned = await this.prisma.wallet.findMany({ where: { userId }, select: { id: true } });
     const walletIds = owned.map((w) => w.id);
-    const [txs, sigs, audits] = await Promise.all([
+    const [txs, sigs, audits, received] = await Promise.all([
       this.prisma.transaction.findMany({
         where: { walletId: { in: walletIds } },
         orderBy: { createdAt: 'desc' },
@@ -52,18 +56,22 @@ export class ActivityService {
       this.prisma.auditLog
         .findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 100 })
         .catch(() => []),
+      this.prisma.receivedTransfer
+        .findMany({ where: { walletId: { in: walletIds } }, orderBy: { createdAt: 'desc' }, take: 100 })
+        .catch(() => []),
     ]);
-    return mergeActivity(txs, sigs, audits).slice(0, 100);
+    return mergeActivity(txs, sigs, audits, received).slice(0, 100);
   }
 
   /** System-wide activity across EVERY user/wallet — the admin console's operator view, so a
    *  custodian sees all tenants' sends, signatures, and governance events (not just their own). */
   async recentSystemWide(): Promise<ActivityItem[]> {
-    const [txs, sigs, audits] = await Promise.all([
+    const [txs, sigs, audits, received] = await Promise.all([
       this.prisma.transaction.findMany({ orderBy: { createdAt: 'desc' }, take: 200 }),
       this.prisma.signedMessage.findMany({ orderBy: { createdAt: 'desc' }, take: 200 }),
       this.prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' }, take: 200 }).catch(() => []),
+      this.prisma.receivedTransfer.findMany({ orderBy: { createdAt: 'desc' }, take: 200 }).catch(() => []),
     ]);
-    return mergeActivity(txs, sigs, audits).slice(0, 200);
+    return mergeActivity(txs, sigs, audits, received).slice(0, 200);
   }
 }

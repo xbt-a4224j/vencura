@@ -153,6 +153,7 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
 .pill.confirmed { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); background: color-mix(in srgb, var(--ok) 12%, transparent); }
 .pill.pending { color: var(--pending); border-color: color-mix(in srgb, var(--pending) 45%, transparent); background: color-mix(in srgb, var(--pending) 14%, transparent); }
 .pill.signed { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.pill.received { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 55%, transparent); background: color-mix(in srgb, var(--ok) 16%, transparent); }
 .pill.failed { color: var(--fail); border-color: color-mix(in srgb, var(--fail) 45%, transparent); background: color-mix(in srgb, var(--fail) 12%, transparent); }
 
 /* Editable wallet nickname */

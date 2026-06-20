@@ -605,6 +605,16 @@ function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: numb
                   <CopyButton value={it.signature} label="⧉" />
                 </li>
               );
+            // received: an inbound transfer indexed from chain (funds we received, not sent)
+            if (it.kind === 'received')
+              return (
+                <li key={it.id}>
+                  {time} <span className="pill received">received</span> ·{' '}
+                  <strong>{activityAmount(it.amount, it.asset === 'ETH' ? 'ETH' : 'TOKEN')}</strong> ←{' '}
+                  <EnsAddress address={it.from} />
+                  {' '}· tx <HashLink value={it.txHash} href={explorerTx(it.txHash)} />
+                </li>
+              );
             // audit: a durable governance event (policy.changed, wallet.created, admin.*)
             return (
               <li key={it.id}>
@@ -1043,6 +1053,8 @@ function ActivityTable({ items, wallets }: { items: ActivityItem[]; wallets: Wal
                 <span className={`pill ${it.status}`}>{it.status}</span>
               ) : it.kind === 'signature' ? (
                 <span className="pill signed">signed</span>
+              ) : it.kind === 'received' ? (
+                <span className="pill received">received</span>
               ) : (
                 <span className="pill audit">{it.type}</span>
               )}
@@ -1063,6 +1075,13 @@ function ActivityTable({ items, wallets }: { items: ActivityItem[]; wallets: Wal
               {it.kind === 'signature' && (
                 <>
                   “{it.message}” → <code>{shortHex(it.signature)}</code>
+                </>
+              )}
+              {it.kind === 'received' && (
+                <>
+                  received <strong>{activityAmount(it.amount, it.asset === 'ETH' ? 'ETH' : 'TOKEN')}</strong> ←{' '}
+                  <EnsAddress address={it.from} />
+                  {' '}· tx <HashLink value={it.txHash} href={explorerTx(it.txHash)} />
                 </>
               )}
               {it.kind === 'audit' && <span className="bal-sub">{JSON.stringify(it.detail)}</span>}
@@ -1226,6 +1245,7 @@ function ActivityTab({ wallets }: { wallets: Wallet[] }) {
               <select id="act-kind" value={kind} onChange={(e) => setKind(e.target.value)}>
                 <option value="all">all</option>
                 <option value="transaction">sends</option>
+                <option value="received">received</option>
                 <option value="signature">signatures</option>
                 <option value="audit">governance</option>
               </select>

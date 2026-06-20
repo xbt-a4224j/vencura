@@ -1,7 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { Abi, PublicClient } from 'viem';
+import { type Abi, parseAbiItem, type PublicClient } from 'viem';
 import type { Hex } from '@vencura/shared';
 import { ERC20_ABI, PUBLIC_CLIENT } from './chain.constants';
+
+// Standard ERC-20 Transfer event — used to find inbound token transfers to our wallets via getLogs
+// (indexed `to` lets the node filter server-side; no per-block scan needed for tokens).
+const TRANSFER_EVENT = parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 value)');
 
 /** Narrow, mockable reads against the chain. The client is injected (PUBLIC_CLIENT). */
 @Injectable()
@@ -73,5 +77,17 @@ export class ChainService {
     } catch {
       return null; // not mined yet
     }
+  }
+
+  /** Inbound ERC-20 Transfer logs to any of `addresses` over a block range (one filtered query,
+   *  not a per-block scan). Used by IncomingWatcher to index received token transfers. */
+  getInboundErc20Logs(addresses: Hex[], fromBlock: bigint, toBlock: bigint) {
+    return this.client.getLogs({ event: TRANSFER_EVENT, args: { to: addresses }, fromBlock, toBlock });
+  }
+
+  /** A block with full tx objects — native ETH transfers emit no logs, so inbound ETH is found by
+   *  scanning block transactions for `to ∈ our wallets`. */
+  getBlockWithTxs(blockNumber: bigint) {
+    return this.client.getBlock({ blockNumber, includeTransactions: true });
   }
 }

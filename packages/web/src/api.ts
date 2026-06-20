@@ -111,6 +111,16 @@ export type ActivityItem =
       detail: unknown;
       walletId: string | null;
       createdAt: string;
+    }
+  | {
+      kind: 'received';
+      id: string;
+      asset: string;
+      amount: string;
+      from: string;
+      txHash: string;
+      walletId?: string;
+      createdAt: string;
     };
 
 // One line of the live "system log" ring buffer (GET /events?after=seq).

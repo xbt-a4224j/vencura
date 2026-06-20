@@ -30,6 +30,16 @@ export interface AuditRow {
   detail: unknown;
   createdAt: Date;
 }
+// Inbound transfers indexed from the chain (funds received, not sent by us) — see IncomingWatcher.
+export interface ReceivedRow {
+  id: string;
+  asset: string;
+  amount: string;
+  fromAddress: string;
+  txHash: string;
+  walletId?: string;
+  createdAt: Date;
+}
 
 export type ActivityItem =
   | {
@@ -44,9 +54,24 @@ export type ActivityItem =
       createdAt: Date;
     }
   | { kind: 'signature'; id: string; message: string; signature: string; walletId?: string; createdAt: Date }
-  | { kind: 'audit'; id: string; type: string; detail: unknown; walletId: string | null; createdAt: Date };
+  | { kind: 'audit'; id: string; type: string; detail: unknown; walletId: string | null; createdAt: Date }
+  | {
+      kind: 'received';
+      id: string;
+      asset: string;
+      amount: string;
+      from: string;
+      txHash: string;
+      walletId?: string;
+      createdAt: Date;
+    };
 
-export function mergeActivity(txs: TxRow[], sigs: SigRow[], audits: AuditRow[] = []): ActivityItem[] {
+export function mergeActivity(
+  txs: TxRow[],
+  sigs: SigRow[],
+  audits: AuditRow[] = [],
+  received: ReceivedRow[] = [],
+): ActivityItem[] {
   const items: ActivityItem[] = [
     ...txs.map((t): ActivityItem => ({
       kind: 'transaction',
@@ -74,6 +99,16 @@ export function mergeActivity(txs: TxRow[], sigs: SigRow[], audits: AuditRow[] =
       detail: a.detail,
       walletId: a.walletId,
       createdAt: a.createdAt,
+    })),
+    ...received.map((r): ActivityItem => ({
+      kind: 'received',
+      id: r.id,
+      asset: r.asset,
+      amount: r.amount,
+      from: r.fromAddress,
+      txHash: r.txHash,
+      walletId: r.walletId,
+      createdAt: r.createdAt,
     })),
   ];
   return items.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());

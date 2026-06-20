@@ -8,6 +8,7 @@ import { ActivityController, UserActivityController } from './activity.controlle
 import { ActivityService } from './activity.service';
 import { ConfirmationWatcher } from './confirmation-watcher.service';
 import { ContractsController } from './contracts.controller';
+import { IncomingWatcher } from './incoming-watcher.service';
 import { MessagesController } from './messages.controller';
 import { TokenController } from './token.controller';
 import { TransactionsController } from './transactions.controller';
@@ -26,6 +27,6 @@ import { TransactionsService } from './transactions.service';
     ContractsController,
     TokenController,
   ],
-  providers: [TransactionsService, ConfirmationWatcher, ActivityService],
+  providers: [TransactionsService, ConfirmationWatcher, IncomingWatcher, ActivityService],
 })
 export class TransactionsModule {}
