@@ -749,7 +749,11 @@ function ConcurrencyDemo({
 function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
   const [balances, setBalances] = useState<BalanceLine[] | null>(null);
   const [policy, setPolicy] = useState<Policy | null>(null);
-  const [message, setMessage] = useState('');
+  // A realistic default payload so signing demonstrates a *use* (proving wallet ownership off-chain),
+  // not "sign a blank box". This is the shape of a Sign-In-With-Ethereum / gasless-approval challenge.
+  const [message, setMessage] = useState(
+    () => `I control ${wallet.address} — signed to prove ownership (off-chain, no gas).`,
+  );
   const [signature, setSignature] = useState('');
   const [verifyOut, setVerifyOut] = useState('');
   const [error, setError] = useState('');
@@ -883,6 +887,11 @@ function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
 
       <details>
         <summary>Sign a message</summary>
+        <p className="bal-sub">
+          Off-chain proof of ownership — no gas, no transaction. The same primitive behind passwordless
+          “Sign-In With Ethereum” and gasless EIP-712 approvals. Sign, then <b>Verify</b> to recover the signer
+          and confirm it’s this wallet.
+        </p>
         <form onSubmit={sign}>
           <label htmlFor={`msg-${wallet.id}`}>Message to sign</label>
           <textarea
