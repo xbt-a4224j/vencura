@@ -53,8 +53,10 @@ export class ActivityService {
         take: 100,
       }),
       // Best-effort: if the audit_log migration hasn't applied yet, degrade to tx+sig (don't 500).
+      // Exclude auth.login — logins are system-log noise, not governance (defensive: also hides any
+      // legacy rows written before login moved to emit()).
       this.prisma.auditLog
-        .findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 100 })
+        .findMany({ where: { userId, type: { not: 'auth.login' } }, orderBy: { createdAt: 'desc' }, take: 100 })
         .catch(() => []),
       this.prisma.receivedTransfer
         .findMany({ where: { walletId: { in: walletIds } }, orderBy: { createdAt: 'desc' }, take: 100 })
@@ -69,7 +71,9 @@ export class ActivityService {
     const [txs, sigs, audits, received] = await Promise.all([
       this.prisma.transaction.findMany({ orderBy: { createdAt: 'desc' }, take: 200 }),
       this.prisma.signedMessage.findMany({ orderBy: { createdAt: 'desc' }, take: 200 }),
-      this.prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' }, take: 200 }).catch(() => []),
+      this.prisma.auditLog
+        .findMany({ where: { type: { not: 'auth.login' } }, orderBy: { createdAt: 'desc' }, take: 200 })
+        .catch(() => []),
       this.prisma.receivedTransfer.findMany({ orderBy: { createdAt: 'desc' }, take: 200 }).catch(() => []),
     ]);
     return mergeActivity(txs, sigs, audits, received).slice(0, 200);

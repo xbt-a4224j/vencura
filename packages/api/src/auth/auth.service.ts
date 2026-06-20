@@ -43,13 +43,10 @@ export class AuthService {
       throw new UnauthorizedException('invalid email or password');
     }
     this.logger.log(`login succeeded: ${user.id}`);
-    // Durable governance event: a successful authentication belongs in the audit trail.
-    await this.events.record({
-      userId: user.id,
-      type: 'auth.login',
-      detail: { email: user.email },
-      msg: `login: ${user.email}`,
-    });
+    // Logins are operational noise, not a governance action — they go to the ephemeral system log
+    // (ring buffer), NOT the durable audit_log. Persisting them flooded the audit trail and every
+    // activity feed with login rows that bury the on-chain history.
+    this.events.emit(`login: ${user.email}`);
     return this.issue(user);
   }
 

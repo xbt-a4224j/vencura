@@ -1805,6 +1805,11 @@ function AdminView({ onExit }: { onExit: () => void }) {
 // doesn't need a router dependency.
 function Root() {
   const [view, setView] = useState<'landing' | 'user' | 'admin'>('landing');
+  // Reflect the active view in the tab title (the user view isn't an admin console).
+  useEffect(() => {
+    document.title =
+      view === 'user' ? 'VenCura — Wallet' : view === 'admin' ? 'VenCura Admin' : 'VenCura';
+  }, [view]);
   if (view === 'user') return <UserView onExit={() => setView('landing')} />;
   if (view === 'admin') return <AdminView onExit={() => setView('landing')} />;
   return <Landing onPick={setView} />;
