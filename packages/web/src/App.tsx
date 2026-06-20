@@ -13,6 +13,7 @@ import {
 } from './vencura';
 import { AuthProvider, useAuth } from './auth-context';
 import { looksLikeEns, resolveEns, reverseResolveEns } from './ens';
+import { Playground } from './Playground';
 import { explorerAddress, explorerTx, FAUCET_URL } from './explorer';
 import { activityAmount, shortHex, toEth } from './format';
 
@@ -229,7 +230,7 @@ function DemoBanner() {
 }
 
 // Root landing page: two tiles — User (use wallets) and Admin (manage accounts / demo data).
-function Landing({ onPick }: { onPick: (view: 'user' | 'admin') => void }) {
+function Landing({ onPick }: { onPick: (view: 'user' | 'admin' | 'playground') => void }) {
   return (
     <main className="app landing">
       <header className="landing-head">
@@ -250,6 +251,13 @@ function Landing({ onPick }: { onPick: (view: 'user' | 'admin') => void }) {
           </span>
           <h2>Admin</h2>
           <p>Create accounts, seed or reset demo data, set policies, and inspect the chain.</p>
+        </button>
+        <button type="button" className="tile" onClick={() => onPick('playground')}>
+          <span className="tile-emoji" aria-hidden>
+            🧪
+          </span>
+          <h2>Playground</h2>
+          <p>Tinker with the typed SDK live — run wallet, send, and token calls against the API.</p>
         </button>
       </div>
     </main>
@@ -1907,7 +1915,7 @@ function AdminView({ onExit }: { onExit: () => void }) {
 // Two experiences behind a simple landing page. Plain state-based routing — a two-view app
 // doesn't need a router dependency.
 const VIEW_KEY = 'vencura.view';
-type View = 'landing' | 'user' | 'admin';
+type View = 'landing' | 'user' | 'admin' | 'playground';
 
 function Root() {
   // Persist the chosen view so a reload returns to the same screen (paired with token-based session
@@ -1919,10 +1927,17 @@ function Root() {
   // Reflect the active view in the tab title (the user view isn't an admin console).
   useEffect(() => {
     document.title =
-      view === 'user' ? 'VenCura — Wallet' : view === 'admin' ? 'VenCura Admin' : 'VenCura';
+      view === 'user'
+        ? 'VenCura — Wallet'
+        : view === 'admin'
+          ? 'VenCura Admin'
+          : view === 'playground'
+            ? 'VenCura — SDK Playground'
+            : 'VenCura';
   }, [view]);
   if (view === 'user') return <UserView onExit={() => setView('landing')} />;
   if (view === 'admin') return <AdminView onExit={() => setView('landing')} />;
+  if (view === 'playground') return <Playground onExit={() => setView('landing')} />;
   return <Landing onPick={setView} />;
 }
 
