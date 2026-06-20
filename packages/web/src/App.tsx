@@ -1889,8 +1889,16 @@ function AdminView({ onExit }: { onExit: () => void }) {
 
 // Two experiences behind a simple landing page. Plain state-based routing — a two-view app
 // doesn't need a router dependency.
+const VIEW_KEY = 'vencura.view';
+type View = 'landing' | 'user' | 'admin';
+
 function Root() {
-  const [view, setView] = useState<'landing' | 'user' | 'admin'>('landing');
+  // Persist the chosen view so a reload returns to the same screen (paired with token-based session
+  // restore in AuthProvider) instead of dropping back to the landing picker.
+  const [view, setView] = useState<View>(() => (localStorage.getItem(VIEW_KEY) as View) || 'landing');
+  useEffect(() => {
+    localStorage.setItem(VIEW_KEY, view);
+  }, [view]);
   // Reflect the active view in the tab title (the user view isn't an admin console).
   useEffect(() => {
     document.title =

@@ -154,6 +154,8 @@ export const api = {
   listAccounts: () => call<Account[]>('/auth/accounts'),
   // The single self-registered user (or null) — drives User-view register-vs-login.
   singleUser: () => call<Account | null>('/auth/user'),
+  // Who the persisted token belongs to — used to restore a session on reload. 401s if expired.
+  me: () => call<Account>('/auth/me', { auth: true }),
   login: (email: string, password: string) =>
     call<AuthResult>('/auth/login', { method: 'POST', body: { email, password } }),
   register: (email: string, password: string) =>

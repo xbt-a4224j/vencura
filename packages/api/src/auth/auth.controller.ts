@@ -1,7 +1,9 @@
-import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
+import { CurrentUser } from './current-user.decorator';
 import { LoginDto, RegisterDto } from './dto';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -30,5 +32,14 @@ export class AuthController {
   @Get('user')
   singleUser() {
     return this.auth.singleUser();
+  }
+
+  // Who the bearer token belongs to — lets the web restore a session from the persisted token on
+  // reload (any account, demo or real), instead of re-logging-in. 401s if the token is missing/expired.
+  @Get('me')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  me(@CurrentUser() user: { id: string; email: string }) {
+    return { id: user.id, email: user.email };
   }
 }

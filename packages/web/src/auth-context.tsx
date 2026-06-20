@@ -70,15 +70,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     enter(await api.register(email, password));
   }, []);
 
-  // On load: fetch the account list and best-effort restore the last-used session (no prompt).
+  // On load: fetch the account list, then restore the session straight from the persisted token
+  // (survives reloads until the JWT expires, ~1d). This works for ANY account — including the real
+  // self-registered user, who isn't in the demo account list. A stale/expired token is cleared.
   useEffect(() => {
     void (async () => {
-      const list = await reload();
-      const last = localStorage.getItem(LAST_KEY);
-      const restore = list.find((a) => a.id === last);
-      if (restore) await signIn(restore).catch(() => undefined);
+      await reload();
+      if (!tokenStore.get()) return;
+      try {
+        setCurrent(await api.me());
+      } catch {
+        tokenStore.clear(); // expired/invalid — drop it so we don't send a dead bearer
+        localStorage.removeItem(LAST_KEY);
+      }
     })().finally(() => setReady(true));
-  }, [reload, signIn]);
+  }, [reload]);
 
   return (
     <Ctx.Provider
