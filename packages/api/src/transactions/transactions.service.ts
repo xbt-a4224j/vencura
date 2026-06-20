@@ -32,13 +32,18 @@ export class TransactionsService {
       functionName: input.functionName,
       args: input.args,
     });
-    return this.send(walletId, userId, { to: input.address, asset: 'CALL', amount: input.value, data }, idempotencyKey);
+    return this.send(
+      walletId,
+      userId,
+      { to: input.address, asset: 'CALL', amount: input.value, data, method: input.functionName },
+      idempotencyKey,
+    );
   }
 
   async send(
     walletId: string,
     userId: string,
-    dto: SendTransactionInput & { data?: string },
+    dto: SendTransactionInput & { data?: string; method?: string },
     idempotencyKey?: string,
   ) {
     const wallet = await this.wallets.findOwnedOrThrow(walletId, userId);
@@ -98,6 +103,7 @@ export class TransactionsService {
             status: 'pending',
             asset: dto.asset,
             amount: dto.amount,
+            method: dto.method ?? null,
             toAddress: dto.to,
             fromAddress: wallet.address,
             txHash,

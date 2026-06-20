@@ -586,8 +586,16 @@ function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: numb
             if (it.kind === 'transaction')
               return (
                 <li key={it.id}>
-                  {time} <span className={`pill ${it.status}`}>{it.status}</span> · sent{' '}
-                  <strong>{activityAmount(it.amount, it.asset)}</strong> →{' '}
+                  {time} <span className={`pill ${it.status}`}>{it.status}</span> ·{' '}
+                  {it.method ? (
+                    <>
+                      called <strong>{it.method}</strong> on
+                    </>
+                  ) : (
+                    <>
+                      sent <strong>{activityAmount(it.amount, it.asset)}</strong> →
+                    </>
+                  )}{' '}
                   <EnsAddress address={it.to} from={wallet.address} />
                   {it.txHash && (
                     <>
@@ -1064,7 +1072,15 @@ function ActivityTable({ items, wallets }: { items: ActivityItem[]; wallets: Wal
             <td>
               {it.kind === 'transaction' && (
                 <>
-                  sent <strong>{activityAmount(it.amount, it.asset)}</strong> →{' '}
+                  {it.method ? (
+                    <>
+                      called <strong>{it.method}</strong> on{' '}
+                    </>
+                  ) : (
+                    <>
+                      sent <strong>{activityAmount(it.amount, it.asset)}</strong> →{' '}
+                    </>
+                  )}
                   <EnsAddress address={it.to} from={addrOf(it.walletId)} />
                   {it.txHash && (
                     <>

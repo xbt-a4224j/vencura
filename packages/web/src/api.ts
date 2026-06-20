@@ -98,6 +98,7 @@ export type ActivityItem =
       status: string;
       asset: string;
       amount: string;
+      method?: string | null;
       to: string;
       txHash: string | null;
       walletId?: string;

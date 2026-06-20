@@ -119,8 +119,9 @@ model Transaction {
   idempotencyKey String?           @unique
   nonce          Int?
   status         TransactionStatus @default(pending)
-  asset          String // 'ETH' for native, or the ERC-20 contract address
+  asset          String // 'ETH' for native, the ERC-20 contract address, or 'CALL' for a contract write
   amount         String // base units (wei / token decimals) as a bigint string — never a float
+  method         String? // for a contract write (asset='CALL'): the function called, e.g. 'approve' — so the activity log reads "approve → token" instead of "sent 0 tokens"
   toAddress      String
   fromAddress    String
   txHash         String?           @unique

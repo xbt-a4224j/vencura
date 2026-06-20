@@ -9,6 +9,7 @@ export interface TxRow {
   status: string;
   asset: string;
   amount: string;
+  method?: string | null;
   toAddress: string;
   txHash: string | null;
   walletId?: string;
@@ -48,6 +49,7 @@ export type ActivityItem =
       status: string;
       asset: string;
       amount: string;
+      method?: string | null;
       to: string;
       txHash: string | null;
       walletId?: string;
@@ -79,6 +81,7 @@ export function mergeActivity(
       status: t.status,
       asset: t.asset,
       amount: t.amount,
+      method: t.method,
       to: t.toAddress,
       txHash: t.txHash,
       walletId: t.walletId,
