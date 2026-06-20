@@ -615,12 +615,14 @@ function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: numb
                   {' '}· tx <HashLink value={it.txHash} href={explorerTx(it.txHash)} />
                 </li>
               );
-            // audit: a durable governance event (policy.changed, wallet.created, admin.*)
-            return (
-              <li key={it.id}>
-                {time} <span className="pill audit">{it.type}</span>
-              </li>
-            );
+            // audit: a durable governance event (policy.changed, wallet.created, token.deployed, …)
+            if (it.kind === 'audit')
+              return (
+                <li key={it.id}>
+                  {time} <span className="pill audit">{it.type}</span>
+                </li>
+              );
+            return null; // unknown / not-yet-deployed kind — render nothing, never a blank pill
           })}
         </ul>
       )}
