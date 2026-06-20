@@ -1266,6 +1266,7 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
   const [pull, setPull] = useState({ from: '', amt: '' });
   const [holder, setHolder] = useState('');
   const [holders, setHolders] = useState<{ address: string; email: string }[]>([]);
+  const [supply, setSupply] = useState<{ total: string; ownerBal: string } | null>(null);
 
   const load = useCallback(() => api.getToken().then(setToken).catch(() => setToken(null)), []);
   useEffect(() => {
@@ -1279,6 +1280,20 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
   useEffect(() => {
     if (!deployFrom && wallets[0]) setDeployFrom(wallets[0].id);
   }, [wallets, deployFrom]);
+  // Total minted supply + the owner's remaining balance (= what's left to distribute). Re-read after
+  // each action (msg changes) so the headroom updates once a distribute confirms.
+  useEffect(() => {
+    if (!token) {
+      setSupply(null);
+      return;
+    }
+    Promise.all([
+      api.contractRead({ address: token.address, abi: erc20Abi, functionName: 'totalSupply', args: [] }),
+      api.contractRead({ address: token.address, abi: erc20Abi, functionName: 'balanceOf', args: [token.owner] }),
+    ])
+      .then(([t, b]) => setSupply({ total: String(t.result), ownerBal: String(b.result) }))
+      .catch(() => setSupply(null));
+  }, [token, msg]);
 
   const ownerWallet = token
     ? wallets.find((w) => w.address.toLowerCase() === token.owner.toLowerCase())
@@ -1361,6 +1376,22 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
             spender <code>{shortHex(token.owner)}</code>
             <CopyButton value={token.owner} label="⧉" />
           </p>
+          {supply && (
+            <dl className="supply" aria-label="token supply">
+              <div>
+                <dt>Total minted</dt>
+                <dd>{toEth(supply.total)} VCD</dd>
+              </div>
+              <div>
+                <dt>Owner holds (available to distribute)</dt>
+                <dd>{toEth(supply.ownerBal)} VCD</dd>
+              </div>
+              <div>
+                <dt>Distributed to holders</dt>
+                <dd>{toEth((BigInt(supply.total) - BigInt(supply.ownerBal)).toString())} VCD</dd>
+              </div>
+            </dl>
+          )}
           <datalist id="holder-options">
             {holders.map((h) => (
               <option key={h.address} value={h.address}>
