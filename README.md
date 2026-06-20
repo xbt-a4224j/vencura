@@ -23,6 +23,10 @@ Web on **Vercel**, API on **Railway** (Docker), Postgres on **Neon**, RPC on **S
 same-origin via a `/api/*` rewrite. Register an account to try it; live balance/send needs a Sepolia-funded
 wallet (faucet link in the admin). Per-IP rate limiting is enabled.
 
+> 📋 **New here? Follow the [reviewer walkthrough](docs/reviewer-walkthrough.html)** — an 8-step, ~10-minute
+> guided tour of the live app (with a diagram for every step) that exercises the four required operations and
+> the design thesis: key custody, concurrency-correctness, and chain-as-truth.
+
 ## Quick start
 
 **Prerequisites:** [Docker](https://www.docker.com/) (Compose v2), **Node 20** (see [`.nvmrc`](.nvmrc)), and

@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VenCura — Reviewer Walkthrough</title>
+    <style>
+      :root {
+        --bg: #ffffff; --ink: #1a1d23; --muted: #5b6472; --line: #dfe3e8;
+        --soft: #f5f6f8; --soft2: #eceef1; --accent: #2d5bff; --ok: #1e8e5a;
+        --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans);
+        line-height: 1.55; -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
+      header.lead { border-bottom: 1px solid var(--line); padding-bottom: 22px; margin-bottom: 28px; }
+      h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -0.01em; }
+      h1::before { content: "◆ "; color: var(--accent); }
+      .sub { color: var(--muted); font-size: 15px; margin: 0 0 14px; }
+      .links a {
+        display: inline-block; font-size: 13px; font-family: var(--mono); color: var(--accent);
+        text-decoration: none; margin-right: 14px;
+      }
+      .links a:hover { text-decoration: underline; }
+      h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin: 40px 0 12px; }
+      .legend { background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; font-size: 14px; }
+      .legend b { font-variant: small-caps; letter-spacing: 0.02em; }
+      .step {
+        border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; margin: 16px 0;
+        background: var(--bg);
+      }
+      .step h3 { font-size: 17px; margin: 0 0 14px; display: flex; align-items: center; gap: 10px; }
+      .num {
+        flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--ink); color: #fff;
+        font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
+      }
+      .row { display: flex; gap: 10px; margin: 7px 0; font-size: 14.5px; }
+      .tag {
+        flex: none; width: 86px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+        color: var(--muted); padding-top: 2px;
+      }
+      .row.do .tag { color: var(--accent); }
+      .row.see .tag { color: var(--ok); }
+      .row p { margin: 0; }
+      code { font-family: var(--mono); font-size: 0.88em; background: var(--soft2); padding: 1px 5px; border-radius: 4px; }
+      a.ext { color: var(--accent); text-decoration: none; }
+      a.ext:hover { text-decoration: underline; }
+      .proves { font-size: 12.5px; color: var(--muted); margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 10px; }
+      .proves b { color: var(--ink); font-weight: 600; }
+      .note { font-size: 12.5px; color: var(--muted); font-style: italic; margin-top: 8px; }
+      figure { margin: 14px 0 4px; }
+      svg { width: 100%; height: auto; display: block; }
+      .arch { border: 1px solid var(--line); border-radius: 12px; padding: 10px; background: var(--soft); }
+      footer { margin-top: 48px; border-top: 1px solid var(--line); padding-top: 18px; font-size: 13px; color: var(--muted); }
+      footer a { color: var(--accent); text-decoration: none; }
+      /* shared SVG text styles */
+      text { font-family: var(--sans); fill: var(--ink); }
+      .lbl { font-size: 12px; }
+      .lblsm { font-size: 10.5px; fill: var(--muted); }
+      .lblmono { font-family: var(--mono); font-size: 11px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="lead">
+        <h1>VenCura — Reviewer Walkthrough</h1>
+        <p class="sub">
+          A custodial Ethereum-wallet API + admin. This is the 8-step happy path that exercises the four
+          required operations and the three things the design is really about: <b>key custody</b>,
+          <b>correctness under concurrency</b>, and <b>chain-as-source-of-truth</b>. ~10 minutes, no setup.
+        </p>
+        <div class="links">
+          <a class="ext" href="https://vencura-alpha.vercel.app" target="_blank" rel="noreferrer">▶ Open the app ↗</a>
+          <a class="ext" href="https://vencura-alpha.vercel.app/api/docs" target="_blank" rel="noreferrer">Swagger / OpenAPI ↗</a>
+          <a class="ext" href="https://sepolia.etherscan.io" target="_blank" rel="noreferrer">Sepolia Etherscan ↗</a>
+        </div>
+      </header>
+
+      <div class="legend">
+        Each step reads the same way — <b style="color:var(--accent)">Do</b> what to click ·
+        <b style="color:var(--ok)">See</b> the signal that confirms it · <b>Under the hood</b> a small diagram of
+        what actually happens. Everything runs against the live deployment; no local setup required.
+      </div>
+
+      <h2>System at a glance</h2>
+      <figure class="arch">
+        <svg viewBox="0 0 820 300" role="img" aria-label="System architecture">
+          <!-- Browser -->
+          <rect x="16" y="118" width="150" height="64" rx="8" fill="#fff" stroke="#c8cdd6"/>
+          <text class="lbl" x="91" y="143" text-anchor="middle" font-weight="700">Browser</text>
+          <text class="lblsm" x="91" y="160" text-anchor="middle">React/TS admin</text>
+          <text class="lblsm" x="91" y="174" text-anchor="middle">Vercel</text>
+          <!-- arrow -->
+          <line x1="166" y1="150" x2="236" y2="150" stroke="#9aa2af" stroke-width="1.5"/>
+          <polygon points="236,150 228,146 228,154" fill="#9aa2af"/>
+          <text class="lblsm" x="201" y="142" text-anchor="middle">/api/* (HTTPS)</text>
+
+          <!-- API box -->
+          <rect x="238" y="40" width="330" height="220" rx="10" fill="#fff" stroke="#c8cdd6"/>
+          <text class="lbl" x="403" y="62" text-anchor="middle" font-weight="700">API — NestJS REST (Railway)</text>
+          <!-- feature modules -->
+          <rect x="256" y="78" width="140" height="26" rx="5" fill="#eef1f6" stroke="#d3d9e2"/>
+          <text class="lblsm" x="326" y="95" text-anchor="middle">auth · wallets · balances</text>
+          <rect x="256" y="110" width="140" height="26" rx="5" fill="#eef1f6" stroke="#d3d9e2"/>
+          <text class="lblsm" x="326" y="127" text-anchor="middle">transactions · policy</text>
+          <!-- signer + lock -->
+          <rect x="410" y="78" width="142" height="26" rx="5" fill="#e9efe9" stroke="#cfe0cf"/>
+          <text class="lblsm" x="481" y="95" text-anchor="middle">Signer — AES-256-GCM</text>
+          <rect x="410" y="110" width="142" height="26" rx="5" fill="#e9efe9" stroke="#cfe0cf"/>
+          <text class="lblsm" x="481" y="127" text-anchor="middle">Lock — pg advisory</text>
+          <!-- schedulers -->
+          <rect x="256" y="150" width="296" height="40" rx="5" fill="#f5f5f0" stroke="#e0e0d4"/>
+          <text class="lblsm" x="404" y="166" text-anchor="middle">Schedulers (in-process pollers)</text>
+          <text class="lblsm" x="404" y="181" text-anchor="middle">ConfirmationWatcher · BalanceRefresher · IncomingWatcher</text>
+          <text class="lblsm" x="403" y="216" text-anchor="middle" fill="var(--muted)">REST + OpenAPI · Zod validation · global error filter</text>
+          <text class="lblsm" x="403" y="232" text-anchor="middle" fill="var(--muted)">JWT auth · per-IP rate limit</text>
+
+          <!-- Postgres -->
+          <line x1="568" y1="120" x2="636" y2="120" stroke="#9aa2af" stroke-width="1.5"/>
+          <polygon points="636,120 628,116 628,124" fill="#9aa2af"/>
+          <text class="lblsm" x="602" y="112" text-anchor="middle">Prisma</text>
+          <rect x="638" y="92" width="166" height="56" rx="8" fill="#fff" stroke="#c8cdd6"/>
+          <text class="lbl" x="721" y="115" text-anchor="middle" font-weight="700">Postgres</text>
+          <text class="lblsm" x="721" y="132" text-anchor="middle">Neon · derived cache</text>
+
+          <!-- Ethereum -->
+          <line x1="568" y1="180" x2="636" y2="180" stroke="#9aa2af" stroke-width="1.5"/>
+          <polygon points="636,180 628,176 628,184" fill="#9aa2af"/>
+          <text class="lblsm" x="602" y="172" text-anchor="middle">viem</text>
+          <rect x="638" y="152" width="166" height="56" rx="8" fill="#fff" stroke="#c8cdd6"/>
+          <text class="lbl" x="721" y="175" text-anchor="middle" font-weight="700">Ethereum Sepolia</text>
+          <text class="lblsm" x="721" y="192" text-anchor="middle">Infura RPC · source of truth</text>
+        </svg>
+      </figure>
+      <p class="note">
+        Chain is the source of truth; Postgres is a derived, cached projection. The only deliberate abstraction
+        seam is <code>Signer</code> (custodial → MPC → non-custodial). No Redis — Postgres is also the concurrency
+        substrate (advisory locks + a unique constraint for idempotency).
+      </p>
+
+      <h2>The walkthrough</h2>
+
+      <!-- STEP 1 -->
+      <div class="step">
+        <h3><span class="num">1</span> Open &amp; sign in</h3>
+        <div class="row do"><span class="tag">Do</span><p>Open <a class="ext" href="https://vencura-alpha.vercel.app" target="_blank" rel="noreferrer">the app ↗</a>. A <b>Demo mode</b> banner explains auth is bypassed with one shared password. Pick <b>User</b> (choose the account — password is prefilled — and <b>Log in</b>) or <b>Admin</b> for the operator console.</p></div>
+        <div class="row see"><span class="tag">See</span><p>You land in the console. <b>Reload the page</b> — you stay signed in and on the same view.</p></div>
+        <figure>
+          <svg viewBox="0 0 820 96" role="img" aria-label="Login flow">
+            <rect x="10" y="34" width="150" height="34" rx="6" fill="#fff" stroke="#c8cdd6"/>
+            <text class="lblsm" x="85" y="55" text-anchor="middle">Browser</text>
+            <line x1="160" y1="51" x2="250" y2="51" stroke="#9aa2af" stroke-width="1.5"/><polygon points="250,51 242,47 242,55" fill="#9aa2af"/>
+            <text class="lblmono" x="205" y="44" text-anchor="middle">POST /auth/login</text>
+            <rect x="252" y="34" width="150" height="34" rx="6" fill="#eef1f6" stroke="#d3d9e2"/>
+            <text class="lblsm" x="327" y="55" text-anchor="middle">auth module</text>
+            <line x1="402" y1="51" x2="492" y2="51" stroke="#9aa2af" stroke-width="1.5"/><polygon points="492,51 484,47 484,55" fill="#9aa2af"/>
+            <text class="lblsm" x="447" y="44" text-anchor="middle">verify (argon2)</text>
+            <rect x="494" y="34" width="120" height="34" rx="6" fill="#fff" stroke="#c8cdd6"/>
+            <text class="lblsm" x="554" y="55" text-anchor="middle">Postgres users</text>
+            <line x1="614" y1="51" x2="700" y2="51" stroke="#9aa2af" stroke-width="1.5"/><polygon points="700,51 692,47 692,55" fill="#9aa2af"/>
+            <text class="lblsm" x="657" y="44" text-anchor="middle">JWT (1d)</text>
+            <rect x="702" y="34" width="108" height="34" rx="6" fill="#e9efe9" stroke="#cfe0cf"/>
+            <text class="lblsm" x="756" y="55" text-anchor="middle">localStorage</text>
+            <text class="lblsm" x="410" y="86" text-anchor="middle" fill="var(--muted)">reload → GET /auth/me restores the session from the stored token (sticky until the JWT expires)</text>
+          </svg>
+        </figure>
+        <p class="proves"><b>Proves:</b> custodial auth — a per-user JWT; the server-side admin key is never shown to the client.</p>
+      </div>
+
+      <!-- STEP 2 -->
+      <div class="step">
+        <h3><span class="num">2</span> Create &amp; fund a wallet</h3>
+        <div class="row do"><span class="tag">Do</span><p>Go to the <b>Wallets</b> tab. Your wallet is auto-provisioned and master-funded on first load (or create one).</p></div>
+        <div class="row see"><span class="tag">See</span><p>A wallet <b>address</b> (<code>0x…</code>) and a small ETH balance. The private key is never shown — by design.</p></div>
+        <figure>
+          <svg viewBox="0 0 820 110" role="img" aria-label="Wallet provisioning + key custody">
+            <rect x="10" y="40" width="170" height="34" rx="6" fill="#eef1f6" stroke="#d3d9e2"/>
+            <text class="lblmono" x="95" y="61" text-anchor="middle">POST /wallets/provision</text>
+            <line x1="180" y1="57" x2="262" y2="57" stroke="#9aa2af" stroke-width="1.5"/><polygon points="262,57 254,53 254,61" fill="#9aa2af"/>
+            <rect x="264" y="28" width="190" height="58" rx="6" fill="#e9efe9" stroke="#cfe0cf"/>
+            <text class="lbl" x="359" y="48" text-anchor="middle" font-weight="700">Signer</text>
+            <text class="lblsm" x="359" y="64" text-anchor="middle">generate key →</text>
+            <text class="lblsm" x="359" y="78" text-anchor="middle">AES-256-GCM encrypt</text>
+            <line x1="454" y1="57" x2="536" y2="57" stroke="#9aa2af" stroke-width="1.5"/><polygon points="536,57 528,53 528,61" fill="#9aa2af"/>
+            <text class="lblsm" x="495" y="50" text-anchor="middle">ciphertext</text>
+            <rect x="538" y="28" width="270" height="58" rx="6" fill="#fff" stroke="#c8cdd6"/>
+            <text class="lbl" x="673" y="48" text-anchor="middle" font-weight="700">Postgres · wallets</text>
+            <text class="lblsm" x="673" y="64" text-anchor="middle">encryptedKey · iv · authTag</text>
+            <text class="lblsm" x="673" y="78" text-anchor="middle">plaintext key never persisted</text>
+          </svg>
+        </figure>
+        <p class="proves"><b>Proves:</b> key custody — the centerpiece. AES-256-GCM at rest behind the pluggable <code>Signer</code>; key decrypted in memory only at sign time, then dropped.</p>
+      </div>
+
+      <!-- STEP 3 -->
+      <div class="step">
+        <h3><span class="num">3</span> Read the balance</h3>
+        <div class="row do"><span class="tag">Do</span><p>On the wallet card, read <b>ETH AVAILABLE</b>; click <b>Refresh</b>.</p></div>
+        <div class="row see"><span class="tag">See</span><p><b>confirmed</b> (with an as-of block) and <b>available</b> = confirmed − pending − a small gas reserve.</p></div>
+        <figure>
+          <svg viewBox="0 0 820 96" role="img" aria-label="Balance read">
+            <rect x="10" y="34" width="180" height="34" rx="6" fill="#eef1f6" stroke="#d3d9e2"/>
+            <text class="lblmono" x="100" y="55" text-anchor="middle">GET /wallets/:id/balance</text>
+            <line x1="190" y1="51" x2="276" y2="51" stroke="#9aa2af" stroke-width="1.5"/><polygon points="276,51 268,47 268,55" fill="#9aa2af"/>
+            <rect x="278" y="34" width="200" height="34" rx="6" fill="#fff" stroke="#c8cdd6"/>
+            <text class="lblsm" x="378" y="55" text-anchor="middle">cached projection (fast read)</text>
+            <line x1="478" y1="51" x2="564" y2="51" stroke="#9aa2af" stroke-width="1.5"/><polygon points="564,51 556,47 556,55" fill="#9aa2af"/>
+            <rect x="566" y="20" width="244" height="62" rx="6" fill="#f5f5f0" stroke="#e0e0d4"/>
+            <text class="lblsm" x="688" y="40" text-anchor="middle">BalanceRefresher poller</text>
+            <text class="lblsm" x="688" y="56" text-anchor="middle">reconciles from chain (Sepolia)</text>
+            <text class="lblsm" x="688" y="72" text-anchor="middle">stale-while-revalidate</text>
+          </svg>
+        </figure>
+        <p class="proves"><b>Proves:</b> getBalance — chain-as-truth. The DB never invents a balance; it caches what the chain reports.</p>
+      </div>
+
+      <!-- STEP 4 -->
+      <div class="step">
+        <h3><span class="num">4</span> Sign a message</h3>
+        <div class="row do"><span class="tag">Do</span><p>Wallets → <b>Sign a message</b>, type any text → <b>Sign</b>.</p></div>
+        <div class="row see"><span class="tag">See</span><p>An <b>EIP-191</b> signature string. (Recovering the signer yields the wallet address.) No gas — it's off-chain.</p></div>
+        <figure>
+          <svg viewBox="0 0 820 96" role="img" aria-label="Sign message">
+            <rect x="10" y="34" width="190" height="34" rx="6" fill="#eef1f6" stroke="#d3d9e2"/>
+            <text class="lblmono" x="105" y="55" text-anchor="middle">POST /wallets/:id/messages</text>
+            <line x1="200" y1="51" x2="286" y2="51" stroke="#9aa2af" stroke-width="1.5"/><polygon points="286,51 278,47 278,55" fill="#9aa2af"/>
+            <rect x="288" y="28" width="210" height="46" rx="6" fill="#e9efe9" stroke="#cfe0cf"/>
+            <text class="lblsm" x="393" y="48" text-anchor="middle">Signer: decrypt in memory</text>
+            <text class="lblsm" x="393" y="63" text-anchor="middle">sign (EIP-191) · then zeroize</text>
+            <line x1="498" y1="51" x2="584" y2="51" stroke="#9aa2af" stroke-width="1.5"/><polygon points="584,51 576,47 576,55" fill="#9aa2af"/>
+            <rect x="586" y="34" width="224" height="34" rx="6" fill="#fff" stroke="#c8cdd6"/>
+            <text class="lblsm" x="698" y="55" text-anchor="middle">0x… signature (returned + logged)</text>
+          </svg>
+        </figure>
+        <p class="proves"><b>Proves:</b> signMessage — deterministic EIP-191 signing through the same custody seam.</p>
+      </div>
+
+      <!-- STEP 5 -->
+      <div class="step">
+        <h3><span class="num">5</span> Send ETH to <code>vitalik.eth</code></h3>
+        <div class="row do"><span class="tag">Do</span><p>Wallets → <b>Send</b>: asset <b>ETH</b>, recipient <code>vitalik.eth</code>, amount <code>0.00001</code> → <b>Send</b>.</p></div>
+        <div class="row see"><span class="tag">See</span><p>The activity row goes <b>PENDING → CONFIRMED</b> with a clickable <b>Etherscan tx link</b>; the ENS name resolved to <code>0xd8dA…6045</code>.</p></div>
+        <figure>
+          <svg viewBox="0 0 820 110" role="img" aria-label="Send ETH pipeline">
+            <rect x="6" y="40" width="120" height="34" rx="6" fill="#eef1f6" stroke="#d3d9e2"/>
+            <text class="lblsm" x="66" y="61" text-anchor="middle">ENS resolve</text>
+            <line x1="126" y1="57" x2="166" y2="57" stroke="#9aa2af" stroke-width="1.5"/><polygon points="166,57 158,53 158,61" fill="#9aa2af"/>
+            <rect x="168" y="40" width="110" height="34" rx="6" fill="#e9efe9" stroke="#cfe0cf"/>
+            <text class="lblsm" x="223" y="61" text-anchor="middle">nonce lock</text>
+            <line x1="278" y1="57" x2="318" y2="57" stroke="#9aa2af" stroke-width="1.5"/><polygon points="318,57 310,53 310,61" fill="#9aa2af"/>
+            <rect x="320" y="40" width="96" height="34" rx="6" fill="#e9efe9" stroke="#cfe0cf"/>
+            <text class="lblsm" x="368" y="61" text-anchor="middle">sign</text>
+            <line x1="416" y1="57" x2="456" y2="57" stroke="#9aa2af" stroke-width="1.5"/><polygon points="456,57 448,53 448,61" fill="#9aa2af"/>
+            <rect x="458" y="40" width="120" height="34" rx="6" fill="#fff" stroke="#c8cdd6"/>
+            <text class="lblsm" x="518" y="61" text-anchor="middle">broadcast →chain</text>
+            <line x1="578" y1="57" x2="618" y2="57" stroke="#9aa2af" stroke-width="1.5"/><polygon points="618,57 610,53 610,61" fill="#9aa2af"/>
+            <rect x="620" y="40" width="100" height="34" rx="6" fill="#fff" stroke="#c8cdd6"/>
+            <text class="lblsm" x="670" y="61" text-anchor="middle">persist pending</text>
+            <rect x="620" y="84" width="190" height="22" rx="5" fill="#f5f5f0" stroke="#e0e0d4"/>
+            <text class="lblsm" x="715" y="99" text-anchor="middle">ConfirmationWatcher → confirmed</text>
+            <line x1="670" y1="74" x2="670" y2="84" stroke="#9aa2af" stroke-width="1.5"/><polygon points="670,84 666,76 674,76" fill="#9aa2af"/>
+          </svg>
+        </figure>
+        <p class="proves"><b>Proves:</b> sendTransaction end-to-end — ENS, the locked sign/broadcast critical section, and the pending→confirmed lifecycle (a poller, not the request, finalizes).</p>
+      </div>
+
+      <!-- STEP 6 -->
+      <div class="step">
+        <h3><span class="num">6</span> Fire 5 concurrent sends — the nonce lock</h3>
+        <div class="row do"><span class="tag">Do</span><p>Wallets → expand <b>Concurrency demo (nonce lock)</b> → <b>Fire 5 concurrent sends</b>.</p></div>
+        <div class="row see"><span class="tag">See</span><p>A green checklist: <b>unique, consecutive nonces · none blocked or dropped · serialized FIFO</b> — and the verdict “5 concurrent sends, zero contention bugs — the lock held.”</p></div>
+        <figure>
+          <svg viewBox="0 0 820 150" role="img" aria-label="Per-wallet nonce lock">
+            <rect x="10" y="14" width="120" height="22" rx="5" fill="#eef1f6" stroke="#d3d9e2"/><text class="lblsm" x="70" y="29" text-anchor="middle">send #1</text>
+            <rect x="10" y="40" width="120" height="22" rx="5" fill="#eef1f6" stroke="#d3d9e2"/><text class="lblsm" x="70" y="55" text-anchor="middle">send #2</text>
+            <rect x="10" y="66" width="120" height="22" rx="5" fill="#eef1f6" stroke="#d3d9e2"/><text class="lblsm" x="70" y="81" text-anchor="middle">send #3 (race)</text>
+            <rect x="10" y="92" width="120" height="22" rx="5" fill="#eef1f6" stroke="#d3d9e2"/><text class="lblsm" x="70" y="107" text-anchor="middle">send #4</text>
+            <rect x="10" y="118" width="120" height="22" rx="5" fill="#eef1f6" stroke="#d3d9e2"/><text class="lblsm" x="70" y="133" text-anchor="middle">send #5</text>
+            <line x1="130" y1="77" x2="196" y2="77" stroke="#9aa2af" stroke-width="1.5"/><polygon points="196,77 188,73 188,81" fill="#9aa2af"/>
+            <rect x="198" y="50" width="180" height="54" rx="8" fill="#e9efe9" stroke="#cfe0cf"/>
+            <text class="lbl" x="288" y="72" text-anchor="middle" font-weight="700">pg_advisory_xact_lock</text>
+            <text class="lblsm" x="288" y="90" text-anchor="middle">one wallet → one at a time</text>
+            <line x1="378" y1="77" x2="444" y2="77" stroke="#9aa2af" stroke-width="1.5"/><polygon points="444,77 436,73 436,81" fill="#9aa2af"/>
+            <rect x="446" y="44" width="364" height="66" rx="8" fill="#fff" stroke="#c8cdd6"/>
+            <text class="lblsm" x="628" y="64" text-anchor="middle">read max(chain pending, nextNonce) → sign → broadcast → ++nonce</text>
+            <text class="lblmono" x="628" y="86" text-anchor="middle">nonce n, n+1, n+2, n+3, n+4</text>
+            <text class="lblsm" x="628" y="102" text-anchor="middle" fill="var(--ok)">unique · consecutive · no double-spend</text>
+          </svg>
+        </figure>
+        <p class="proves"><b>Proves:</b> correctness under concurrency — a first-class requirement. The advisory lock serializes the read-nonce→sign→broadcast→persist section per wallet; idempotency is backstopped by a unique constraint.</p>
+      </div>
+
+      <!-- STEP 7 -->
+      <div class="step">
+        <h3><span class="num">7</span> ERC-20 lifecycle — approve &amp; <code>transferFrom</code></h3>
+        <div class="row do"><span class="tag">Do</span><p><b>Token</b> tab shows the deployed <b>VCD</b> token + supply. <b>Distribute</b> some VCD to a holder (pick from the dropdown). Switch to the <b>User</b> view → <b>Approve admin</b> for ≥ that amount. Back in <b>Token</b> → <b>transferFrom → admin</b>.</p></div>
+        <div class="row see"><span class="tag">See</span><p>Each action gets an Etherscan link. The on-chain <b>allowance</b> is the gate: a pull within allowance+balance succeeds; an over-pull is rejected with a precise message naming the exact shortfall — <em>before</em> any tx is broadcast.</p></div>
+        <figure>
+          <svg viewBox="0 0 820 120" role="img" aria-label="approve then transferFrom">
+            <rect x="10" y="30" width="150" height="40" rx="6" fill="#fff" stroke="#c8cdd6"/>
+            <text class="lblsm" x="85" y="48" text-anchor="middle">Holder (user)</text>
+            <text class="lblsm" x="85" y="62" text-anchor="middle">approve(admin, M)</text>
+            <line x1="160" y1="50" x2="250" y2="50" stroke="#9aa2af" stroke-width="1.5"/><polygon points="250,50 242,46 242,54" fill="#9aa2af"/>
+            <text class="lblsm" x="205" y="43" text-anchor="middle">sets allowance</text>
+            <rect x="252" y="30" width="160" height="40" rx="6" fill="#e9efe9" stroke="#cfe0cf"/>
+            <text class="lbl" x="332" y="48" text-anchor="middle" font-weight="700">allowance = M</text>
+            <text class="lblsm" x="332" y="62" text-anchor="middle">on-chain, the gate</text>
+            <line x1="412" y1="50" x2="498" y2="50" stroke="#9aa2af" stroke-width="1.5"/><polygon points="498,50 490,46 490,54" fill="#9aa2af"/>
+            <rect x="500" y="30" width="180" height="40" rx="6" fill="#fff" stroke="#c8cdd6"/>
+            <text class="lblsm" x="590" y="48" text-anchor="middle">Admin transferFrom(≤ M)</text>
+            <text class="lblsm" x="590" y="62" text-anchor="middle">pulls to admin</text>
+            <rect x="252" y="84" width="428" height="26" rx="5" fill="#f5f5f0" stroke="#e0e0d4"/>
+            <text class="lblsm" x="466" y="101" text-anchor="middle">preflight reads allowance + balanceOf → names any shortfall, never broadcasts a doomed pull</text>
+          </svg>
+        </figure>
+        <p class="proves"><b>Proves:</b> ERC-20 support with the on-chain allowance as the authorization gate (not an off-chain allowlist).</p>
+        <p class="note">Deploying a fresh token and reset/seed are operator-only (they need the admin key). The token above is already deployed, so distribute → approve → transferFrom needs no special access.</p>
+      </div>
+
+      <!-- STEP 8 -->
+      <div class="step">
+        <h3><span class="num">8</span> Activity &amp; audit trail</h3>
+        <div class="row do"><span class="tag">Do</span><p>Open the <b>Activity</b> tab (and the per-wallet feed). Use the <b>Refresh</b> buttons — no full reload needed.</p></div>
+        <div class="row see"><span class="tag">See</span><p>One newest-first stream: <b>sends</b> (contract calls labelled by method, e.g. <code>approve</code>), <b>received</b> (inbound transfers indexed from the chain), and <b>governance</b> events (e.g. <code>token.deployed</code>). Logins live in the separate live <b>system log</b>.</p></div>
+        <figure>
+          <svg viewBox="0 0 820 134" role="img" aria-label="Unified activity merge">
+            <rect x="10" y="14" width="200" height="22" rx="5" fill="#fff" stroke="#c8cdd6"/><text class="lblsm" x="110" y="29" text-anchor="middle">transactions (sends / calls)</text>
+            <rect x="10" y="42" width="200" height="22" rx="5" fill="#fff" stroke="#c8cdd6"/><text class="lblsm" x="110" y="57" text-anchor="middle">signedMessages</text>
+            <rect x="10" y="70" width="200" height="22" rx="5" fill="#fff" stroke="#c8cdd6"/><text class="lblsm" x="110" y="85" text-anchor="middle">auditLog (governance)</text>
+            <rect x="10" y="98" width="200" height="22" rx="5" fill="#fff" stroke="#c8cdd6"/><text class="lblsm" x="110" y="113" text-anchor="middle">receivedTransfers</text>
+            <line x1="210" y1="67" x2="286" y2="67" stroke="#9aa2af" stroke-width="1.5"/><polygon points="286,67 278,63 278,71" fill="#9aa2af"/>
+            <rect x="288" y="48" width="150" height="38" rx="8" fill="#e9efe9" stroke="#cfe0cf"/>
+            <text class="lbl" x="363" y="71" text-anchor="middle" font-weight="700">merge · newest-first</text>
+            <line x1="438" y1="67" x2="514" y2="67" stroke="#9aa2af" stroke-width="1.5"/><polygon points="514,67 506,63 506,71" fill="#9aa2af"/>
+            <rect x="516" y="48" width="294" height="38" rx="8" fill="#fff" stroke="#c8cdd6"/>
+            <text class="lblsm" x="663" y="71" text-anchor="middle">Activity feed (per-wallet · cross-wallet · system-wide)</text>
+            <rect x="516" y="98" width="294" height="24" rx="5" fill="#f5f5f0" stroke="#e0e0d4"/>
+            <text class="lblsm" x="663" y="114" text-anchor="middle">IncomingWatcher indexes inbound transfers → received rows</text>
+            <line x1="110" y1="120" x2="110" y2="130" stroke="#9aa2af" stroke-width="1.2"/>
+            <text class="lblsm" x="110" y="130" text-anchor="middle"> </text>
+          </svg>
+        </figure>
+        <p class="proves"><b>Proves:</b> transaction history (on-chain + off-chain) and a durable audit trail — and that incoming transfers, which the platform didn’t initiate, are still surfaced.</p>
+      </div>
+
+      <footer>
+        More depth: <a href="../README.md">README</a> ·
+        <a href="https://vencura-alpha.vercel.app/api/docs" target="_blank" rel="noreferrer">Swagger ↗</a> ·
+        <a href="REQUIREMENTS.md">requirements</a> ·
+        <a href="SECURITY.md">security writeup</a> ·
+        <a href="architecture.html">architecture</a>.
+        <br />Chain is the source of truth; the DB is a derived cache. The thesis: custody, concurrency-correctness, and chain-truth — not just “it sends a tx.”
+      </footer>
+    </div>
+  </body>
+</html>
