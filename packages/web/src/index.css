@@ -320,13 +320,26 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
   border: 1px solid color-mix(in srgb, var(--pending) 40%, transparent); border-radius: 4px; padding: 0 4px;
 }
 .pg2-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
-.pg2-editor { height: 380px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.pg2-run { align-self: flex-start; }
+.pg2-editor { height: 460px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.pg2-runrow { display: flex; align-items: center; gap: 12px; }
+.pg2-status { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .pg2-output {
-  margin: 0; min-height: 140px; max-height: 340px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+  margin: 0; min-height: 140px; max-height: 360px; overflow: auto; white-space: pre-wrap; word-break: break-word;
   font-family: var(--mono); font-size: 12.5px; line-height: 1.5; padding: 12px; border: 1px solid var(--line);
   border-radius: 8px; background: var(--panel-2); color: var(--ink);
 }
+.pg2-maps { border-top: 1px dashed var(--line); padding-top: 12px; }
+.pg2-reqtag {
+  display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  padding: 2px 8px; border-radius: 999px; background: var(--panel-2); color: var(--muted); border: 1px solid var(--line);
+}
+.pg2-reqtag.req { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); background: color-mix(in srgb, var(--ok) 8%, transparent); }
+.pg2-req { margin-left: 8px; font-family: var(--mono); font-size: 12.5px; color: var(--ink); background: none; padding: 0; }
+.pg2-note { font-size: 12.5px; color: var(--muted); margin: 8px 0; }
+.pg2-flow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pg2-flowstep { display: inline-flex; align-items: center; gap: 6px; }
+.pg2-arrow { color: var(--muted); }
+.pg2-pill { font-size: 11px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); }
 @media (max-width: 760px) {
   .pg2-wrap { flex-direction: column; }
   .pg2-files { width: auto; flex-direction: row; flex-wrap: wrap; }
