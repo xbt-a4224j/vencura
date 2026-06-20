@@ -1254,6 +1254,47 @@ function ActivityTab({ wallets }: { wallets: Wallet[] }) {
   );
 }
 
+// Holder address field: a visible dropdown of platform wallets (discoverable, unlike a bare
+// <datalist>) paired with a free-text input — pick a known holder OR type any address.
+function HolderField({
+  value,
+  onChange,
+  holders,
+  label,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  holders: { address: string; email: string }[];
+  label: string;
+  placeholder: string;
+}) {
+  return (
+    <span className="holder-field">
+      {holders.length > 0 && (
+        <select
+          aria-label={`${label} — pick a holder`}
+          value={holders.some((h) => h.address === value) ? value : ''}
+          onChange={(e) => e.target.value && onChange(e.target.value)}
+        >
+          <option value="">pick holder…</option>
+          {holders.map((h) => (
+            <option key={h.address} value={h.address}>
+              {h.email} · {shortHex(h.address)}
+            </option>
+          ))}
+        </select>
+      )}
+      <input
+        aria-label={label}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </span>
+  );
+}
+
 // Admin Token tab: deploy a demo ERC-20 (admin owns the supply), distribute it to the user, then —
 // once the user approves the admin as spender — pull their tokens via transferFrom. The on-chain
 // allowance is the gate (replacing the old off-chain allowlist).
@@ -1392,20 +1433,13 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
               </div>
             </dl>
           )}
-          <datalist id="holder-options">
-            {holders.map((h) => (
-              <option key={h.address} value={h.address}>
-                {h.email}
-              </option>
-            ))}
-          </datalist>
           <h4>1 · Distribute to a holder</h4>
-          <input
-            aria-label="recipient address"
-            list="holder-options"
-            placeholder="holder wallet 0x… (or pick)"
+          <HolderField
+            label="recipient address"
+            placeholder="holder wallet 0x… (or type)"
+            holders={holders}
             value={dist.to}
-            onChange={(e) => setDist({ ...dist, to: e.target.value })}
+            onChange={(v) => setDist({ ...dist, to: v })}
           />{' '}
           <input
             aria-label="distribute amount"
@@ -1417,12 +1451,12 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
             Send tokens
           </button>
           <h4>2 · After the holder approves — pull with transferFrom</h4>
-          <input
-            aria-label="from address"
-            list="holder-options"
-            placeholder="holder 0x… (or pick)"
+          <HolderField
+            label="from address"
+            placeholder="holder 0x… (or type)"
+            holders={holders}
             value={pull.from}
-            onChange={(e) => setPull({ ...pull, from: e.target.value })}
+            onChange={(v) => setPull({ ...pull, from: v })}
           />{' '}
           <input
             aria-label="transferFrom amount"
@@ -1434,12 +1468,12 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
             transferFrom → admin
           </button>
           <h4>Check allowance</h4>
-          <input
-            aria-label="holder address for allowance"
-            list="holder-options"
-            placeholder="holder 0x… (or pick)"
+          <HolderField
+            label="holder address for allowance"
+            placeholder="holder 0x… (or type)"
+            holders={holders}
             value={holder}
-            onChange={(e) => setHolder(e.target.value)}
+            onChange={setHolder}
           />{' '}
           <button onClick={checkAllowance} disabled={busy || !holder}>
             Read allowance

@@ -180,6 +180,8 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
 .nonce-row .nnum { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; }
 .verdict.ok { color: var(--ok); font-weight: 700; }
 .verdict.bad { color: var(--fail); font-weight: 700; }
+.holder-field { display: inline-flex; gap: 6px; align-items: center; }
+.holder-field select { max-width: 220px; }
 .supply {
   display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0 4px;
 }
