@@ -1265,11 +1265,17 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
   const [dist, setDist] = useState({ to: '', amt: '' });
   const [pull, setPull] = useState({ from: '', amt: '' });
   const [holder, setHolder] = useState('');
+  const [holders, setHolders] = useState<{ address: string; email: string }[]>([]);
 
   const load = useCallback(() => api.getToken().then(setToken).catch(() => setToken(null)), []);
   useEffect(() => {
     void load();
   }, [load]);
+  // Platform wallets for the holder picker (datalist). Best-effort: the admin token flow targets a
+  // real holder, but free text still works if the list is empty/unavailable.
+  useEffect(() => {
+    api.listHolders().then(setHolders).catch(() => setHolders([]));
+  }, []);
   useEffect(() => {
     if (!deployFrom && wallets[0]) setDeployFrom(wallets[0].id);
   }, [wallets, deployFrom]);
@@ -1355,10 +1361,18 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
             spender <code>{shortHex(token.owner)}</code>
             <CopyButton value={token.owner} label="⧉" />
           </p>
+          <datalist id="holder-options">
+            {holders.map((h) => (
+              <option key={h.address} value={h.address}>
+                {h.email}
+              </option>
+            ))}
+          </datalist>
           <h4>1 · Distribute to a holder</h4>
           <input
             aria-label="recipient address"
-            placeholder="holder wallet 0x…"
+            list="holder-options"
+            placeholder="holder wallet 0x… (or pick)"
             value={dist.to}
             onChange={(e) => setDist({ ...dist, to: e.target.value })}
           />{' '}
@@ -1374,7 +1388,8 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
           <h4>2 · After the holder approves — pull with transferFrom</h4>
           <input
             aria-label="from address"
-            placeholder="holder 0x…"
+            list="holder-options"
+            placeholder="holder 0x… (or pick)"
             value={pull.from}
             onChange={(e) => setPull({ ...pull, from: e.target.value })}
           />{' '}
@@ -1390,7 +1405,8 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
           <h4>Check allowance</h4>
           <input
             aria-label="holder address for allowance"
-            placeholder="holder 0x…"
+            list="holder-options"
+            placeholder="holder 0x… (or pick)"
             value={holder}
             onChange={(e) => setHolder(e.target.value)}
           />{' '}

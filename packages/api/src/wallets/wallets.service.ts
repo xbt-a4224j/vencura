@@ -40,6 +40,16 @@ export class WalletsService {
     });
   }
 
+  /** Every wallet across all users (address + owner email) — the admin's holder picker for the
+   *  token flow, so the operator can pick a real platform holder instead of pasting an address. */
+  async listHolders(): Promise<{ address: string; email: string }[]> {
+    const wallets = await this.prisma.wallet.findMany({
+      select: { address: true, user: { select: { email: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    return wallets.map((w) => ({ address: w.address, email: w.user.email }));
+  }
+
   /** Authz seam: resolve a wallet only if it belongs to the user. 404 (not 403) → no ownership
    *  enumeration. Reused by balances + transactions so the ownership check lives in one place. */
   async findOwnedOrThrow(walletId: string, userId: string): Promise<{ id: string; address: string }> {

@@ -152,6 +152,8 @@ export const api = {
   // One wallet per account: returns the user's wallet, creating + master-funding it on first call.
   provisionWallet: () => call<Wallet>('/wallets/provision', { method: 'POST', auth: true }),
   listWallets: () => call<Wallet[]>('/wallets', { auth: true }),
+  // Admin-only: every platform wallet (address + owner email) for the token-flow holder picker.
+  listHolders: () => call<{ address: string; email: string }[]>('/wallets/holders', { auth: true }),
   getBalance: (walletId: string) => call<BalanceView>(`/wallets/${walletId}/balance`, { auth: true }),
   signMessage: (walletId: string, message: string) =>
     call<{ signature: string }>(`/wallets/${walletId}/messages`, {
