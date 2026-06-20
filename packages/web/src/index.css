@@ -303,31 +303,31 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
 }
 .app > header h1 .logobtn:hover { color: var(--accent-ink); }
 
-/* SDK Playground */
+/* SDK Playground (Monaco TS interpreter) */
 .app-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
 .app-head h1 { margin: 0 0 4px; }
-.pg-snippets { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
-.pill-btn {
-  font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line);
-  background: var(--panel-2); color: var(--ink); cursor: pointer;
+.pg2-wrap { display: flex; gap: 14px; align-items: stretch; }
+.pg2-files { flex: none; width: 184px; display: flex; flex-direction: column; gap: 4px; }
+.pg2-file {
+  text-align: left; font-family: var(--mono); font-size: 12px; padding: 7px 10px; border-radius: 7px;
+  border: 1px solid transparent; background: transparent; color: var(--muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
 }
-.pill-btn:hover { border-color: var(--accent); color: var(--accent); }
-.pg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
-@media (max-width: 760px) { .pg-grid { grid-template-columns: 1fr; } }
-.pg-pane { display: flex; flex-direction: column; gap: 8px; }
-.pg-editor {
-  width: 100%; min-height: 280px; resize: vertical; font-family: var(--mono); font-size: 13px;
-  line-height: 1.5; padding: 12px; border: 1px solid var(--line); border-radius: 8px;
-  background: var(--panel); color: var(--ink); tab-size: 2;
+.pg2-file:hover { background: var(--panel-2); color: var(--ink); }
+.pg2-file.on { background: var(--panel-2); color: var(--ink); border-color: var(--line); }
+.pg2-tag {
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--pending);
+  border: 1px solid color-mix(in srgb, var(--pending) 40%, transparent); border-radius: 4px; padding: 0 4px;
 }
-.pg-output {
-  margin: 0; min-height: 280px; max-height: 520px; overflow: auto; white-space: pre-wrap;
-  word-break: break-word; font-family: var(--mono); font-size: 12.5px; line-height: 1.5;
-  padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--ink);
+.pg2-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.pg2-editor { height: 380px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.pg2-run { align-self: flex-start; }
+.pg2-output {
+  margin: 0; min-height: 140px; max-height: 340px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.5; padding: 12px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--panel-2); color: var(--ink);
 }
-.pg-ref { margin-top: 18px; }
-.pg-ref summary { cursor: pointer; font-size: 13px; color: var(--muted); }
-.pg-ref-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 10px; }
-.pg-ref-grid ul { list-style: none; margin: 4px 0 0; padding: 0; }
-.pg-ref-grid li { font-size: 12px; }
-.pg-ref-grid code { background: none; padding: 0; color: var(--mono-ink); }
+@media (max-width: 760px) {
+  .pg2-wrap { flex-direction: column; }
+  .pg2-files { width: auto; flex-direction: row; flex-wrap: wrap; }
+}

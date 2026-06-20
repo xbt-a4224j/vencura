@@ -10,10 +10,12 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
+    "@vencura/sdk": "workspace:*",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "viem": "^2.52.2",
-    "@vencura/sdk": "workspace:*"
+    "sucrase": "^3.35.1",
+    "viem": "^2.52.2"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",

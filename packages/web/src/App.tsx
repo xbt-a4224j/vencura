@@ -1,4 +1,4 @@
-import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { type FormEvent, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { isAddress, parseEther, recoverMessageAddress } from 'viem';
 import {
   type Account,
@@ -13,8 +13,10 @@ import {
 } from './vencura';
 import { AuthProvider, useAuth } from './auth-context';
 import { looksLikeEns, resolveEns, reverseResolveEns } from './ens';
-import { Playground } from './Playground';
 import { explorerAddress, explorerTx, FAUCET_URL } from './explorer';
+
+// Lazy: the Playground pulls in Monaco + sucrase, kept out of the main bundle.
+const Playground = lazy(() => import('./Playground').then((m) => ({ default: m.Playground })));
 import { activityAmount, shortHex, toEth } from './format';
 
 // Copy any value to the clipboard with brief "Copied ✓" feedback.
@@ -1937,7 +1939,12 @@ function Root() {
   }, [view]);
   if (view === 'user') return <UserView onExit={() => setView('landing')} />;
   if (view === 'admin') return <AdminView onExit={() => setView('landing')} />;
-  if (view === 'playground') return <Playground onExit={() => setView('landing')} />;
+  if (view === 'playground')
+    return (
+      <Suspense fallback={<main className="app"><p className="bal-sub">Loading playground…</p></main>}>
+        <Playground onExit={() => setView('landing')} />
+      </Suspense>
+    );
   return <Landing onPick={setView} />;
 }
 
