@@ -618,18 +618,9 @@ function ConcurrencyDemo({
   const [n, setN] = useState(5);
   const [results, setResults] = useState<{ nonce: number | null; error?: string }[]>([]);
   const [busy, setBusy] = useState(false);
-  // Dry-run: render the serialized nonce timeline the lock WOULD assign, without spending — so the
-  // payoff is visible even on an unfunded wallet (audit #11). Relative (n, n+1, …) since the live
-  // starting nonce isn't known client-side.
-  const [sim, setSim] = useState(false);
-  const simulate = () => {
-    setSim(true);
-    setResults(Array.from({ length: n }, (_, i) => ({ nonce: i })));
-  };
 
   const fire = async () => {
     if (!recipient) return;
-    setSim(false);
     setBusy(true);
     setResults([]);
     const sends = Array.from({ length: n }, () =>
@@ -652,17 +643,13 @@ function ConcurrencyDemo({
     <details>
       <summary>Concurrency demo (nonce lock)</summary>
       <p className="bal-sub">
-        Fires N sends at one wallet at once — proof the per-wallet nonce lock serializes them into
-        unique, consecutive nonces (no collisions, no gaps). Simulate it anytime; a funded wallet
-        runs it for real on-chain.
+        Fires N self-sends concurrently — proof the per-wallet nonce lock serializes them into
+        unique, consecutive nonces (no collisions, no gaps).
       </p>
       <label>
         N concurrent sends{' '}
         <input type="number" min={2} max={20} value={n} onChange={(e) => setN(Number(e.target.value))} />
       </label>{' '}
-      <button type="button" className="copybtn" onClick={simulate} disabled={busy}>
-        Simulate (dry-run)
-      </button>{' '}
       {recipient && canSend ? (
         <button type="button" onClick={fire} disabled={busy}>
           {busy ? 'Firing…' : `Fire ${n} concurrent sends`}
@@ -674,26 +661,17 @@ function ConcurrencyDemo({
       )}
       {results.length > 0 && (
         <div style={{ marginTop: 10 }}>
-          {sim && (
-            <p className="bal-sub">
-              Dry-run — the nonces the lock would assign (relative); no funds moved.
-            </p>
-          )}
           {[...results]
             .sort((a, b) => (a.nonce ?? Number.MAX_SAFE_INTEGER) - (b.nonce ?? Number.MAX_SAFE_INTEGER))
             .map((r, i) => (
               <div className="nonce-row" key={i}>
-                <span className="lock" aria-hidden>
-                  🔒
-                </span>
-                <span className="nnum">
-                  {r.nonce != null ? (sim ? `nonce n+${r.nonce}` : `nonce ${r.nonce}`) : '—'}
-                </span>
+                <span className="lock" aria-hidden>🔒</span>
+                <span className="nnum">{r.nonce != null ? `nonce ${r.nonce}` : '—'}</span>
                 <span>
                   {r.error ? (
                     <span className="pill failed">failed</span>
                   ) : (
-                    <span className="pill pending">{sim ? 'would broadcast' : 'broadcast'}</span>
+                    <span className="pill pending">broadcast</span>
                   )}
                   {r.error ? ` ${r.error}` : ''}
                 </span>
@@ -701,7 +679,7 @@ function ConcurrencyDemo({
             ))}
           <p className={`verdict ${unique && monotonic && errors.length === 0 ? 'ok' : 'bad'}`}>
             {errors.length === 0
-              ? `${nonces.length}/${results.length} serialized — unique, consecutive nonces ✓${sim ? ' (simulated)' : ''}`
+              ? `${nonces.length}/${results.length} serialized — unique, consecutive nonces ✓`
               : `${errors.length}/${results.length} failed (${errors[0].error})`}
           </p>
         </div>
