@@ -22,8 +22,11 @@ export class ActivityService {
     const [txs, sigs, audits] = await Promise.all([
       this.prisma.transaction.findMany({ where: { walletId }, orderBy: { createdAt: 'desc' }, take: 50 }),
       this.prisma.signedMessage.findMany({ where: { walletId }, orderBy: { createdAt: 'desc' }, take: 50 }),
+      // Scope audit rows to THIS wallet — account-level events (auth.login has walletId=null) would
+      // otherwise flood a single wallet's feed and bury its on-chain history. Per-wallet feed =
+      // per-wallet events; account-wide audit (logins) lives in the Activity tab (recentForUser).
       this.prisma.auditLog
-        .findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 50 })
+        .findMany({ where: { walletId }, orderBy: { createdAt: 'desc' }, take: 50 })
         .catch(() => []),
     ]);
     return mergeActivity(txs, sigs, audits);
