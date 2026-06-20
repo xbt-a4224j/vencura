@@ -8,21 +8,21 @@
  * This is the same invariant the API's unit tests assert, shown here as a script.
  */
 import { parseEther } from 'viem';
-import { VencuraClient } from '../src';
+import { NATIVE_ASSET, Vencura } from '../src';
 
 const N = 5;
 
 async function main() {
-  const v = new VencuraClient();
-  await v.login('admin@vencura.local', 'demo-password');
-  const wallets = await v.listWallets();
+  const v = new Vencura();
+  await v.auth.login({ email: 'admin@vencura.local', password: 'demo-password' });
+  const wallets = await v.wallets.list();
   const [sender, recipient] = wallets;
 
   // Fire N sends simultaneously (Promise.all), not in sequence.
   const results = await Promise.all(
     Array.from({ length: N }, () =>
-      v
-        .sendTransaction(sender.id, { to: recipient.address, asset: 'ETH', amount: parseEther('0.001').toString() })
+      v.transactions
+        .send({ walletId: sender.id, to: recipient.address, asset: NATIVE_ASSET, amount: parseEther('0.001').toString() })
         .then((tx) => tx.nonce)
         .catch((e) => `error: ${e.message}`),
     ),

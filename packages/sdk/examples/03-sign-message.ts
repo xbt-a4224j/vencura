@@ -7,15 +7,15 @@
  * wallet's unified activity history (see example 05's tail / GET /activity).
  */
 import { recoverMessageAddress } from 'viem';
-import { VencuraClient } from '../src';
+import { Vencura } from '../src';
 
 async function main() {
-  const v = new VencuraClient();
-  await v.register(`demo+${Date.now()}@example.com`, 'password123');
-  const wallet = await v.createWallet();
+  const v = new Vencura();
+  await v.auth.register({ email: `demo+${Date.now()}@example.com`, password: 'password123' });
+  const wallet = await v.wallets.create();
 
   const message = 'I authorize this VenCura demo.';
-  const { signature } = await v.signMessage(wallet.id, message);
+  const { signature } = await v.wallets.signMessage({ walletId: wallet.id, message });
   console.log('signature:', signature);
 
   // EIP-191 recovery should yield the wallet's own address.

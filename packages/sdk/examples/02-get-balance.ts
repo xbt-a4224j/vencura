@@ -4,14 +4,14 @@
  *
  * Balance is read from chain and cached; `available` = confirmed − pending − gas reserve.
  */
-import { VencuraClient } from '../src';
+import { Vencura } from '../src';
 
 async function main() {
-  const v = new VencuraClient();
-  await v.register(`demo+${Date.now()}@example.com`, 'password123');
-  const wallet = await v.createWallet();
+  const v = new Vencura();
+  await v.auth.register({ email: `demo+${Date.now()}@example.com`, password: 'password123' });
+  const wallet = await v.wallets.create();
 
-  const { balances } = await v.getBalance(wallet.id);
+  const { balances } = await v.wallets.getBalance({ walletId: wallet.id });
   for (const b of balances) {
     console.log(`${b.symbol}: available=${b.available} confirmed=${b.confirmed} (as of block ${b.asOfBlock ?? '—'})`);
   }
