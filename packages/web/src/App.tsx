@@ -14,7 +14,7 @@ import {
 import { AuthProvider, useAuth } from './auth-context';
 import { looksLikeEns, resolveEns, reverseResolveEns } from './ens';
 import { explorerAddress, explorerTx, FAUCET_URL } from './explorer';
-import { shortHex, toEth } from './format';
+import { activityAmount, shortHex, toEth } from './format';
 
 // Copy any value to the clipboard with brief "Copied ✓" feedback.
 function CopyButton({ value, label = 'Copy' }: { value: string; label?: string }) {
@@ -39,19 +39,25 @@ function CopyButton({ value, label = 'Copy' }: { value: string; label?: string }
 // Module-level cache so repeated renders of the same address don't re-fetch.
 const ensNameCache = new Map<string, string | null>();
 
-/** Renders an address as a HashLink; swaps in the .eth primary name when it resolves. */
-function EnsAddress({ address }: { address: string }) {
+/** Renders an address as a HashLink; swaps in the .eth primary name when it resolves. When `from`
+ *  is the same wallet, flags it as a self-send (↺ self) so dust concurrency tests read clearly. */
+function EnsAddress({ address, from }: { address: string; from?: string }) {
+  const isSelf = !!from && address.toLowerCase() === from.toLowerCase();
   const [name, setName] = useState<string | null>(ensNameCache.get(address) ?? null);
   useEffect(() => {
-    if (ensNameCache.has(address)) return;
+    if (isSelf || ensNameCache.has(address)) return;
     reverseResolveEns(address).then((n) => {
       ensNameCache.set(address, n);
       setName(n);
     });
-  }, [address]);
+  }, [address, isSelf]);
   return (
     <span>
-      {name && <span title={address}>{name} </span>}
+      {isSelf ? (
+        <span className="self-tag" title={address}>↺ self </span>
+      ) : (
+        name && <span title={address}>{name} </span>
+      )}
       <HashLink value={address} href={explorerAddress(address)} />
     </span>
   );
@@ -573,8 +579,8 @@ function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: numb
           return (
             <li key={it.id}>
               <span className={`pill ${it.status}`}>{it.status}</span> · sent{' '}
-              <strong>{toEth(it.amount)}</strong> {it.asset === 'ETH' ? 'ETH' : 'tokens'} →{' '}
-              <EnsAddress address={it.to} />
+              <strong>{activityAmount(it.amount, it.asset)}</strong> →{' '}
+              <EnsAddress address={it.to} from={wallet.address} />
               {it.txHash && (
                 <>
                   {' '}
@@ -1002,9 +1008,10 @@ function LimitsEditor({ wallet }: { wallet: Wallet }) {
 // Unified activity rows as a table (time · wallet · type · detail) — shared by Overview + Activity.
 function ActivityTable({ items, wallets }: { items: ActivityItem[]; wallets: Wallet[] }) {
   if (items.length === 0) return <p className="bal-sub">No activity yet.</p>;
+  const addrOf = (id?: string | null) => wallets.find((x) => x.id === id)?.address;
   const label = (id?: string | null) => {
-    const w = wallets.find((x) => x.id === id);
-    return w ? shortHex(w.address) : '—';
+    const a = addrOf(id);
+    return a ? shortHex(a) : '—';
   };
   return (
     <table className="act-table">
@@ -1033,8 +1040,8 @@ function ActivityTable({ items, wallets }: { items: ActivityItem[]; wallets: Wal
             <td>
               {it.kind === 'transaction' && (
                 <>
-                  sent <strong>{toEth(it.amount)}</strong> →{' '}
-                  <EnsAddress address={it.to} />
+                  sent <strong>{activityAmount(it.amount, it.asset)}</strong> →{' '}
+                  <EnsAddress address={it.to} from={addrOf(it.walletId)} />
                   {it.txHash && (
                     <>
                       {' '}

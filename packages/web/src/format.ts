@@ -17,6 +17,15 @@ export function toEth(wei: string | bigint, dp = 8, minDp = 6): string {
   }
 }
 
+/** Activity amount for display: ETH dust (< 1e-6 ETH) reads as wei so a 1-wei send doesn't look
+ *  like an empty "0 ETH"; tokens and normal ETH amounts format to decimals. */
+export function activityAmount(amount: string, asset: string): string {
+  if (asset !== 'ETH') return `${toEth(amount)} tokens`;
+  const v = BigInt(amount);
+  if (v > 0n && v < 1_000_000_000_000n) return `${v} wei`; // < 1e-6 ETH → show exact wei
+  return `${toEth(amount)} ETH`;
+}
+
 /** 0x1234…abcd — truncate an address/hash for display (full value stays copyable). */
 export function shortHex(v: string): string {
   return v.length > 12 ? `${v.slice(0, 6)}…${v.slice(-4)}` : v;
