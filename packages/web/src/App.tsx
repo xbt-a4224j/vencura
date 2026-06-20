@@ -580,37 +580,38 @@ function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: numb
       {items.length === 0 ? (
         <p className="bal-sub">No transactions or signatures yet — sign a message or send to get started.</p>
       ) : (
-        <ul>
-      {items.map((it) => {
-        if (it.kind === 'transaction')
-          return (
-            <li key={it.id}>
-              <span className={`pill ${it.status}`}>{it.status}</span> · sent{' '}
-              <strong>{activityAmount(it.amount, it.asset)}</strong> →{' '}
-              <EnsAddress address={it.to} from={wallet.address} />
-              {it.txHash && (
-                <>
-                  {' '}
-                  · tx <HashLink value={it.txHash} href={explorerTx(it.txHash)} />
-                </>
-              )}
-            </li>
-          );
-        if (it.kind === 'signature')
-          return (
-            <li key={it.id}>
-              <span className="pill signed">signed</span> · “{it.message}” →{' '}
-              <code>{shortHex(it.signature)}</code>
-              <CopyButton value={it.signature} label="⧉" />
-            </li>
-          );
-        // audit: a durable governance event (policy.changed, wallet.created, admin.*)
-        return (
-          <li key={it.id}>
-            <span className="pill audit">{it.type}</span>
-          </li>
-        );
-      })}
+        <ul className="act-scroll">
+          {items.map((it) => {
+            const time = <span className="act-time">{new Date(it.createdAt).toLocaleTimeString()}</span>;
+            if (it.kind === 'transaction')
+              return (
+                <li key={it.id}>
+                  {time} <span className={`pill ${it.status}`}>{it.status}</span> · sent{' '}
+                  <strong>{activityAmount(it.amount, it.asset)}</strong> →{' '}
+                  <EnsAddress address={it.to} from={wallet.address} />
+                  {it.txHash && (
+                    <>
+                      {' '}
+                      · tx <HashLink value={it.txHash} href={explorerTx(it.txHash)} />
+                    </>
+                  )}
+                </li>
+              );
+            if (it.kind === 'signature')
+              return (
+                <li key={it.id}>
+                  {time} <span className="pill signed">signed</span> · “{it.message}” →{' '}
+                  <code>{shortHex(it.signature)}</code>
+                  <CopyButton value={it.signature} label="⧉" />
+                </li>
+              );
+            // audit: a durable governance event (policy.changed, wallet.created, admin.*)
+            return (
+              <li key={it.id}>
+                {time} <span className="pill audit">{it.type}</span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </>
@@ -1242,7 +1243,9 @@ function ActivityTab({ wallets }: { wallets: Wallet[] }) {
               {busy ? 'Refreshing…' : 'Refresh'}
             </button>
           </div>
-          <ActivityTable items={filtered} wallets={wallets} />
+          <div className="act-scroll">
+            <ActivityTable items={filtered} wallets={wallets} />
+          </div>
         </>
       ) : (
         <LiveLog />

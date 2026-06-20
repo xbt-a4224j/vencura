@@ -1,5 +1,6 @@
 import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ADMIN_EMAIL } from '@vencura/shared';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ActivityService } from './activity.service';
@@ -17,8 +18,9 @@ export class ActivityController {
   }
 }
 
-// Cross-wallet unified activity for the signed-in user — backs the Activity tab's audit view
-// (one call instead of N per-wallet polls). Scoped to the caller's own wallets.
+// Cross-wallet unified activity — backs the Activity tab's audit view (one call instead of N
+// per-wallet polls). The admin operator sees system-wide activity (every tenant); a regular user
+// sees only their own wallets' events.
 @ApiTags('transactions')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
@@ -27,7 +29,9 @@ export class UserActivityController {
   constructor(private readonly activity: ActivityService) {}
 
   @Get()
-  recent(@CurrentUser() user: { id: string }) {
-    return this.activity.recentForUser(user.id);
+  recent(@CurrentUser() user: { id: string; email: string }) {
+    return user.email === ADMIN_EMAIL
+      ? this.activity.recentSystemWide()
+      : this.activity.recentForUser(user.id);
   }
 }

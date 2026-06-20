@@ -52,4 +52,15 @@ export class ActivityService {
     ]);
     return mergeActivity(txs, sigs, audits).slice(0, 100);
   }
+
+  /** System-wide activity across EVERY user/wallet — the admin console's operator view, so a
+   *  custodian sees all tenants' sends, signatures, and governance events (not just their own). */
+  async recentSystemWide(): Promise<ActivityItem[]> {
+    const [txs, sigs, audits] = await Promise.all([
+      this.prisma.transaction.findMany({ orderBy: { createdAt: 'desc' }, take: 200 }),
+      this.prisma.signedMessage.findMany({ orderBy: { createdAt: 'desc' }, take: 200 }),
+      this.prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' }, take: 200 }).catch(() => []),
+    ]);
+    return mergeActivity(txs, sigs, audits).slice(0, 200);
+  }
 }
