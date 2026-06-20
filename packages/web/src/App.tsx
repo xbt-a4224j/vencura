@@ -1046,7 +1046,7 @@ function ActivityTable({ items, wallets }: { items: ActivityItem[]; wallets: Wal
       <tbody>
         {items.map((it) => (
           <tr key={it.id}>
-            <td>{new Date(it.createdAt).toLocaleTimeString()}</td>
+            <td className="act-when">{new Date(it.createdAt).toLocaleString()}</td>
             <td>{label(it.walletId)}</td>
             <td>
               {it.kind === 'transaction' ? (

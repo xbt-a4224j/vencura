@@ -54,6 +54,21 @@ export class IncomingWatcher {
     const to = head - from + 1n > maxPerTick() ? from + maxPerTick() - 1n : head;
 
     let count = 0;
+    const blockTime = new Map<bigint, Date>(); // blockNumber → on-chain timestamp (the real event time)
+
+    // Native ETH inbound — scan each block's txs (native transfers emit no logs). We fetch every
+    // block in range anyway, so record its timestamp for the ERC-20 pass too (no extra RPC).
+    for (let b = from; b <= to; b++) {
+      const block = await this.chain.getBlockWithTxs(b);
+      blockTime.set(b, new Date(Number(block.timestamp) * 1000));
+      for (const tx of block.transactions) {
+        if (!tx.to || tx.value <= 0n) continue;
+        if (tx.from.toLowerCase() === tx.to.toLowerCase()) continue; // self-send: already our own tx
+        const walletId = byAddr.get(tx.to.toLowerCase());
+        if (!walletId) continue;
+        count += await this.record(walletId, tx.hash, -1, 'ETH', tx.value.toString(), tx.from, b, blockTime.get(b)!);
+      }
+    }
 
     // ERC-20 inbound — one server-side-filtered query over the whole range.
     const logs = await this.chain.getInboundErc20Logs(addresses, from, to);
@@ -63,19 +78,8 @@ export class IncomingWatcher {
       if (fromAddr.toLowerCase() === toAddr.toLowerCase()) continue; // self-send: already our own tx
       const walletId = byAddr.get(toAddr.toLowerCase());
       if (!walletId || !log.transactionHash || log.blockNumber == null) continue;
-      count += await this.record(walletId, log.transactionHash, Number(log.logIndex ?? 0), log.address.toLowerCase(), (log.args.value ?? 0n).toString(), fromAddr, log.blockNumber);
-    }
-
-    // Native ETH inbound — scan each block's txs (native transfers emit no logs).
-    for (let b = from; b <= to; b++) {
-      const block = await this.chain.getBlockWithTxs(b);
-      for (const tx of block.transactions) {
-        if (!tx.to || tx.value <= 0n) continue;
-        if (tx.from.toLowerCase() === tx.to.toLowerCase()) continue; // self-send: already our own tx
-        const walletId = byAddr.get(tx.to.toLowerCase());
-        if (!walletId) continue;
-        count += await this.record(walletId, tx.hash, -1, 'ETH', tx.value.toString(), tx.from, b);
-      }
+      const occurredAt = blockTime.get(log.blockNumber) ?? new Date(); // in-range blocks are all mapped
+      count += await this.record(walletId, log.transactionHash, Number(log.logIndex ?? 0), log.address.toLowerCase(), (log.args.value ?? 0n).toString(), fromAddr, log.blockNumber, occurredAt);
     }
 
     await this.prisma.chainCursor.upsert({
@@ -95,10 +99,13 @@ export class IncomingWatcher {
     amount: string,
     fromAddress: string,
     blockNumber: bigint,
+    occurredAt: Date,
   ): Promise<number> {
     try {
+      // createdAt = the on-chain block time (the real event time), NOT now() — a backfilled
+      // transfer from yesterday must sort/show as yesterday, not as its indexing moment.
       await this.prisma.receivedTransfer.create({
-        data: { walletId, txHash, logIndex, asset, amount, fromAddress, blockNumber },
+        data: { walletId, txHash, logIndex, asset, amount, fromAddress, blockNumber, createdAt: occurredAt },
       });
       return 1;
     } catch {

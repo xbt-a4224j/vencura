@@ -282,6 +282,7 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
 .act-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .act-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); border-bottom: 1px solid var(--line); padding: 6px 8px; }
 .act-table td { border-bottom: 1px solid var(--line); padding: 7px 8px; vertical-align: top; }
+.act-when { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); }
 .logconsole {
   font-family: var(--mono); font-size: 12px; background: #0f1320; color: #d7e0f5;
   border-radius: var(--radius); padding: 12px 14px; height: 320px; overflow-y: auto; white-space: pre-wrap;

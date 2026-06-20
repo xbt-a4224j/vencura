@@ -29,7 +29,7 @@ describe('IncomingWatcher', () => {
     prismaMock.receivedTransfer.create.mockResolvedValue({});
     chainMock.getBlockNumber.mockResolvedValue(100n);
     chainMock.getInboundErc20Logs.mockResolvedValue([]);
-    chainMock.getBlockWithTxs.mockResolvedValue({ transactions: [] });
+    chainMock.getBlockWithTxs.mockResolvedValue({ timestamp: 1_700_000_000n, transactions: [] });
     const moduleRef = await Test.createTestingModule({
       providers: [
         IncomingWatcher,
@@ -40,18 +40,21 @@ describe('IncomingWatcher', () => {
     watcher = moduleRef.get(IncomingWatcher);
   });
 
-  it('records a native ETH transfer received by a managed wallet', async () => {
+  const blockDate = new Date(1_700_000_000 * 1000); // matches the mocked block.timestamp
+
+  it('records a native ETH transfer received by a managed wallet, stamped with block time', async () => {
     chainMock.getBlockWithTxs.mockResolvedValue({
+      timestamp: 1_700_000_000n,
       transactions: [{ hash: '0xnative', to: OURS, from: OTHER, value: 5n }],
     });
     await watcher.scan();
     expect(prismaMock.receivedTransfer.create).toHaveBeenCalledWith({
-      data: { walletId: 'w1', txHash: '0xnative', logIndex: -1, asset: 'ETH', amount: '5', fromAddress: OTHER, blockNumber: 100n },
+      data: { walletId: 'w1', txHash: '0xnative', logIndex: -1, asset: 'ETH', amount: '5', fromAddress: OTHER, blockNumber: 100n, createdAt: blockDate },
     });
     expect(prismaMock.chainCursor.upsert).toHaveBeenCalled(); // cursor advanced
   });
 
-  it('records an inbound ERC-20 transfer from getLogs', async () => {
+  it('records an inbound ERC-20 transfer from getLogs, stamped with block time', async () => {
     chainMock.getInboundErc20Logs.mockResolvedValue([
       {
         transactionHash: '0xerc20',
@@ -63,7 +66,7 @@ describe('IncomingWatcher', () => {
     ]);
     await watcher.scan();
     expect(prismaMock.receivedTransfer.create).toHaveBeenCalledWith({
-      data: { walletId: 'w1', txHash: '0xerc20', logIndex: 2, asset: '0xtoken', amount: '1000', fromAddress: OTHER, blockNumber: 100n },
+      data: { walletId: 'w1', txHash: '0xerc20', logIndex: 2, asset: '0xtoken', amount: '1000', fromAddress: OTHER, blockNumber: 100n, createdAt: blockDate },
     });
   });
 
