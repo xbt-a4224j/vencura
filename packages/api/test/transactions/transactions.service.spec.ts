@@ -4,6 +4,7 @@ import { PrismaService } from '@/infra/prisma/prisma.service';
 import { ChainService } from '@/infra/chain/chain.service';
 import { PolicyEngine } from '@/policy/policy.engine';
 import { WalletsService } from '@/wallets/wallets.service';
+import { EventsService } from '@/infra/events/events.service';
 import { LOCK } from '@/infra/lock/lock';
 import { SIGNER } from '@/signer/signer';
 import { TransactionsService } from '@/transactions/transactions.service';
@@ -60,6 +61,7 @@ async function build(prisma: ReturnType<typeof makePrisma>) {
       { provide: ChainService, useValue: chainMock },
       { provide: PolicyEngine, useValue: policyMock },
       { provide: WalletsService, useValue: { findOwnedOrThrow: prisma.wallet.findFirst } },
+      { provide: EventsService, useValue: { record: vi.fn(), emit: vi.fn() } },
       { provide: LOCK, useValue: new SerialLock() },
       { provide: SIGNER, useValue: signerMock },
     ],

@@ -35,8 +35,9 @@ describe.skipIf(!process.env.RUN_DB_TESTS)('TransactionsService policy daily-lim
   // Wallet ownership is checked via WalletsService; stub it to the seeded wallet.
   const wallets = { findOwnedOrThrow: async () => ({ id: walletId, address }) } as never;
 
+  const events = { record: async () => undefined, emit: () => undefined } as never;
   const service = () =>
-    new TransactionsService(prisma, chain, policy, wallets, lock, signer as never);
+    new TransactionsService(prisma, chain, policy, wallets, events, lock, signer as never);
 
   beforeEach(async () => {
     nextNonce = 0;

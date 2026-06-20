@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { Test } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChainService } from '@/infra/chain/chain.service';
+import { EventsService } from '@/infra/events/events.service';
 import { LOCK } from '@/infra/lock/lock';
 import { PrismaService } from '@/infra/prisma/prisma.service';
 import { PolicyEngine } from '@/policy/policy.engine';
@@ -51,6 +52,7 @@ async function build(prisma: ReturnType<typeof makePrisma>) {
       { provide: ChainService, useValue: chainMock },
       { provide: PolicyEngine, useValue: policyMock },
       { provide: WalletsService, useValue: { findOwnedOrThrow: vi.fn().mockResolvedValue({ id: 'w1', address: '0xabc' }) } },
+      { provide: EventsService, useValue: { record: vi.fn(), emit: vi.fn() } },
       { provide: LOCK, useValue: passThroughLock },
       { provide: SIGNER, useValue: signerMock },
     ],

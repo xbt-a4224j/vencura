@@ -4,6 +4,7 @@ import { NATIVE_ASSET, type ContractWriteInput, type Hex, type SendTransactionIn
 import { type Abi, encodeDeployData, encodeFunctionData, erc20Abi, parseEther } from 'viem';
 import { DEMO_TOKEN_ABI, DEMO_TOKEN_BYTECODE } from '../admin/demo-token.artifact';
 import { ChainService } from '../infra/chain/chain.service';
+import { EventsService } from '../infra/events/events.service';
 import { LOCK, type Lock } from '../infra/lock/lock';
 import { PrismaService } from '../infra/prisma/prisma.service';
 import { PolicyEngine } from '../policy/policy.engine';
@@ -18,6 +19,7 @@ export class TransactionsService {
     private readonly chain: ChainService,
     private readonly policy: PolicyEngine,
     private readonly wallets: WalletsService,
+    private readonly events: EventsService,
     @Inject(LOCK) private readonly lock: Lock,
     @Inject(SIGNER) private readonly signer: Signer,
   ) {}
@@ -148,6 +150,15 @@ export class TransactionsService {
       update: { address: receipt.contractAddress, owner: wallet.address },
     });
     this.logger.log(`demo token deployed: ${saved.address} (owner ${saved.owner})`);
+    // Durable governance event: deploying the token mints the full supply to the admin. Record it
+    // in the audit trail so the mint is a first-class action, not only inferred from the chain index.
+    await this.events.record({
+      userId,
+      walletId,
+      type: 'token.deployed',
+      detail: { address: saved.address, owner: saved.owner, supply: supply.toString(), txHash: hash },
+      msg: `token deployed: ${saved.address} (1,000,000 VCD minted to ${saved.owner})`,
+    });
     return { address: saved.address, owner: saved.owner, txHash: hash };
   }
 
