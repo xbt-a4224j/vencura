@@ -1391,11 +1391,27 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
   const transferFrom = () =>
     run(async () => {
       if (!ownerWallet) throw new Error('owner wallet not found locally');
+      const amount = parseEther(pull.amt || '0');
+      // Preflight the two on-chain gates so we can name the exact shortfall(s) with real numbers,
+      // rather than relying on the revert reason (which reports only whichever check trips first).
+      const [allowanceR, balanceR] = await Promise.all([
+        api.contractRead({ address: token!.address, abi: erc20Abi, functionName: 'allowance', args: [pull.from, token!.owner] }),
+        api.contractRead({ address: token!.address, abi: erc20Abi, functionName: 'balanceOf', args: [pull.from] }),
+      ]);
+      const allowance = BigInt(String(allowanceR.result));
+      const balance = BigInt(String(balanceR.result));
+      const problems: string[] = [];
+      if (allowance < amount) problems.push(`approved only ${toEth(allowance.toString())} VCD (allowance)`);
+      if (balance < amount) problems.push(`holds only ${toEth(balance.toString())} VCD (balance)`);
+      if (problems.length)
+        throw new Error(
+          `Can't pull ${pull.amt} VCD — holder ${problems.join(' and ')}. The holder must approve ≥ the amount and hold enough to cover it.`,
+        );
       const tx = await api.contractWrite(ownerWallet.id, {
         address: token!.address,
         abi: erc20Abi,
         functionName: 'transferFrom',
-        args: [pull.from, token!.owner, parseEther(pull.amt || '0').toString()],
+        args: [pull.from, token!.owner, amount.toString()],
       });
       return { text: `✓ pulled ${pull.amt} VCD from ${shortHex(pull.from)} → admin (nonce ${tx.nonce})`, txHash: tx.txHash };
     });
