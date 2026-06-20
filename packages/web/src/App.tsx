@@ -1359,6 +1359,19 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
       cancelled = true;
     };
   }, []);
+  // Recover after a deploy/restart that outlasted the mount retries: refetch when the tab regains
+  // focus (e.g. you click back after the redeploy finishes). On failure, keep the existing list.
+  useEffect(() => {
+    const refetch = () => {
+      if (document.visibilityState === 'visible') api.listHolders().then(setHolders).catch(() => undefined);
+    };
+    window.addEventListener('focus', refetch);
+    document.addEventListener('visibilitychange', refetch);
+    return () => {
+      window.removeEventListener('focus', refetch);
+      document.removeEventListener('visibilitychange', refetch);
+    };
+  }, []);
   useEffect(() => {
     if (!deployFrom && wallets[0]) setDeployFrom(wallets[0].id);
   }, [wallets, deployFrom]);
