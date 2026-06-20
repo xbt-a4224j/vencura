@@ -4,6 +4,11 @@ import type { Hex } from '@vencura/shared';
 import { PrismaService } from '../infra/prisma/prisma.service';
 import { BalancesService } from './balances.service';
 
+// Cache-warm cadence. Each tick costs ~3 RPC calls PER wallet (block + native + token), so on a
+// metered RPC (Infura free tier) this is the dominant idle cost — kept conservative and tunable via
+// env. Manual "Refresh" in the UI covers demo immediacy; this just keeps the cache from going stale.
+const REFRESH_MS = Number(process.env.BALANCE_REFRESH_MS ?? 120_000);
+
 /** Keeps the balance cache warm. At scale this becomes per-wallet queued jobs (Block 4 queue). */
 @Injectable()
 export class BalanceRefresher {
@@ -14,7 +19,7 @@ export class BalanceRefresher {
     private readonly balances: BalancesService,
   ) {}
 
-  @Interval(30_000)
+  @Interval(REFRESH_MS)
   async refreshAll(): Promise<void> {
     const wallets = await this.prisma.wallet.findMany({ select: { id: true, address: true } });
     for (const w of wallets) {

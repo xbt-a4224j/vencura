@@ -6,10 +6,12 @@ import { ChainService } from '../infra/chain/chain.service';
 import { PrismaService } from '../infra/prisma/prisma.service';
 
 const CURSOR = 'incoming'; // chain_cursor row name
-// First-run lookback so an already-funded demo wallet's recent deposits get backfilled (Sepolia
-// ≈ 7200 blocks/day). Each tick advances at most MAX_PER_TICK blocks so a cold start doesn't
-// hammer the RPC in one shot — it catches up over a few ticks, then tracks the head.
-const lookback = (): bigint => BigInt(process.env.INCOMING_LOOKBACK_BLOCKS ?? 7200);
+// Poll cadence + first-run lookback. The native scan costs ~1 RPC per block, and the lookback
+// backfill RE-RUNS on every restart/deploy — so these are deliberately conservative and env-tunable
+// to stay within a metered RPC's daily budget (Infura free tier). Default lookback ≈ last ~2h of
+// Sepolia blocks: enough to catch a recent deposit without a thousands-of-calls backfill per deploy.
+const POLL_MS = Number(process.env.INCOMING_POLL_MS ?? 60_000);
+const lookback = (): bigint => BigInt(process.env.INCOMING_LOOKBACK_BLOCKS ?? 600);
 const maxPerTick = (): bigint => BigInt(process.env.INCOMING_MAX_BLOCKS_PER_TICK ?? 200);
 
 /**
@@ -29,7 +31,7 @@ export class IncomingWatcher {
     private readonly chain: ChainService,
   ) {}
 
-  @Interval(15_000)
+  @Interval(POLL_MS)
   async scan(): Promise<void> {
     if (this.running) return;
     this.running = true;
