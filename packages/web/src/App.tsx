@@ -1324,7 +1324,9 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
   const [token, setToken] = useState<{ address: string; owner: string } | null | undefined>(undefined);
   const [deployFrom, setDeployFrom] = useState('');
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
+  // Result of the last action: a line of text plus an optional tx hash so we can deep-link to the
+  // explorer (like the wallet activity feed), instead of only printing a truncated hash.
+  const [result, setResult] = useState<{ text: string; txHash?: string | null } | null>(null);
   const [dist, setDist] = useState({ to: '', amt: '' });
   const [pull, setPull] = useState({ from: '', amt: '' });
   const [holder, setHolder] = useState('');
@@ -1356,24 +1358,24 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
     ])
       .then(([t, b]) => setSupply({ total: String(t.result), ownerBal: String(b.result) }))
       .catch(() => setSupply(null));
-  }, [token, msg]);
+  }, [token, result]);
 
   const ownerWallet = token
     ? wallets.find((w) => w.address.toLowerCase() === token.owner.toLowerCase())
     : undefined;
-  const run = (fn: () => Promise<string>) => {
+  const run = (fn: () => Promise<{ text: string; txHash?: string | null }>) => {
     setBusy(true);
-    setMsg('');
+    setResult(null);
     fn()
-      .then(setMsg)
-      .catch((e) => setMsg((e as Error).message))
+      .then(setResult)
+      .catch((e) => setResult({ text: (e as Error).message }))
       .finally(() => setBusy(false));
   };
   const deploy = () =>
     run(async () => {
       const t = await api.deployToken(deployFrom);
       await load();
-      return `✓ deployed ${t.address} — tx ${shortHex(t.txHash)}`;
+      return { text: `✓ deployed ${t.address}`, txHash: t.txHash };
     });
   const distribute = () =>
     run(async () => {
@@ -1384,7 +1386,7 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
         functionName: 'transfer',
         args: [dist.to, parseEther(dist.amt || '0').toString()],
       });
-      return `✓ sent ${dist.amt} VCD → ${shortHex(dist.to)} (nonce ${tx.nonce})`;
+      return { text: `✓ sent ${dist.amt} VCD → ${shortHex(dist.to)} (nonce ${tx.nonce})`, txHash: tx.txHash };
     });
   const transferFrom = () =>
     run(async () => {
@@ -1395,7 +1397,7 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
         functionName: 'transferFrom',
         args: [pull.from, token!.owner, parseEther(pull.amt || '0').toString()],
       });
-      return `✓ pulled ${pull.amt} VCD from ${shortHex(pull.from)} → admin (nonce ${tx.nonce})`;
+      return { text: `✓ pulled ${pull.amt} VCD from ${shortHex(pull.from)} → admin (nonce ${tx.nonce})`, txHash: tx.txHash };
     });
   const checkAllowance = () =>
     run(async () => {
@@ -1405,7 +1407,7 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
         functionName: 'allowance',
         args: [holder, token!.owner],
       });
-      return `allowance(${shortHex(holder)} → admin) = ${toEth(String(r.result))} VCD`;
+      return { text: `allowance(${shortHex(holder)} → admin) = ${toEth(String(r.result))} VCD` };
     });
 
   return (
@@ -1502,7 +1504,17 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
           </button>
         </>
       )}
-      {msg && <p>{msg}</p>}
+      {result && (
+        <p>
+          {result.text}
+          {result.txHash && (
+            <>
+              {' '}
+              · tx <HashLink value={result.txHash} href={explorerTx(result.txHash)} />
+            </>
+          )}
+        </p>
+      )}
     </section>
   );
 }
