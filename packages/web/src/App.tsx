@@ -5,12 +5,12 @@ import {
   type ActivityItem,
   ADMIN_EMAIL,
   adminKeyStore,
-  api,
   type BalanceLine,
   type LogLine,
   type Policy,
+  v,
   type Wallet,
-} from './api';
+} from './vencura';
 import { AuthProvider, useAuth } from './auth-context';
 import { looksLikeEns, resolveEns, reverseResolveEns } from './ens';
 import { explorerAddress, explorerTx, FAUCET_URL } from './explorer';
@@ -80,8 +80,8 @@ function useChainHead() {
   const [head, setHead] = useState<{ blockNumber: number; gasGwei: number } | null>(null);
   const refresh = useCallback(
     () =>
-      api
-        .chainHead()
+      v.chain
+        .head()
         .then(setHead)
         .catch(() => undefined),
     [],
@@ -145,8 +145,8 @@ function useWallets(accountId: string | undefined) {
       return Promise.resolve();
     }
     setError('');
-    return api
-      .listWallets()
+    return v.wallets
+      .list()
       .then((w) => {
         setWallets(w);
         setLastUpdated(new Date().toLocaleTimeString());
@@ -309,7 +309,7 @@ function UserAuth({ onExit }: { onExit: () => void }) {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api
+    v.auth
       .singleUser()
       .then((u) => {
         setExisting(u);
@@ -471,7 +471,7 @@ function SendForm({
         throw new Error('Enter a valid amount.');
       }
       if (wei <= 0n) throw new Error('Amount must be greater than 0.');
-      const tx = await api.send(wallet.id, { to: addr, asset, amount: wei.toString() });
+      const tx = await v.transactions.send({ walletId: wallet.id, to: addr, asset, amount: wei.toString() });
       if (tx.txHash) setSent({ txHash: tx.txHash, name: resolved?.name });
       setAmount('');
       setTo('');
@@ -560,8 +560,8 @@ function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: numb
 
   const load = useCallback(() => {
     setBusy(true);
-    return api
-      .listActivity(wallet.id)
+    return v.activity
+      .forWallet({ walletId: wallet.id })
       .then(setItems)
       .catch(() => undefined)
       .finally(() => setBusy(false));
@@ -660,8 +660,8 @@ function ConcurrencyDemo({
     setBusy(true);
     setResults([]);
     const sends = Array.from({ length: n }, () =>
-      api
-        .send(wallet.id, { to: recipient, asset: 'ETH', amount: '1' })
+      v.transactions
+        .send({ walletId: wallet.id, to: recipient, asset: 'ETH', amount: '1' })
         .then((tx) => ({ nonce: tx.nonce }))
         .catch((e) => ({ nonce: null, error: (e as Error).message })),
     );
@@ -775,7 +775,10 @@ function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
   const load = useCallback(
     () =>
       guard(async () => {
-        const [bal, pol] = await Promise.all([api.getBalance(wallet.id), api.getPolicy(wallet.id)]);
+        const [bal, pol] = await Promise.all([
+          v.wallets.getBalance({ walletId: wallet.id }),
+          v.wallets.getPolicy({ walletId: wallet.id }),
+        ]);
         setBalances(bal.balances);
         setPolicy(pol);
       }),
@@ -789,7 +792,7 @@ function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
   const sign = (e: FormEvent) => {
     e.preventDefault();
     setVerifyOut('');
-    return guard(async () => setSignature((await api.signMessage(wallet.id, message)).signature));
+    return guard(async () => setSignature((await v.wallets.signMessage({ walletId: wallet.id, message })).signature));
   };
 
   // Sign → verify loop: recover the signer from (message, signature) and prove it's this wallet.
@@ -929,8 +932,8 @@ function WalletsTab({ wallets, onChange, email }: { wallets: Wallet[]; onChange:
   const [error, setError] = useState('');
   useEffect(() => {
     if (wallets.length === 0) {
-      api
-        .provisionWallet()
+      v.wallets
+        .provision()
         .then(() => onChange())
         .catch((e) => setError((e as Error).message));
     }
@@ -957,8 +960,8 @@ function LimitsEditor({ wallet }: { wallet: Wallet }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    api
-      .getPolicy(wallet.id)
+    v.wallets
+      .getPolicy({ walletId: wallet.id })
       .then((p) => {
         setPerTxLimit(p.perTxLimit ? toEth(p.perTxLimit) : '');
         setDailyLimit(p.dailyLimit ? toEth(p.dailyLimit) : '');
@@ -989,7 +992,7 @@ function LimitsEditor({ wallet }: { wallet: Wallet }) {
         perTxLimit: perTxLimit.trim() ? parseEther(perTxLimit.trim()).toString() : null,
         dailyLimit: dailyLimit.trim() ? parseEther(dailyLimit.trim()).toString() : null,
       };
-      await api.setPolicy(wallet.id, next);
+      await v.wallets.setPolicy({ walletId: wallet.id, ...next });
       setLoaded(next);
       setStatus(`✓ saved ${new Date().toLocaleTimeString()}`);
     } catch (err) {
@@ -1128,13 +1131,13 @@ function OverviewTab({ wallets, onGoWallets }: { wallets: Wallet[]; onGoWallets:
     let active = true;
     Promise.all(
       wallets.map((w) =>
-        api
-          .getBalance(w.id)
+        v.wallets
+          .getBalance({ walletId: w.id })
           .then((b) => [w.id, BigInt(b.balances.find((l) => l.asset === 'ETH')?.confirmed ?? '0')] as const)
           .catch(() => [w.id, 0n] as const),
       ),
     ).then((entries) => active && setBals(Object.fromEntries(entries)));
-    api.listAllActivity().then((a) => active && setActivity(a)).catch(() => undefined);
+    v.activity.all().then((a) => active && setActivity(a)).catch(() => undefined);
     return () => {
       active = false;
     };
@@ -1197,8 +1200,8 @@ function LiveLog() {
   useEffect(() => {
     let active = true;
     const tick = () =>
-      api
-        .events(cursor.current)
+      v.activity
+        .events({ after: cursor.current })
         .then(({ lines: l, seq }) => {
           if (!active) return;
           cursor.current = seq;
@@ -1239,8 +1242,8 @@ function ActivityTab({ wallets }: { wallets: Wallet[] }) {
   const [busy, setBusy] = useState(false);
   const load = useCallback(() => {
     setBusy(true);
-    return api
-      .listAllActivity()
+    return v.activity
+      .all()
       .then(setItems)
       .catch(() => undefined)
       .finally(() => setBusy(false));
@@ -1358,7 +1361,7 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
   const [holders, setHolders] = useState<{ address: string; email: string }[]>([]);
   const [supply, setSupply] = useState<{ total: string; ownerBal: string } | null>(null);
 
-  const load = useCallback(() => api.getToken().then(setToken).catch(() => setToken(null)), []);
+  const load = useCallback(() => v.tokens.get().then(setToken).catch(() => setToken(null)), []);
   useEffect(() => {
     void load();
   }, [load]);
@@ -1371,7 +1374,7 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
     (async () => {
       for (let attempt = 0; !cancelled; attempt++) {
         try {
-          const h = await api.listHolders();
+          const h = await v.wallets.holders();
           if (!cancelled) setHolders(h);
           return;
         } catch {
@@ -1388,7 +1391,7 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
   // focus (e.g. you click back after the redeploy finishes). On failure, keep the existing list.
   useEffect(() => {
     const refetch = () => {
-      if (document.visibilityState === 'visible') api.listHolders().then(setHolders).catch(() => undefined);
+      if (document.visibilityState === 'visible') v.wallets.holders().then(setHolders).catch(() => undefined);
     };
     window.addEventListener('focus', refetch);
     document.addEventListener('visibilitychange', refetch);
@@ -1408,8 +1411,8 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
       return;
     }
     Promise.all([
-      api.contractRead({ address: token.address, abi: erc20Abi, functionName: 'totalSupply', args: [] }),
-      api.contractRead({ address: token.address, abi: erc20Abi, functionName: 'balanceOf', args: [token.owner] }),
+      v.transactions.contractRead({ address: token.address, abi: erc20Abi, functionName: 'totalSupply', args: [] }),
+      v.transactions.contractRead({ address: token.address, abi: erc20Abi, functionName: 'balanceOf', args: [token.owner] }),
     ])
       .then(([t, b]) => setSupply({ total: String(t.result), ownerBal: String(b.result) }))
       .catch(() => setSupply(null));
@@ -1428,14 +1431,14 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
   };
   const deploy = () =>
     run(async () => {
-      const t = await api.deployToken(deployFrom);
+      const t = await v.tokens.deploy({ walletId: deployFrom });
       await load();
       return { text: `✓ deployed ${t.address}`, txHash: t.txHash };
     });
   const distribute = () =>
     run(async () => {
       if (!ownerWallet) throw new Error('owner wallet not found locally');
-      const tx = await api.contractWrite(ownerWallet.id, {
+      const tx = await v.transactions.contractWrite({ walletId: ownerWallet.id,
         address: token!.address,
         abi: erc20Abi,
         functionName: 'transfer',
@@ -1450,8 +1453,8 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
       // Preflight the two on-chain gates so we can name the exact shortfall(s) with real numbers,
       // rather than relying on the revert reason (which reports only whichever check trips first).
       const [allowanceR, balanceR] = await Promise.all([
-        api.contractRead({ address: token!.address, abi: erc20Abi, functionName: 'allowance', args: [pull.from, token!.owner] }),
-        api.contractRead({ address: token!.address, abi: erc20Abi, functionName: 'balanceOf', args: [pull.from] }),
+        v.transactions.contractRead({ address: token!.address, abi: erc20Abi, functionName: 'allowance', args: [pull.from, token!.owner] }),
+        v.transactions.contractRead({ address: token!.address, abi: erc20Abi, functionName: 'balanceOf', args: [pull.from] }),
       ]);
       const allowance = BigInt(String(allowanceR.result));
       const balance = BigInt(String(balanceR.result));
@@ -1462,7 +1465,7 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
         throw new Error(
           `Can't pull ${pull.amt} VCD — holder ${problems.join(' and ')}. The holder must approve ≥ the amount and hold enough to cover it.`,
         );
-      const tx = await api.contractWrite(ownerWallet.id, {
+      const tx = await v.transactions.contractWrite({ walletId: ownerWallet.id,
         address: token!.address,
         abi: erc20Abi,
         functionName: 'transferFrom',
@@ -1472,7 +1475,7 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
     });
   const checkAllowance = () =>
     run(async () => {
-      const r = await api.contractRead({
+      const r = await v.transactions.contractRead({
         address: token!.address,
         abi: erc20Abi,
         functionName: 'allowance',
@@ -1601,7 +1604,7 @@ function UserTokenPanel({ wallets }: { wallets: Wallet[] }) {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api.getToken().then((t) => setToken(t)).catch(() => undefined);
+    v.tokens.get().then((t) => setToken(t)).catch(() => undefined);
   }, []);
   useEffect(() => {
     if (!walletId && wallets[0]) setWalletId(wallets[0].id);
@@ -1610,7 +1613,7 @@ function UserTokenPanel({ wallets }: { wallets: Wallet[] }) {
   const wallet = wallets.find((w) => w.id === walletId);
   const refreshBal = useCallback(() => {
     if (!token || !wallet) return;
-    api
+    v.transactions
       .contractRead({ address: token.address, abi: erc20Abi, functionName: 'balanceOf', args: [wallet.address] })
       .then((r) => setBal(toEth(String(r.result))))
       .catch(() => undefined);
@@ -1624,8 +1627,9 @@ function UserTokenPanel({ wallets }: { wallets: Wallet[] }) {
   const approve = () => {
     setBusy(true);
     setResult(null);
-    api
-      .contractWrite(walletId, {
+    v.transactions
+      .contractWrite({
+        walletId,
         address: token.address,
         abi: erc20Abi,
         functionName: 'approve',
@@ -1716,7 +1720,7 @@ function SettingsTab({ onChange }: { onChange: () => void }) {
     setSeedMsg('');
     setBusy(true);
     try {
-      const res = await api.seedDemo();
+      const res = await v.admin.seed();
       const funded = res.wallets.filter((w) => w.funded).length;
       await reload(); // demo account now appears in the User-view picker
       onChange(); // refresh the wallet-scoped panels
@@ -1735,7 +1739,7 @@ function SettingsTab({ onChange }: { onChange: () => void }) {
     setSeedMsg('');
     setBusy(true);
     try {
-      const res = await api.resetDemo();
+      const res = await v.admin.reset();
       signOut(); // the old session's account no longer exists
       await reload(); // AdminView re-signs in as the fresh demo account
       setSeedMsg(`Reset complete — re-seeded ${res.email}.`);
