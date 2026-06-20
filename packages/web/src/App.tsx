@@ -556,24 +556,31 @@ function SendForm({
 // PENDING→CONFIRMED appears when the user refreshes (the confirmation watcher runs server-side).
 function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: number }) {
   const [items, setItems] = useState<ActivityItem[]>([]);
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    api
+  const load = useCallback(() => {
+    setBusy(true);
+    return api
       .listActivity(wallet.id)
-      .then((rows) => active && setItems(rows))
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, [wallet.id, refreshKey]);
+      .then(setItems)
+      .catch(() => undefined)
+      .finally(() => setBusy(false));
+  }, [wallet.id]);
 
-  if (items.length === 0)
-    return (
-      <p className="bal-sub">No transactions or signatures yet — sign a message or send to get started.</p>
-    );
+  // Fetch on mount + whenever a send/sign or the wallet's Refresh bumps refreshKey.
+  useEffect(() => {
+    void load();
+  }, [load, refreshKey]);
+
   return (
-    <ul>
+    <>
+      <button type="button" className="copybtn" onClick={() => void load()} disabled={busy}>
+        {busy ? 'Refreshing…' : 'Refresh activity'}
+      </button>
+      {items.length === 0 ? (
+        <p className="bal-sub">No transactions or signatures yet — sign a message or send to get started.</p>
+      ) : (
+        <ul>
       {items.map((it) => {
         if (it.kind === 'transaction')
           return (
@@ -604,7 +611,9 @@ function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: numb
           </li>
         );
       })}
-    </ul>
+        </ul>
+      )}
+    </>
   );
 }
 
@@ -1180,17 +1189,19 @@ function ActivityTab({ wallets }: { wallets: Wallet[] }) {
   const [items, setItems] = useState<ActivityItem[]>([]);
   const [kind, setKind] = useState('all');
   const [q, setQ] = useState('');
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => {
+    setBusy(true);
+    return api
+      .listAllActivity()
+      .then(setItems)
+      .catch(() => undefined)
+      .finally(() => setBusy(false));
+  }, []);
+  // Manual-refresh model (like the rest of the app): fetch when the audit subtab opens, then on demand.
   useEffect(() => {
-    if (sub !== 'audit') return;
-    let active = true;
-    const load = () => api.listAllActivity().then((a) => active && setItems(a)).catch(() => undefined);
-    void load();
-    const t = setInterval(load, 5000);
-    return () => {
-      active = false;
-      clearInterval(t);
-    };
-  }, [sub]);
+    if (sub === 'audit') void load();
+  }, [sub, load]);
   const filtered = items.filter(
     (it) =>
       (kind === 'all' || it.kind === kind) &&
@@ -1227,6 +1238,9 @@ function ActivityTab({ wallets }: { wallets: Wallet[] }) {
                 onChange={(e) => setQ(e.target.value)}
               />
             </label>
+            <button type="button" className="copybtn" onClick={() => void load()} disabled={busy}>
+              {busy ? 'Refreshing…' : 'Refresh'}
+            </button>
           </div>
           <ActivityTable items={filtered} wallets={wallets} />
         </>
