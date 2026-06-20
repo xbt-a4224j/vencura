@@ -1,5 +1,5 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { erc20Abi, isAddress, parseEther, recoverMessageAddress } from 'viem';
+import { isAddress, parseEther, recoverMessageAddress } from 'viem';
 import {
   type Account,
   type ActivityItem,
@@ -1411,10 +1411,10 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
       return;
     }
     Promise.all([
-      v.transactions.contractRead({ address: token.address, abi: erc20Abi, functionName: 'totalSupply', args: [] }),
-      v.transactions.contractRead({ address: token.address, abi: erc20Abi, functionName: 'balanceOf', args: [token.owner] }),
+      v.tokens.totalSupply({ token: token.address }),
+      v.tokens.balanceOf({ token: token.address, owner: token.owner }),
     ])
-      .then(([t, b]) => setSupply({ total: String(t.result), ownerBal: String(b.result) }))
+      .then(([total, ownerBal]) => setSupply({ total: total.toString(), ownerBal: ownerBal.toString() }))
       .catch(() => setSupply(null));
   }, [token, result]);
 
@@ -1438,11 +1438,11 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
   const distribute = () =>
     run(async () => {
       if (!ownerWallet) throw new Error('owner wallet not found locally');
-      const tx = await v.transactions.contractWrite({ walletId: ownerWallet.id,
-        address: token!.address,
-        abi: erc20Abi,
-        functionName: 'transfer',
-        args: [dist.to, parseEther(dist.amt || '0').toString()],
+      const tx = await v.tokens.transfer({
+        walletId: ownerWallet.id,
+        token: token!.address,
+        to: dist.to,
+        amount: parseEther(dist.amt || '0').toString(),
       });
       return { text: `✓ sent ${dist.amt} VCD → ${shortHex(dist.to)} (nonce ${tx.nonce})`, txHash: tx.txHash };
     });
@@ -1452,12 +1452,10 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
       const amount = parseEther(pull.amt || '0');
       // Preflight the two on-chain gates so we can name the exact shortfall(s) with real numbers,
       // rather than relying on the revert reason (which reports only whichever check trips first).
-      const [allowanceR, balanceR] = await Promise.all([
-        v.transactions.contractRead({ address: token!.address, abi: erc20Abi, functionName: 'allowance', args: [pull.from, token!.owner] }),
-        v.transactions.contractRead({ address: token!.address, abi: erc20Abi, functionName: 'balanceOf', args: [pull.from] }),
+      const [allowance, balance] = await Promise.all([
+        v.tokens.allowance({ token: token!.address, owner: pull.from, spender: token!.owner }),
+        v.tokens.balanceOf({ token: token!.address, owner: pull.from }),
       ]);
-      const allowance = BigInt(String(allowanceR.result));
-      const balance = BigInt(String(balanceR.result));
       const problems: string[] = [];
       if (allowance < amount) problems.push(`approved only ${toEth(allowance.toString())} VCD (allowance)`);
       if (balance < amount) problems.push(`holds only ${toEth(balance.toString())} VCD (balance)`);
@@ -1465,23 +1463,19 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
         throw new Error(
           `Can't pull ${pull.amt} VCD — holder ${problems.join(' and ')}. The holder must approve ≥ the amount and hold enough to cover it.`,
         );
-      const tx = await v.transactions.contractWrite({ walletId: ownerWallet.id,
-        address: token!.address,
-        abi: erc20Abi,
-        functionName: 'transferFrom',
-        args: [pull.from, token!.owner, amount.toString()],
+      const tx = await v.tokens.transferFrom({
+        walletId: ownerWallet.id,
+        token: token!.address,
+        from: pull.from,
+        to: token!.owner,
+        amount: amount.toString(),
       });
       return { text: `✓ pulled ${pull.amt} VCD from ${shortHex(pull.from)} → admin (nonce ${tx.nonce})`, txHash: tx.txHash };
     });
   const checkAllowance = () =>
     run(async () => {
-      const r = await v.transactions.contractRead({
-        address: token!.address,
-        abi: erc20Abi,
-        functionName: 'allowance',
-        args: [holder, token!.owner],
-      });
-      return { text: `allowance(${shortHex(holder)} → admin) = ${toEth(String(r.result))} VCD` };
+      const value = await v.tokens.allowance({ token: token!.address, owner: holder, spender: token!.owner });
+      return { text: `allowance(${shortHex(holder)} → admin) = ${toEth(value.toString())} VCD` };
     });
 
   return (
@@ -1613,9 +1607,9 @@ function UserTokenPanel({ wallets }: { wallets: Wallet[] }) {
   const wallet = wallets.find((w) => w.id === walletId);
   const refreshBal = useCallback(() => {
     if (!token || !wallet) return;
-    v.transactions
-      .contractRead({ address: token.address, abi: erc20Abi, functionName: 'balanceOf', args: [wallet.address] })
-      .then((r) => setBal(toEth(String(r.result))))
+    v.tokens
+      .balanceOf({ token: token.address, owner: wallet.address })
+      .then((b) => setBal(toEth(b.toString())))
       .catch(() => undefined);
   }, [token, wallet]);
   useEffect(() => {
@@ -1627,14 +1621,8 @@ function UserTokenPanel({ wallets }: { wallets: Wallet[] }) {
   const approve = () => {
     setBusy(true);
     setResult(null);
-    v.transactions
-      .contractWrite({
-        walletId,
-        address: token.address,
-        abi: erc20Abi,
-        functionName: 'approve',
-        args: [token.owner, parseEther(amt || '0').toString()],
-      })
+    v.tokens
+      .approve({ walletId, token: token.address, spender: token.owner, amount: parseEther(amt || '0').toString() })
       .then((tx) => setResult({ text: `✓ approved admin for ${amt} VCD (nonce ${tx.nonce})`, txHash: tx.txHash }))
       .catch((e) => setResult({ text: (e as Error).message }))
       .finally(() => setBusy(false));

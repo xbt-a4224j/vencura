@@ -323,6 +323,10 @@ class TokensApi {
     const r = await this.tx.contractRead({ address: p.token, abi: erc20Abi, functionName: 'balanceOf', args: [p.owner] });
     return BigInt(String(r.result));
   }
+  async totalSupply(p: { token: string }): Promise<bigint> {
+    const r = await this.tx.contractRead({ address: p.token, abi: erc20Abi, functionName: 'totalSupply', args: [] });
+    return BigInt(String(r.result));
+  }
 }
 
 class ActivityApi {

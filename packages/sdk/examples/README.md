@@ -6,23 +6,20 @@ and readable top to bottom.
 
 ## Run
 
-```bash
-# point at any API; defaults to http://localhost:3000
-export VENCURA_API_URL=http://localhost:3000        # or https://vencura-api-production-3c23.up.railway.app
+They default to the **live deployment** and authenticate with the shared demo account — so they run
+with zero setup. Point elsewhere with `VENCURA_API_URL` (e.g. a local `pnpm dev`).
 
+```bash
 pnpm --filter @vencura/sdk exec tsx examples/01-create-wallet.ts
 pnpm --filter @vencura/sdk exec tsx examples/02-get-balance.ts
 pnpm --filter @vencura/sdk exec tsx examples/03-sign-message.ts
-```
-
-Examples **04** and **05** send real transactions, so they need a **funded** wallet.
-Seed the funded demo wallets on the local anvil node first:
-
-```bash
-pnpm --filter @vencura/api db:seed
 pnpm --filter @vencura/sdk exec tsx examples/04-send-transaction.ts
 pnpm --filter @vencura/sdk exec tsx examples/05-concurrency.ts
+pnpm --filter @vencura/sdk exec tsx examples/06-token-flow.ts
 ```
+
+> **04–06 broadcast real Sepolia transactions** (1-wei self-sends / token approve+transferFrom on the
+> demo wallet). Against a local API, run `pnpm --filter @vencura/api db:seed` first.
 
 | Script | Shows |
 | --- | --- |
