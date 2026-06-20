@@ -112,7 +112,9 @@ class Http {
     this.baseUrl = (opts.basePath ?? envUrl ?? BasePath.Local).toString().replace(/\/$/, '');
     this.tokenStore = opts.tokenStore ?? memoryTokenStore();
     this.adminKey = opts.adminKey;
-    this.fetchFn = opts.fetch ?? globalThis.fetch;
+    // Bind to the global: browser `fetch` throws "Illegal invocation" if called with `this` other
+    // than window (Node's fetch doesn't enforce this, which is why it only bit in the browser).
+    this.fetchFn = opts.fetch ?? globalThis.fetch.bind(globalThis);
   }
 
   private resolveAdminKey(): string {
