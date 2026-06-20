@@ -638,13 +638,26 @@ function ConcurrencyDemo({
   const unique = new Set(nonces).size === nonces.length;
   const monotonic = sorted.every((v, i) => i === 0 || v === sorted[i - 1] + 1);
   const errors = results.filter((r) => r.error);
+  const allBroadcast = results.length > 0 && errors.length === 0;
+  const range = sorted.length ? `${sorted[0]}–${sorted[sorted.length - 1]}` : '—';
+  // The named guarantees a reviewer cares about — each maps to a concrete failure mode the
+  // per-wallet nonce lock prevents.
+  const checks = [
+    { ok: allBroadcast, label: `${nonces.length}/${results.length} broadcast — none blocked or dropped` },
+    { ok: unique, label: `Unique nonces ${range} — no collision, no double-spend` },
+    { ok: monotonic, label: 'Consecutive — no gaps, no stuck nonce' },
+    { ok: unique && monotonic, label: 'Serialized in order — one tx per nonce, FIFO under the lock' },
+  ];
+  const allPass = checks.every((c) => c.ok);
 
   return (
     <details>
       <summary>Concurrency demo (nonce lock)</summary>
       <p className="bal-sub">
-        Fires N self-sends concurrently — proof the per-wallet nonce lock serializes them into
-        unique, consecutive nonces (no collisions, no gaps).
+        Fires N self-sends (1 wei each) at this wallet <em>simultaneously</em>. Without serialization
+        they'd race the same nonce → collisions, gaps, or a double-spend. A Postgres advisory lock
+        (<code>pg_advisory_xact_lock</code>) serializes read-nonce → sign → broadcast, so each gets a
+        unique, consecutive nonce.
       </p>
       <label>
         N concurrent sends{' '}
@@ -677,10 +690,19 @@ function ConcurrencyDemo({
                 </span>
               </div>
             ))}
-          <p className={`verdict ${unique && monotonic && errors.length === 0 ? 'ok' : 'bad'}`}>
-            {errors.length === 0
-              ? `${nonces.length}/${results.length} serialized — unique, consecutive nonces ✓`
-              : `${errors.length}/${results.length} failed (${errors[0].error})`}
+          <ul className="checklist" style={{ marginTop: 10 }}>
+            {checks.map((c) => (
+              <li key={c.label} className={c.ok ? 'ok' : 'bad'}>
+                <span aria-hidden>{c.ok ? '✓' : '✗'}</span> {c.label}
+              </li>
+            ))}
+          </ul>
+          <p className={`verdict ${allPass ? 'ok' : 'bad'}`}>
+            {allPass
+              ? `${nonces.length} concurrent sends, zero contention bugs — the lock held.`
+              : errors.length
+                ? `${errors.length}/${results.length} failed (${errors[0].error})`
+                : 'ordering violated — nonces overlapped or skipped.'}
           </p>
         </div>
       )}

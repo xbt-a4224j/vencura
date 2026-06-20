@@ -180,6 +180,11 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
 .nonce-row .nnum { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; }
 .verdict.ok { color: var(--ok); font-weight: 700; }
 .verdict.bad { color: var(--fail); font-weight: 700; }
+.checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.checklist li { font-size: 13px; display: flex; gap: 8px; align-items: baseline; }
+.checklist li.ok { color: var(--ok); }
+.checklist li.bad { color: var(--fail); }
+.checklist li span { font-weight: 700; }
 
 /* Header status bar — network + last-updated + refresh */
 .statusbar { display: flex; align-items: center; gap: 14px; font-size: 12.5px; color: var(--muted); margin: -8px 0 18px; padding: 8px 0; border-bottom: 1px solid var(--line); }

@@ -19,11 +19,14 @@ export class ActivityService {
 
   async recent(walletId: string, userId: string): Promise<ActivityItem[]> {
     await this.wallets.findOwnedOrThrow(walletId, userId); // authz: caller must own the wallet
-    const [txs, sigs] = await Promise.all([
+    const [txs, sigs, audits] = await Promise.all([
       this.prisma.transaction.findMany({ where: { walletId }, orderBy: { createdAt: 'desc' }, take: 50 }),
       this.prisma.signedMessage.findMany({ where: { walletId }, orderBy: { createdAt: 'desc' }, take: 50 }),
+      this.prisma.auditLog
+        .findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 50 })
+        .catch(() => []),
     ]);
-    return mergeActivity(txs, sigs);
+    return mergeActivity(txs, sigs, audits);
   }
 
   /** Cross-wallet audit trail for one user: every send, signature, and governance event across
