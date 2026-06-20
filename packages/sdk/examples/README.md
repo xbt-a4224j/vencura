@@ -31,6 +31,7 @@ pnpm --filter @vencura/sdk exec tsx examples/05-concurrency.ts
 | `03-sign-message.ts` | sign a message, recover the signer locally (EIP-191) |
 | `04-send-transaction.ts` | `sendAndConfirm` — broadcast native ETH and wait for confirmation (auto idempotency key) |
 | `05-concurrency.ts` | fire N concurrent sends → unique, consecutive nonces (the nonce lock) |
+| `06-token-flow.ts` | ERC-20 approve → transferFrom via the typed token helpers (`v.tokens.*`) |
 
 ## CLI
 
