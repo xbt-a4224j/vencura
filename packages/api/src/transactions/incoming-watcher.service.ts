@@ -67,7 +67,16 @@ export class IncomingWatcher {
         if (tx.from.toLowerCase() === tx.to.toLowerCase()) continue; // self-send: already our own tx
         const walletId = byAddr.get(tx.to.toLowerCase());
         if (!walletId) continue;
-        count += await this.record(walletId, tx.hash, -1, 'ETH', tx.value.toString(), tx.from, b, blockTime.get(b)!);
+        count += await this.record({
+          walletId,
+          txHash: tx.hash,
+          logIndex: -1, // native transfer — no log
+          asset: 'ETH',
+          amount: tx.value.toString(),
+          fromAddress: tx.from,
+          blockNumber: b,
+          occurredAt: blockTime.get(b)!,
+        });
       }
     }
 
@@ -79,8 +88,16 @@ export class IncomingWatcher {
       if (fromAddr.toLowerCase() === toAddr.toLowerCase()) continue; // self-send: already our own tx
       const walletId = byAddr.get(toAddr.toLowerCase());
       if (!walletId || !log.transactionHash || log.blockNumber == null) continue;
-      const occurredAt = blockTime.get(log.blockNumber) ?? new Date(); // in-range blocks are all mapped
-      count += await this.record(walletId, log.transactionHash, Number(log.logIndex ?? 0), log.address.toLowerCase(), (log.args.value ?? 0n).toString(), fromAddr, log.blockNumber, occurredAt);
+      count += await this.record({
+        walletId,
+        txHash: log.transactionHash,
+        logIndex: Number(log.logIndex ?? 0),
+        asset: log.address.toLowerCase(),
+        amount: (log.args.value ?? 0n).toString(),
+        fromAddress: fromAddr,
+        blockNumber: log.blockNumber,
+        occurredAt: blockTime.get(log.blockNumber) ?? new Date(), // in-range blocks are all mapped
+      });
     }
 
     await this.prisma.chainCursor.upsert({
@@ -91,23 +108,22 @@ export class IncomingWatcher {
     if (count > 0) this.logger.log(`indexed ${count} inbound transfer(s) [blocks ${from}..${to}]`);
   }
 
-  /** Insert one received transfer; returns 1 if new, 0 if it was already indexed (unique conflict). */
-  private async record(
-    walletId: string,
-    txHash: string,
-    logIndex: number,
-    asset: string,
-    amount: string,
-    fromAddress: string,
-    blockNumber: bigint,
-    occurredAt: Date,
-  ): Promise<number> {
+  /** Insert one received transfer; returns 1 if new, 0 if it was already indexed (unique conflict).
+   *  `occurredAt` (the on-chain block time) becomes `createdAt` — NOT now() — so a backfilled
+   *  transfer from yesterday sorts/shows as yesterday, not as its indexing moment. */
+  private async record(t: {
+    walletId: string;
+    txHash: string;
+    logIndex: number;
+    asset: string;
+    amount: string;
+    fromAddress: string;
+    blockNumber: bigint;
+    occurredAt: Date;
+  }): Promise<number> {
+    const { occurredAt, ...row } = t;
     try {
-      // createdAt = the on-chain block time (the real event time), NOT now() — a backfilled
-      // transfer from yesterday must sort/show as yesterday, not as its indexing moment.
-      await this.prisma.receivedTransfer.create({
-        data: { walletId, txHash, logIndex, asset, amount, fromAddress, blockNumber, createdAt: occurredAt },
-      });
+      await this.prisma.receivedTransfer.create({ data: { ...row, createdAt: occurredAt } });
       return 1;
     } catch (e) {
       // Only a P2002 unique conflict means "already indexed" (idempotent re-scan) → skip quietly.
