@@ -823,6 +823,12 @@ function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
   const ethAvailable = ethBal ? BigInt(ethBal.available) : 0n;
   const canSend = ethAvailable > 0n;
   const ethZero = !!balances && ethAvailable === 0n;
+  // New wallets are auto-funded (0.001 ETH from the master) on provision — the tx is broadcast, not
+  // awaited, so the balance reads 0 for ~15-30s until it confirms. Distinguish "auto-fund still
+  // landing" (recently created) from "genuinely needs funding" so we don't tell the user to self-fund
+  // while the seed is already on the way.
+  const justProvisioned =
+    ethZero && !!wallet.createdAt && Date.now() - new Date(wallet.createdAt).getTime() < 120_000;
 
   return (
     <li>
@@ -867,15 +873,25 @@ function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
             ))}
           </div>
         )}
-        {ethZero && (
-          <p className="hint">
-            This wallet is unfunded — fund it to send.{' '}
-            <a href={FAUCET_URL} target="_blank" rel="noreferrer">
-              Sepolia faucet ↗
-            </a>
-            <CopyButton value={wallet.address} label="copy address" />
-          </p>
-        )}
+        {ethZero &&
+          (justProvisioned ? (
+            <p className="hint">
+              Auto-funding this wallet with 0.001 ETH — give it ~30s, then click <strong>Refresh</strong>. Still
+              0 after a minute?{' '}
+              <a href={FAUCET_URL} target="_blank" rel="noreferrer">
+                Sepolia faucet ↗
+              </a>
+              <CopyButton value={wallet.address} label="copy address" />
+            </p>
+          ) : (
+            <p className="hint">
+              This wallet is unfunded — top it up to send.{' '}
+              <a href={FAUCET_URL} target="_blank" rel="noreferrer">
+                Sepolia faucet ↗
+              </a>
+              <CopyButton value={wallet.address} label="copy address" />
+            </p>
+          ))}
       </div>
 
       <h4>Send</h4>
