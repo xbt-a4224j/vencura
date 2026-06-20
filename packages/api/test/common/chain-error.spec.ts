@@ -32,6 +32,22 @@ describe('mapChainError', () => {
     },
   );
 
+  it('maps a transferFrom allowance revert to 400 INSUFFICIENT_ALLOWANCE', () => {
+    const mapped = mapChainError(new Error('execution reverted: allowance'));
+    expect(mapped).toMatchObject({ status: 400, code: 'INSUFFICIENT_ALLOWANCE' });
+    expect(mapped?.detail).toMatch(/allowance/i);
+  });
+
+  it('maps a token balance revert to 400 INSUFFICIENT_TOKEN_BALANCE', () => {
+    const mapped = mapChainError(new Error('execution reverted: balance'));
+    expect(mapped).toMatchObject({ status: 400, code: 'INSUFFICIENT_TOKEN_BALANCE' });
+  });
+
+  it('maps a reasonless revert to 400 EXECUTION_REVERTED', () => {
+    const mapped = mapChainError(new Error('execution reverted'));
+    expect(mapped).toMatchObject({ status: 400, code: 'EXECUTION_REVERTED' });
+  });
+
   it('returns null for an unknown error', () => {
     expect(mapChainError(new Error('something totally unexpected'))).toBeNull();
   });

@@ -15,5 +15,28 @@ export function mapChainError(err: unknown): MappedError | null {
     return { status: 409, detail: 'Replacement transaction underpriced.', code: 'REPLACEMENT_UNDERPRICED' };
   if (/(fetch failed|ECONNREFUSED|timed out|HTTP request failed)/i.test(msg))
     return { status: 503, detail: 'Chain RPC unavailable; try again.', code: 'RPC_UNAVAILABLE' };
+  // An on-chain revert (caught at gas-estimation time, before broadcast) — a contract precondition
+  // failed. Specialize on the revert reason when present (this demo token reverts "allowance" /
+  // "balance"); otherwise a generic, actionable message still beats a bare 500.
+  if (/execution reverted|reverted with reason|VM Exception/i.test(msg)) {
+    if (/allowance/i.test(msg))
+      return {
+        status: 400,
+        detail:
+          'transferFrom reverted: the holder’s on-chain approval (allowance) is less than the requested amount. The holder must approve at least that amount first.',
+        code: 'INSUFFICIENT_ALLOWANCE',
+      };
+    if (/balance/i.test(msg))
+      return {
+        status: 400,
+        detail: 'Reverted: the token balance is less than the requested amount.',
+        code: 'INSUFFICIENT_TOKEN_BALANCE',
+      };
+    return {
+      status: 400,
+      detail: 'The transaction would revert on-chain (a contract precondition failed) — check the allowance and balances.',
+      code: 'EXECUTION_REVERTED',
+    };
+  }
   return null;
 }
