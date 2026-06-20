@@ -31,3 +31,17 @@ pnpm --filter @vencura/sdk exec tsx examples/05-concurrency.ts
 | `03-sign-message.ts` | sign a message, recover the signer locally (EIP-191) |
 | `04-send-transaction.ts` | `sendAndConfirm` — broadcast native ETH and wait for confirmation (auto idempotency key) |
 | `05-concurrency.ts` | fire N concurrent sends → unique, consecutive nonces (the nonce lock) |
+
+## CLI
+
+The package ships a `vencura` CLI (a thin wrapper over the SDK). The JWT persists in `~/.vencura/token`,
+so log in once. API base via `$VENCURA_API_URL` (default `http://localhost:3000`).
+
+```bash
+export VENCURA_API_URL=https://vencura-alpha.vercel.app/api
+pnpm --filter @vencura/sdk exec node dist/cli.js login <email> <password>
+pnpm --filter @vencura/sdk exec node dist/cli.js balance
+pnpm --filter @vencura/sdk exec node dist/cli.js sign "I control this wallet"
+pnpm --filter @vencura/sdk exec node dist/cli.js send --to vitalik.eth --amount 0.0001 --wait
+pnpm --filter @vencura/sdk exec node dist/cli.js activity
+```
