@@ -1572,7 +1572,7 @@ function UserTokenPanel({ wallets }: { wallets: Wallet[] }) {
   const [walletId, setWalletId] = useState('');
   const [amt, setAmt] = useState('');
   const [bal, setBal] = useState('');
-  const [msg, setMsg] = useState('');
+  const [result, setResult] = useState<{ text: string; txHash?: string | null } | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -1598,7 +1598,7 @@ function UserTokenPanel({ wallets }: { wallets: Wallet[] }) {
 
   const approve = () => {
     setBusy(true);
-    setMsg('');
+    setResult(null);
     api
       .contractWrite(walletId, {
         address: token.address,
@@ -1606,8 +1606,8 @@ function UserTokenPanel({ wallets }: { wallets: Wallet[] }) {
         functionName: 'approve',
         args: [token.owner, parseEther(amt || '0').toString()],
       })
-      .then((tx) => setMsg(`✓ approved admin for ${amt} VCD (nonce ${tx.nonce})`))
-      .catch((e) => setMsg((e as Error).message))
+      .then((tx) => setResult({ text: `✓ approved admin for ${amt} VCD (nonce ${tx.nonce})`, txHash: tx.txHash }))
+      .catch((e) => setResult({ text: (e as Error).message }))
       .finally(() => setBusy(false));
   };
 
@@ -1643,7 +1643,17 @@ function UserTokenPanel({ wallets }: { wallets: Wallet[] }) {
           {busy ? 'Approving…' : 'Approve admin'}
         </button>
       </div>
-      {msg && <p>{msg}</p>}
+      {result && (
+        <p>
+          {result.text}
+          {result.txHash && (
+            <>
+              {' '}
+              · tx <HashLink value={result.txHash} href={explorerTx(result.txHash)} />
+            </>
+          )}
+        </p>
+      )}
     </section>
   );
 }
