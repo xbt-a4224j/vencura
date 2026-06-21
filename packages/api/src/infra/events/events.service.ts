@@ -22,7 +22,7 @@ export class EventsService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Push an ephemeral operational line (policy pass, nonce acquired, broadcast…) to the ring. */
+  /** Push an ephemeral operational line (nonce acquired, broadcast…) to the ring. */
   emit(msg: string, level: LogLine['level'] = 'info'): LogLine {
     const line: LogLine = { seq: ++this.seq, at: new Date().toISOString(), level, msg };
     this.buffer.push(line);
@@ -31,7 +31,7 @@ export class EventsService {
   }
 
   /** Persist a governance action to `audit_log` AND surface it on the live ring. Best-effort: the
-   *  audit write must never fail the user's operation (e.g. a send/policy change), so a DB error
+   *  audit write must never fail the user's operation (e.g. a send), so a DB error
    *  here is logged to the ring as a warning, not thrown. Production would harden this to a
    *  transactional outbox so the trail can't silently drop a row. */
   async record(e: {

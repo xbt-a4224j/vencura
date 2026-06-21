@@ -166,11 +166,7 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
 .field > span { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .field input, .field select { min-width: 160px; }
 
-/* Policy badges on a wallet card */
-.badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
-.badge { font-size: 11.5px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; }
-
-/* Live policy pre-flight verdict in the send form */
+/* Inline verdict line in the send form (ENS resolution, idempotent-retry result) */
 .preflight { font-size: 12.5px; font-weight: 600; margin: 4px 0; }
 .preflight.ok { color: var(--ok); }
 .preflight.bad { color: var(--fail); }
@@ -295,16 +291,6 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
 .stat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
 .stat .stat-num { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
 .stat .stat-label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
-
-/* ── Limit cards (clear per-wallet separation; labels above fields) ───────────────── */
-.policy-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin: 12px 0; }
-.policy-card > header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.policy-card .cur { font-size: 12.5px; color: var(--muted); margin: 0 0 12px; }
-.policy-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
-.policy-grid textarea { width: 100%; min-height: 64px; }
-.policy-limits { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.policy-card label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
-.policy-card .save-row { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 12px; }
 
 /* ── Activity tab: filterable audit table + live system-log console ──────────────── */
 .subtabs { display: flex; gap: 6px; margin: 4px 0 12px; }

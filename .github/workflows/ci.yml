@@ -51,8 +51,8 @@ jobs:
       - name: Build
         run: pnpm build
 
-  # Gated DB integration tests: exercise the REAL Postgres advisory lock + the policy daily-limit
-  # race against an ephemeral Postgres. The mock-based `verify` job can't catch a regression in the
+  # Gated DB integration tests: exercise the REAL Postgres advisory lock
+  # against an ephemeral Postgres. The mock-based `verify` job can't catch a regression in the
   # actual serialization primitive, so we run the RUN_DB_TESTS-gated specs here on every push.
   db-tests:
     runs-on: ubuntu-latest
@@ -111,7 +111,6 @@ jobs:
         run: >-
           pnpm --filter @vencura/api exec vitest run --no-file-parallelism
           test/infra/lock/pg-advisory-lock.int.spec.ts
-          test/transactions/policy-race.int.spec.ts
           test/transactions/happy-path.e2e.spec.ts
 
   release:

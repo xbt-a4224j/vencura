@@ -82,13 +82,6 @@ export interface LogLine {
   msg: string;
 }
 
-/** Effective per-wallet policy (GET/PUT /wallets/:id/policy). */
-export interface PolicyView {
-  walletId?: string;
-  perTxLimit: string | null;
-  dailyLimit: string | null;
-}
-
 export interface ChainHead {
   network: string;
   blockNumber: number;

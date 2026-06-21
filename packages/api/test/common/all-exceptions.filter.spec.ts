@@ -18,14 +18,14 @@ describe('AllExceptionsFilter', () => {
 
   it('shapes an HttpException into an RFC-7807-ish body with its status', () => {
     const { host, status, json } = mockHost();
-    filter.catch(new ForbiddenException('policy violation'), host);
+    filter.catch(new ForbiddenException('forbidden'), host);
     expect(status).toHaveBeenCalledWith(HttpStatus.FORBIDDEN);
     const body = json.mock.calls[0][0];
     expect(body).toMatchObject({
       type: 'about:blank',
       status: HttpStatus.FORBIDDEN,
-      detail: 'policy violation',
-      code: 'POLICY_VIOLATION',
+      detail: 'forbidden',
+      code: 'FORBIDDEN',
     });
     expect(body.traceId).toEqual(expect.any(String));
   });

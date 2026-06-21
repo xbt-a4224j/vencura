@@ -1,4 +1,4 @@
-import { ForbiddenException, type INestApplication } from '@nestjs/common';
+import { type INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import { ZodValidationPipe } from 'nestjs-zod';
@@ -12,7 +12,6 @@ import { LockModule } from '@/infra/lock/lock.module';
 import { LOCK } from '@/infra/lock/lock';
 import { EventsModule } from '@/infra/events/events.module';
 import { SIGNER } from '@/signer/signer';
-import { PolicyEngine } from '@/policy/policy.engine';
 import { TransactionsModule } from '@/transactions/transactions.module';
 
 const prismaMock = {
@@ -32,7 +31,6 @@ const chainMock = {
   sendRawTransaction: vi.fn().mockResolvedValue('0xhash'),
 };
 const signerMock = { signTransaction: vi.fn().mockResolvedValue('0xraw') };
-const policyMock = { assertAllowed: vi.fn().mockResolvedValue(undefined) };
 // Pass-through lock for HTTP-level tests.
 const lockMock = { withWalletLock: (_id: string, fn: () => Promise<unknown>) => fn() };
 
@@ -50,8 +48,6 @@ describe('Send HTTP', () => {
       .useValue(chainMock)
       .overrideProvider(SIGNER)
       .useValue(signerMock)
-      .overrideProvider(PolicyEngine)
-      .useValue(policyMock)
       .overrideProvider(LOCK)
       .useValue(lockMock)
       .compile();
@@ -65,7 +61,6 @@ describe('Send HTTP', () => {
 
   beforeEach(() => {
     prismaMock.wallet.findFirst.mockResolvedValue({ id: 'w1', address: '0xabc' });
-    policyMock.assertAllowed.mockResolvedValue(undefined);
   });
 
   it('sends and returns a pending tx (201)', async () => {
@@ -75,15 +70,6 @@ describe('Send HTTP', () => {
       .send({ to: '0x000000000000000000000000000000000000dEaD', asset: 'ETH', amount: '1' });
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({ txHash: '0xhash', status: 'pending' });
-  });
-
-  it('403 when policy denies', async () => {
-    policyMock.assertAllowed.mockRejectedValueOnce(new ForbiddenException('policy violation'));
-    const res = await request(app.getHttpServer())
-      .post('/wallets/w1/transactions')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ to: '0x000000000000000000000000000000000000dEaD', asset: 'ETH', amount: '1' });
-    expect(res.status).toBe(403);
   });
 
   it('401 without a token', async () => {

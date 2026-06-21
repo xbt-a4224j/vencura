@@ -7,7 +7,6 @@ import { ChainService } from '../infra/chain/chain.service';
 import { EventsService } from '../infra/events/events.service';
 import { LOCK, type Lock } from '../infra/lock/lock';
 import { PrismaService } from '../infra/prisma/prisma.service';
-import { PolicyEngine } from '../policy/policy.engine';
 import { SIGNER, type Signer } from '../signer/signer';
 import { WalletsService } from '../wallets/wallets.service';
 
@@ -17,7 +16,6 @@ export class TransactionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly chain: ChainService,
-    private readonly policy: PolicyEngine,
     private readonly wallets: WalletsService,
     private readonly events: EventsService,
     @Inject(LOCK) private readonly lock: Lock,
@@ -49,11 +47,6 @@ export class TransactionsService {
     const wallet = await this.wallets.findOwnedOrThrow(walletId, userId);
 
     return this.lock.withWalletLock(walletId, async () => {
-      // Policy check INSIDE the lock (CC-1): the daily-limit sum reads committed rows, and a
-      // concurrent send's row is only created below — so checking outside the lock is a TOCTOU
-      // (two same-wallet sends each read today=0 and both pass). The advisory lock serializes
-      // the whole critical section, so the second caller blocks, re-reads, and sees the first row.
-      await this.policy.assertAllowed(walletId, dto);
       // Idempotency check INSIDE the lock: serialized with the create below, so two
       // concurrent requests with the same key can't both broadcast (the second sees
       // the first's row and returns it). The @unique constraint is the backstop.

@@ -1,4 +1,4 @@
-// Demo seed routine: one user, a few funded wallets, a sample policy. Idempotent on the
+// Demo seed routine: one user, a few funded wallets. Idempotent on the
 // demo email. Reused by `pnpm db:seed` (prisma/seed.ts) and the dev-gated POST /admin/seed.
 import type { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
@@ -41,7 +41,7 @@ async function fundOnAnvil(address: `0x${string}`): Promise<boolean> {
   }
 }
 
-/** Create the demo user + wallets + policy. Idempotent: wipes the demo user's wallets first. */
+/** Create the demo user + wallets. Idempotent: wipes the demo user's wallets first. */
 export async function seedDemo(prisma: PrismaClient): Promise<SeedResult> {
   const key = masterKey();
   const passwordHash = await argon2.hash(DEMO_PASSWORD);
@@ -50,12 +50,12 @@ export async function seedDemo(prisma: PrismaClient): Promise<SeedResult> {
     create: { email: ADMIN_EMAIL, passwordHash, isDemo: true },
     update: { passwordHash, isDemo: true },
   });
-  // Re-seed cleanly: drop any prior demo wallets (cascades policies/txs/balances).
+  // Re-seed cleanly: drop any prior demo wallets (cascades txs/balances).
   await prisma.wallet.deleteMany({ where: { userId: user.id } });
 
   const wallets: SeedResult['wallets'] = [];
   for (let i = 0; i < WALLET_COUNT; i++) {
-    // Wallet 0 (the policy/sender wallet) uses a fixed key from DEMO_FUNDED_PRIVKEY when set,
+    // Wallet 0 (the funded sender wallet) uses a fixed key from DEMO_FUNDED_PRIVKEY when set,
     // so its address is STABLE across re-seeds/resets — fund it once on a faucet and the funds
     // persist (they live on-chain at the address, not in the DB). Other wallets stay random.
     const privateKey = i === 0 ? (demoFundedKey() ?? generatePrivateKey()) : generatePrivateKey();
@@ -67,15 +67,6 @@ export async function seedDemo(prisma: PrismaClient): Promise<SeedResult> {
     const funded = await fundOnAnvil(address as `0x${string}`);
     wallets.push({ ...wallet, funded });
   }
-
-  // Spending-limit policy on the first (funded) wallet — per-tx + daily caps (no allowlist).
-  const [first] = wallets;
-  const limits = { perTxLimit: parseEther('5').toString(), dailyLimit: parseEther('8').toString() };
-  await prisma.walletPolicy.upsert({
-    where: { walletId: first.id },
-    create: { walletId: first.id, ...limits },
-    update: { ...limits },
-  });
 
   return { email: ADMIN_EMAIL, password: DEMO_PASSWORD, wallets };
 }

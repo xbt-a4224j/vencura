@@ -8,7 +8,6 @@ import {
   type BalanceLine,
   DEMO_PASSWORD,
   type LogLine,
-  type Policy,
   v,
   type Wallet,
 } from './vencura';
@@ -259,7 +258,7 @@ function Landing({ onPick }: { onPick: (view: 'user' | 'admin' | 'playground') =
             🛠️
           </span>
           <h2>Admin</h2>
-          <p>The custody-ops console — wallets, policy limits, the chain inspector, audit + live system log.</p>
+          <p>The custody-ops console — wallets, the chain inspector, audit + live system log.</p>
         </button>
         <button type="button" className="tile" onClick={() => onPick('user')}>
           <span className="tile-emoji" aria-hidden>
@@ -339,17 +338,7 @@ function Landing({ onPick }: { onPick: (view: 'user' | 'admin' | 'playground') =
               <td>
                 <code>POST /wallets/:id/transactions</code>
               </td>
-              <td>Per-wallet nonce-serialized, idempotent broadcast; policy enforced before signing.</td>
-            </tr>
-            <tr>
-              <td>Policy editor (limits)</td>
-              <td>
-                <code>v.wallets.setPolicy()</code>
-              </td>
-              <td>
-                <code>PUT /wallets/:id/policy</code>
-              </td>
-              <td>Per-tx and daily caps, checked before signing.</td>
+              <td>Per-wallet nonce-serialized, idempotent broadcast.</td>
             </tr>
             <tr>
               <td>Activity feed</td>
@@ -390,7 +379,7 @@ function Landing({ onPick }: { onPick: (view: 'user' | 'admin' | 'playground') =
           className="sysmap-svg"
           viewBox="0 0 880 340"
           role="img"
-          aria-label="Architecture: the React web app calls the typed SDK, which calls the NestJS API over REST. The API holds the pluggable AES-256-GCM signer, the per-wallet nonce lock, the confirmation/balance pollers, and the pre-sign policy engine. It persists to Postgres (a cached projection) and reads from / broadcasts to Ethereum Sepolia via Infura, which is the source of truth."
+          aria-label="Architecture: the React web app calls the typed SDK, which calls the NestJS API over REST. The API holds the pluggable AES-256-GCM signer, the per-wallet nonce lock, the confirmation/balance pollers. It persists to Postgres (a cached projection) and reads from / broadcasts to Ethereum Sepolia via Infura, which is the source of truth."
         >
           <defs>
             <marker id="vc-arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
@@ -422,8 +411,6 @@ function Landing({ onPick }: { onPick: (view: 'user' | 'admin' | 'playground') =
           <text x="506" y="220" textAnchor="middle" fontSize="12" fontWeight="600" fill="var(--ink)">Pollers</text>
           <text x="506" y="236" textAnchor="middle" fontSize="10.5" fill="var(--muted)">confirmations · balances</text>
 
-          <rect x="406" y="254" width="200" height="40" rx="7" fill="var(--panel)" stroke="var(--line)" />
-          <text x="506" y="278" textAnchor="middle" fontSize="11" fill="var(--muted)">Policy engine — enforced pre-sign</text>
 
           <rect x="662" y="88" width="206" height="86" rx="9" fill="var(--panel)" stroke="var(--line)" />
           <text x="765" y="116" textAnchor="middle" fontSize="13" fontWeight="600" fill="var(--ink)">Postgres</text>
@@ -597,16 +584,14 @@ function UserAuth({ onExit }: { onExit: () => void }) {
 }
 
 
-/** Send native ETH (or an ERC-20 by address) to a recipient address, with a live per-tx pre-flight. */
+/** Send native ETH (or an ERC-20 by address) to a recipient address. */
 function SendForm({
   wallet,
   assets,
-  policy,
   onSent,
 }: {
   wallet: Wallet;
   assets: { value: string; label: string }[];
-  policy: Policy | null;
   onSent: () => void;
 }) {
   const [asset, setAsset] = useState('ETH');
@@ -660,21 +645,6 @@ function SendForm({
   }, [to]);
 
   const addr = resolved?.address ?? '';
-  // Client mirror of the server per-tx limit for a live pre-flight verdict. The daily limit is
-  // server-enforced (needs today's spend), so it isn't previewed here.
-  const preflight = (() => {
-    if (!policy || !addr) return null;
-    if (asset === 'ETH' && policy.perTxLimit && amount) {
-      try {
-        if (parseEther(amount) > BigInt(policy.perTxLimit))
-          return { ok: false, msg: `exceeds per-tx limit (${toEth(policy.perTxLimit)} ETH)` };
-      } catch {
-        /* invalid amount — the submit guard handles it */
-      }
-    }
-    return { ok: true, msg: 'within policy' };
-  })();
-
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
@@ -756,7 +726,6 @@ function SendForm({
         <label className="field" htmlFor={`amount-${wallet.id}`}>
           <span>
             Amount (ETH)
-            {policy?.perTxLimit ? ` · max ${toEth(policy.perTxLimit)}/tx` : ''}
           </span>
           <input
             id={`amount-${wallet.id}`}
@@ -768,7 +737,7 @@ function SendForm({
           />
         </label>
 
-        <button type="submit" disabled={busy || amount.length === 0 || !addr || (preflight ? !preflight.ok : false)}>
+        <button type="submit" disabled={busy || amount.length === 0 || !addr}>
           {busy ? 'Sending…' : 'Send'}
         </button>
       </div>
@@ -780,11 +749,6 @@ function SendForm({
       )}
       {to.trim() && !resolving && !resolved && (
         <p className="preflight bad">✗ enter a valid 0x address or ENS name</p>
-      )}
-      {preflight && (
-        <p className={`preflight ${preflight.ok ? 'ok' : 'bad'}`}>
-          {preflight.ok ? '✓ within policy' : `✗ would be blocked: ${preflight.msg}`}
-        </p>
       )}
       {sent && (
         <div className="hint">
@@ -886,7 +850,7 @@ function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: numb
                   {' '}· tx <HashLink value={it.txHash} href={explorerTx(it.txHash)} />
                 </li>
               );
-            // audit: a durable governance event (policy.changed, wallet.created, token.deployed, …)
+            // audit: a durable governance event (wallet.created, token.deployed, …)
             if (it.kind === 'audit')
               return (
                 <li key={it.id}>
@@ -1011,7 +975,6 @@ function ConcurrencyDemo({
 
 function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
   const [balances, setBalances] = useState<BalanceLine[] | null>(null);
-  const [policy, setPolicy] = useState<Policy | null>(null);
   // A realistic default payload so signing demonstrates a *use* (proving wallet ownership off-chain),
   // not "sign a blank box". This is the shape of a Sign-In-With-Ethereum / gasless-approval challenge.
   const [message, setMessage] = useState(
@@ -1038,12 +1001,8 @@ function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
   const load = useCallback(
     () =>
       guard(async () => {
-        const [bal, pol] = await Promise.all([
-          v.wallets.getBalance({ walletId: wallet.id }),
-          v.wallets.getPolicy({ walletId: wallet.id }),
-        ]);
+        const bal = await v.wallets.getBalance({ walletId: wallet.id });
         setBalances(bal.balances);
-        setPolicy(pol);
       }),
     [wallet.id],
   );
@@ -1102,12 +1061,6 @@ function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
         </a>
         <CopyButton value={wallet.address} label="⧉" />
       </div>
-      {policy && (policy.perTxLimit || policy.dailyLimit) && (
-        <div className="badges">
-          {policy.perTxLimit && <span className="badge">Per-tx ≤ {toEth(policy.perTxLimit)} ETH</span>}
-          {policy.dailyLimit && <span className="badge">Daily ≤ {toEth(policy.dailyLimit)} ETH</span>}
-        </div>
-      )}
       <div>
         <button
           onClick={() => {
@@ -1158,7 +1111,7 @@ function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
       </div>
 
       <h4>Send</h4>
-      <SendForm wallet={wallet} assets={assetOptions} policy={policy} onSent={onSent} />
+      <SendForm wallet={wallet} assets={assetOptions} onSent={onSent} />
 
       {/* One wallet per account → no internal "your wallets" recipients; the concurrency demo
           fires repeated self-sends to prove the nonce lock. ERC-20 / approve lives in the Token tab. */}
@@ -1226,103 +1179,6 @@ function WalletsTab({ wallets, onChange, email }: { wallets: Wallet[]; onChange:
         <WalletItem key={w.id} wallet={w} email={email} />
       ))}
     </ul>
-  );
-}
-
-/** Edit one wallet's spending limits as a self-contained card: per-tx + daily caps (entered in
- *  ETH). Labels sit directly above their field; save is disabled until something changes. */
-function LimitsEditor({ wallet }: { wallet: Wallet }) {
-  const [perTxLimit, setPerTxLimit] = useState('');
-  const [dailyLimit, setDailyLimit] = useState('');
-  const [loaded, setLoaded] = useState<Policy | null>(null);
-  const [status, setStatus] = useState('');
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    v.wallets
-      .getPolicy({ walletId: wallet.id })
-      .then((p) => {
-        setPerTxLimit(p.perTxLimit ? toEth(p.perTxLimit) : '');
-        setDailyLimit(p.dailyLimit ? toEth(p.dailyLimit) : '');
-        setLoaded(p);
-      })
-      .catch((e) => setError((e as Error).message));
-  }, [wallet.id]);
-
-  // Dirty check vs the loaded limits so Save only lights up on a real change.
-  const dirty =
-    !!loaded &&
-    (perTxLimit !== (loaded.perTxLimit ? toEth(loaded.perTxLimit) : '') ||
-      dailyLimit !== (loaded.dailyLimit ? toEth(loaded.dailyLimit) : ''));
-
-  const cur = loaded
-    ? !loaded.perTxLimit && !loaded.dailyLimit
-      ? 'No limits set — any amount.'
-      : `per-tx ${loaded.perTxLimit ? `≤ ${toEth(loaded.perTxLimit)} ETH` : '∞'} · daily ${loaded.dailyLimit ? `≤ ${toEth(loaded.dailyLimit)} ETH` : '∞'}`
-    : 'Loading…';
-
-  const save = async (e: FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setStatus('');
-    try {
-      const next: Policy = {
-        // Limits are entered in ETH; persist as wei base units to match the backend.
-        perTxLimit: perTxLimit.trim() ? parseEther(perTxLimit.trim()).toString() : null,
-        dailyLimit: dailyLimit.trim() ? parseEther(dailyLimit.trim()).toString() : null,
-      };
-      await v.wallets.setPolicy({ walletId: wallet.id, ...next });
-      setLoaded(next);
-      setStatus(`✓ saved ${new Date().toLocaleTimeString()}`);
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  };
-
-  return (
-    <form className="policy-card" onSubmit={save}>
-      <header>
-        <span className="nick">Wallet</span>
-        <a href={explorerAddress(wallet.address)} target="_blank" rel="noreferrer" title={wallet.address}>
-          <code>{shortHex(wallet.address)}</code> ↗
-        </a>
-        <CopyButton value={wallet.address} label="⧉" />
-      </header>
-      <p className="cur">Currently: {cur}</p>
-      <div className="policy-limits">
-        <label htmlFor={`pertx-${wallet.id}`}>
-          Per-tx limit (ETH)
-          <input
-            id={`pertx-${wallet.id}`}
-            type="number"
-            step="any"
-            min="0"
-            placeholder="∞"
-            value={perTxLimit}
-            onChange={(e) => setPerTxLimit(e.target.value)}
-          />
-        </label>
-        <label htmlFor={`daily-${wallet.id}`}>
-          Daily limit (ETH)
-          <input
-            id={`daily-${wallet.id}`}
-            type="number"
-            step="any"
-            min="0"
-            placeholder="∞"
-            value={dailyLimit}
-            onChange={(e) => setDailyLimit(e.target.value)}
-          />
-        </label>
-      </div>
-      <div className="save-row">
-        {status && <span className="bal-sub">{status}</span>}
-        <button type="submit" disabled={!dirty}>
-          Save limits
-        </button>
-      </div>
-      {error && <p role="alert">{error}</p>}
-    </form>
   );
 }
 
@@ -1454,23 +1310,6 @@ function OverviewTab({ wallets, onGoWallets }: { wallets: Wallet[]; onGoWallets:
   );
 }
 
-// Policies tab: one card per wallet, separate from wallet operation (audit #1/#2).
-function LimitsTab({ wallets }: { wallets: Wallet[] }) {
-  if (wallets.length === 0)
-    return (
-      <section>
-        <p>No wallets — create one or seed demo data first.</p>
-      </section>
-    );
-  return (
-    <section>
-      {wallets.map((w) => (
-        <LimitsEditor key={w.id} wallet={w} />
-      ))}
-    </section>
-  );
-}
-
 // The live "system log": polls GET /events with a seq cursor and tails the ring buffer.
 function LiveLog() {
   const [lines, setLines] = useState<LogLine[]>([]);
@@ -1500,7 +1339,7 @@ function LiveLog() {
   return (
     <div className="logconsole" ref={boxRef} role="log" aria-label="Live system log" aria-live="polite">
       {lines.length === 0
-        ? 'Waiting for events… create a wallet, set a policy, or send to see the engine narrate.'
+        ? 'Waiting for events… create a wallet or send to see the engine narrate.'
         : lines.map((l) => (
             <div key={l.seq}>
               <span className="ts">{new Date(l.at).toLocaleTimeString()} </span>
@@ -2028,7 +1867,7 @@ function SettingsTab({ onChange }: { onChange: () => void }) {
         )}
       </h3>
       <p className="bal-sub">
-        Gates only seed/reset — creating wallets, sending, and policy don't need it. In production
+        Gates only seed/reset — creating wallets and sending don't need it. In production
         it's a server-side secret, never shown; here you paste the dev key to enable the destructive
         actions below.
       </p>
@@ -2119,7 +1958,6 @@ function SettingsTab({ onChange }: { onChange: () => void }) {
 const ADMIN_TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'wallets', label: 'Wallets' },
-  { id: 'limits', label: 'Limits' },
   { id: 'token', label: 'Token' },
   { id: 'activity', label: 'Activity' },
   { id: 'settings', label: 'Settings' },
@@ -2158,7 +1996,6 @@ function AdminView({ onExit }: { onExit: () => void }) {
       <div role="tabpanel" aria-labelledby={`tab-${tab}`}>
         {tab === 'overview' && <OverviewTab wallets={wallets} onGoWallets={() => setTab('wallets')} />}
         {tab === 'wallets' && <WalletsTab wallets={wallets} onChange={refresh} email={current?.email ?? ''} />}
-        {tab === 'limits' && <LimitsTab wallets={wallets} />}
         {tab === 'token' && <TokenTab wallets={wallets} />}
         {tab === 'activity' && <ActivityTab wallets={wallets} />}
         {tab === 'settings' && <SettingsTab onChange={refresh} />}

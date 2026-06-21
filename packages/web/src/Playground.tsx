@@ -157,8 +157,6 @@ declare const v: {
     holders(): Promise<{ address: string; email: string }[]>;
     getBalance(p: { walletId: string }): Promise<BalanceView>;
     signMessage(p: { walletId: string; message: string }): Promise<{ signature: string }>;
-    getPolicy(p: { walletId: string }): Promise<{ perTxLimit: string | null; dailyLimit: string | null }>;
-    setPolicy(p: { walletId: string; perTxLimit: string | null; dailyLimit: string | null }): Promise<unknown>;
   };
   transactions: {
     send(p: { walletId: string; to: string; asset: string; amount: string; idempotencyKey?: string }): Promise<Transaction>;

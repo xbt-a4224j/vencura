@@ -5,7 +5,6 @@ import {
   type BalanceLine,
   DEMO_PASSWORD,
   type LogLine,
-  type PolicyView,
   Vencura,
   type Wallet,
 } from '@vencura/sdk';
@@ -40,4 +39,3 @@ export const v = new Vencura({ basePath: '/api', tokenStore, adminKey: () => adm
 
 // Re-export the response models the components type against (single source: @vencura/shared).
 export type { Account, ActivityItem, BalanceLine, LogLine, Wallet };
-export type Policy = PolicyView;

@@ -87,7 +87,7 @@ Only `.env.example` (with placeholders) is tracked in git.
 
 ```
 packages/
-  api/      NestJS REST API + workers (auth, wallets, transactions, balances, policy, signer, admin)
+  api/      NestJS REST API + workers (auth, wallets, transactions, balances, signer, admin)
   sdk/      typed TS client over the OpenAPI spec + example scripts
   web/      React/TS admin UI (load-bearing for every feature)
   shared/   shared types / zod schemas
@@ -137,7 +137,6 @@ graph TD
         WalletsM["WalletsModule\nPOST /wallets\nGET /wallets"]
         TxM["TransactionsModule\nPOST /wallets/:id/transactions\nPOST /wallets/:id/messages\nGET /wallets/:id/transactions\n+ ConfirmationWatcher (poller)"]
         BalM["BalancesModule\nGET /wallets/:id/balance\n+ BalanceRefresher (poller)"]
-        PolicyM["PolicyModule\nPolicyEngine\nallowlist · amount · daily limits"]
         SignerM["SignerModule\nEncryptedKeySigner (AES-256-GCM)\nShamirSigner (bonus)"]
         AdminM["AdminModule\nPOST /admin/reset · seed\nconcurrency demo"]
 
@@ -149,7 +148,7 @@ graph TD
     end
 
     subgraph Storage["Data layer"]
-        PG[("Postgres\nderived cache\nwallet_balances · transactions\nwallet · users · policies")]
+        PG[("Postgres\nderived cache\nwallet_balances · transactions\nwallet · users")]
     end
 
     subgraph Chain["Ethereum"]
@@ -163,7 +162,6 @@ graph TD
     Browser -->|REST + JWT| AdminM
 
     WalletsM --> SignerM
-    TxM --> PolicyM
     TxM --> SignerM
     TxM --> LockM
 
@@ -185,7 +183,6 @@ sequenceDiagram
     participant C as Client
     participant Ctrl as TransactionsController
     participant Svc as TransactionsService
-    participant PE as PolicyEngine
     participant Lock as LockModule<br/>(pg_advisory_xact_lock)
     participant Signer as Signer<br/>(EncryptedKeySigner)
     participant Chain as Chain (viem)
@@ -193,9 +190,6 @@ sequenceDiagram
 
     C->>Ctrl: POST /wallets/:id/transactions<br/>{to, amount, asset, idempotencyKey}
     Ctrl->>Svc: sendTransaction(walletId, dto)
-
-    Svc->>PE: assertAllowed(walletId, dto)<br/>allowlist · per-tx limit · daily limit
-    PE-->>Svc: allowed (or throws 403)
 
     Svc->>Lock: withWalletLock(walletId, fn)
     Note over Lock,DB: pg_advisory_xact_lock acquired —<br/>concurrent same-wallet sends<br/>queue here; each gets a unique nonce

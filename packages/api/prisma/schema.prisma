@@ -44,7 +44,6 @@ model Wallet {
   transactions   Transaction[]
   signedMessages SignedMessage[]
   balances       WalletBalance[]
-  policy         WalletPolicy?
   received       ReceivedTransfer[]
 
   @@index([userId])
@@ -98,15 +97,6 @@ model SignedMessage {
   @@map("signed_messages")
 }
 
-model WalletPolicy {
-  walletId   String  @id
-  perTxLimit String?
-  dailyLimit String?
-  wallet     Wallet  @relation(fields: [walletId], references: [id], onDelete: Cascade)
-
-  @@map("wallet_policies")
-}
-
 enum TransactionStatus {
   pending
   confirmed
@@ -149,7 +139,7 @@ model WalletBalance {
 }
 
 // Durable governance/audit record (the "audit_log" of §4). Captures sensitive ACTIONS that
-// don't already live in `transactions`/`signed_messages` — policy changes, wallet creation,
+// don't already live in `transactions`/`signed_messages` — wallet creation,
 // admin reset/seed — so the unified Activity view is a true, queryable audit trail. Standalone
 // (no relations): an audit row outlives the wallet/user it references, so we keep ids as plain
 // columns and never cascade-delete history.
@@ -157,7 +147,7 @@ model AuditLog {
   id        String   @id @default(uuid())
   userId    String
   walletId  String?
-  type      String // policy.changed | wallet.created | admin.seed | admin.reset
+  type      String // wallet.created | admin.seed | admin.reset
   detail    Json?
   createdAt DateTime @default(now())
 

@@ -5,7 +5,6 @@ import { ChainService } from '@/infra/chain/chain.service';
 import { EventsService } from '@/infra/events/events.service';
 import { LOCK } from '@/infra/lock/lock';
 import { PrismaService } from '@/infra/prisma/prisma.service';
-import { PolicyEngine } from '@/policy/policy.engine';
 import { SIGNER } from '@/signer/signer';
 import { WalletsService } from '@/wallets/wallets.service';
 import { TransactionsService } from '@/transactions/transactions.service';
@@ -42,7 +41,6 @@ const chainMock = {
   sendRawTransaction: vi.fn().mockResolvedValue('0xhash'),
 };
 const signerMock = { signTransaction: vi.fn().mockResolvedValue('0xraw') };
-const policyMock = { assertAllowed: vi.fn().mockResolvedValue(undefined) };
 
 async function build(prisma: ReturnType<typeof makePrisma>) {
   const moduleRef = await Test.createTestingModule({
@@ -50,7 +48,6 @@ async function build(prisma: ReturnType<typeof makePrisma>) {
       TransactionsService,
       { provide: PrismaService, useValue: prisma },
       { provide: ChainService, useValue: chainMock },
-      { provide: PolicyEngine, useValue: policyMock },
       { provide: WalletsService, useValue: { findOwnedOrThrow: vi.fn().mockResolvedValue({ id: 'w1', address: '0xabc' }) } },
       { provide: EventsService, useValue: { record: vi.fn(), emit: vi.fn() } },
       { provide: LOCK, useValue: passThroughLock },

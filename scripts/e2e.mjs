@@ -7,7 +7,7 @@
 //   API=http://host:port node scripts/e2e.mjs
 
 const API = process.env.API ?? 'http://localhost:3000';
-const DEAD = '0x000000000000000000000000000000000000dEaD'; // never on an allowlist
+const DEAD = '0x000000000000000000000000000000000000dEaD';
 const ETH = (n) => (BigInt(Math.round(n * 1e6)) * 10n ** 12n).toString(); // n ETH → wei string
 
 let failures = 0;
@@ -50,7 +50,7 @@ async function main() {
     !JSON.stringify(newWallet.json).toLowerCase().includes('encrypt'),
   );
 
-  // 3. log in as the seeded demo user (funded wallets + a sample policy)
+  // 3. log in as the seeded demo user (funded wallets)
   const login = await req('/auth/login', {
     method: 'POST',
     body: { email: 'demo@vencura.local', password: 'demo-password' },
@@ -59,27 +59,15 @@ async function main() {
   const token = login.json.accessToken;
   if (!token) return; // nothing else works without it
 
-  // 4. find the wallet that carries the policy (robust to wallet ordering)
+  // 4. pick the seeded funded wallet
   const wallets = (await req('/wallets', { token })).json;
-  let policyWallet, policy;
-  for (const w of wallets ?? []) {
-    const p = (await req(`/wallets/${w.id}/policy`, { token })).json;
-    if (p.allowlist?.length) {
-      policyWallet = w;
-      policy = p;
-      break;
-    }
-  }
-  check(
-    'a seeded wallet has a policy with an allowlist',
-    !!policyWallet,
-    policyWallet ? `wallet ${policyWallet.address}` : 'none found',
-  );
-  if (!policyWallet) return;
-  const allowed = policy.allowlist[0];
+  const fundedWallet = wallets?.[0];
+  check('demo user has a seeded wallet', !!fundedWallet, fundedWallet ? `wallet ${fundedWallet.address}` : 'none found');
+  if (!fundedWallet) return;
+  const recipient = DEAD;
 
   // 5. balance reads (confirmed + available)
-  const bal = (await req(`/wallets/${policyWallet.id}/balance`, { token })).json;
+  const bal = (await req(`/wallets/${fundedWallet.id}/balance`, { token })).json;
   check(
     'balance returns confirmed + available',
     !!bal.balances?.[0] && 'available' in bal.balances[0],
@@ -87,7 +75,7 @@ async function main() {
   );
 
   // 6. sign a message
-  const sig = await req(`/wallets/${policyWallet.id}/messages`, {
+  const sig = await req(`/wallets/${fundedWallet.id}/messages`, {
     method: 'POST',
     token,
     body: { message: 'e2e gm' },
@@ -97,65 +85,48 @@ async function main() {
     sig.status === 201 && /^0x[0-9a-fA-F]+$/.test(sig.json.signature ?? ''),
   );
 
-  // 7. send to an allowlisted recipient → pending, then watcher confirms it
-  const send = await req(`/wallets/${policyWallet.id}/transactions`, {
+  // 7. send → pending, then watcher confirms it
+  const send = await req(`/wallets/${fundedWallet.id}/transactions`, {
     method: 'POST',
     token,
-    body: { to: allowed, asset: 'ETH', amount: ETH(0.1) },
+    body: { to: recipient, asset: 'ETH', amount: ETH(0.1) },
   });
   check(
-    'send to allowlisted recipient → pending',
+    'send → pending',
     send.status === 201 && send.json.status === 'pending',
     `nonce ${send.json.nonce}`,
   );
   let confirmed = false;
   for (let i = 0; i < 12 && !confirmed; i++) {
     await sleep(2000);
-    const txs = (await req(`/wallets/${policyWallet.id}/transactions`, { token })).json;
+    const txs = (await req(`/wallets/${fundedWallet.id}/transactions`, { token })).json;
     confirmed = txs?.[0]?.status === 'confirmed';
   }
   check('confirmation watcher flips it to confirmed', confirmed);
 
   // 8. idempotency: same key twice → one transaction
   const idem = `e2e-${Date.now()}`;
-  const a = await req(`/wallets/${policyWallet.id}/transactions`, {
+  const a = await req(`/wallets/${fundedWallet.id}/transactions`, {
     method: 'POST',
     token,
     idem,
-    body: { to: allowed, asset: 'ETH', amount: ETH(0.05) },
+    body: { to: recipient, asset: 'ETH', amount: ETH(0.05) },
   });
-  const b = await req(`/wallets/${policyWallet.id}/transactions`, {
+  const b = await req(`/wallets/${fundedWallet.id}/transactions`, {
     method: 'POST',
     token,
     idem,
-    body: { to: allowed, asset: 'ETH', amount: ETH(0.05) },
+    body: { to: recipient, asset: 'ETH', amount: ETH(0.05) },
   });
   check('same idempotency key → same tx id', !!a.json.id && a.json.id === b.json.id);
-
-  // 9. policy denials
-  const deny = await req(`/wallets/${policyWallet.id}/transactions`, {
-    method: 'POST',
-    token,
-    body: { to: DEAD, asset: 'ETH', amount: ETH(0.1) },
-  });
-  check('non-allowlisted recipient → 403', deny.status === 403, deny.json.detail);
-  if (policy.perTxLimit) {
-    const over = (BigInt(policy.perTxLimit) + 1n).toString();
-    const big = await req(`/wallets/${policyWallet.id}/transactions`, {
-      method: 'POST',
-      token,
-      body: { to: allowed, asset: 'ETH', amount: over },
-    });
-    check('over per-tx limit → 403', big.status === 403, big.json.detail);
-  }
 
   // 10. unauthenticated request → 401
   check(
     'unauthenticated send → 401',
     (
-      await req(`/wallets/${policyWallet.id}/transactions`, {
+      await req(`/wallets/${fundedWallet.id}/transactions`, {
         method: 'POST',
-        body: { to: allowed, asset: 'ETH', amount: ETH(0.1) },
+        body: { to: recipient, asset: 'ETH', amount: ETH(0.1) },
       })
     ).status === 401,
   );

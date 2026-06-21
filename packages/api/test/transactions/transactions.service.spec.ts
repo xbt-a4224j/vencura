@@ -2,7 +2,6 @@ import { Test } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '@/infra/prisma/prisma.service';
 import { ChainService } from '@/infra/chain/chain.service';
-import { PolicyEngine } from '@/policy/policy.engine';
 import { WalletsService } from '@/wallets/wallets.service';
 import { EventsService } from '@/infra/events/events.service';
 import { LOCK } from '@/infra/lock/lock';
@@ -51,7 +50,6 @@ const chainMock = {
   sendRawTransaction: vi.fn().mockResolvedValue('0xhash'),
 };
 const signerMock = { signTransaction: vi.fn().mockResolvedValue('0xraw') };
-const policyMock = { assertAllowed: vi.fn().mockResolvedValue(undefined) };
 
 async function build(prisma: ReturnType<typeof makePrisma>) {
   const moduleRef = await Test.createTestingModule({
@@ -59,7 +57,6 @@ async function build(prisma: ReturnType<typeof makePrisma>) {
       TransactionsService,
       { provide: PrismaService, useValue: prisma },
       { provide: ChainService, useValue: chainMock },
-      { provide: PolicyEngine, useValue: policyMock },
       { provide: WalletsService, useValue: { findOwnedOrThrow: prisma.wallet.findFirst } },
       { provide: EventsService, useValue: { record: vi.fn(), emit: vi.fn() } },
       { provide: LOCK, useValue: new SerialLock() },

@@ -76,7 +76,7 @@ function detailOf(exception: HttpException): string {
 
 /** Map a status + detail to a stable, machine-readable error code (the error taxonomy). */
 function codeFor(status: number, detail: string): string {
-  if (status === HttpStatus.FORBIDDEN) return /policy/i.test(detail) ? 'POLICY_VIOLATION' : 'FORBIDDEN';
+  if (status === HttpStatus.FORBIDDEN) return 'FORBIDDEN';
   if (status === HttpStatus.BAD_REQUEST) return /address/i.test(detail) ? 'INVALID_ADDRESS' : 'BAD_REQUEST';
   if (status === HttpStatus.UNAUTHORIZED) return 'UNAUTHORIZED';
   if (status === HttpStatus.NOT_FOUND) return 'NOT_FOUND';

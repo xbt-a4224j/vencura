@@ -9,7 +9,6 @@ import {
   type DeployTokenResult,
   type Holder,
   type LogLine,
-  type PolicyView,
   type SeedResult,
   type TokenInfo,
   type Transaction,
@@ -215,16 +214,6 @@ class WalletsApi {
   /** Off-chain proof of ownership (EIP-191). */
   signMessage(p: { walletId: string; message: string }): Promise<{ signature: string }> {
     return this.http.request(`/wallets/${p.walletId}/messages`, { method: 'POST', body: { message: p.message }, auth: true });
-  }
-  getPolicy(p: { walletId: string }): Promise<PolicyView> {
-    return this.http.request<PolicyView>(`/wallets/${p.walletId}/policy`, { auth: true });
-  }
-  setPolicy(p: { walletId: string; perTxLimit: string | null; dailyLimit: string | null }): Promise<PolicyView> {
-    return this.http.request<PolicyView>(`/wallets/${p.walletId}/policy`, {
-      method: 'PUT',
-      body: { perTxLimit: p.perTxLimit, dailyLimit: p.dailyLimit },
-      auth: true,
-    });
   }
 }
 

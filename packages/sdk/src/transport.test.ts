@@ -35,7 +35,7 @@ describe('Vencura transport — default fetch binding', () => {
     let called = false;
     const v = new Vencura({
       basePath: 'https://api.example',
-      fetch: ((input: unknown) => {
+      fetch: (() => {
         called = true;
         return Promise.resolve(new Response(JSON.stringify({ blockNumber: 7 }), { status: 200 }));
       }) as typeof fetch,

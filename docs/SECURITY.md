@@ -116,8 +116,6 @@ Treated as a first-class security property (a double-spend / nonce reuse is a co
   request (same key) results in exactly one broadcast — the second caller sees the first's row and returns it.
 - **Validate against live chain state:** nonce and balance are read from the chain (not the cache) inside the
   lock, so a stale cache can't authorize an overspend.
-- **Policy is enforced inside the lock** too (the daily-limit sum reads committed rows) — closing a TOCTOU where
-  two racing sends each see "today = 0" and both pass.
 
 ## 6. Input validation, errors, and data hygiene
 

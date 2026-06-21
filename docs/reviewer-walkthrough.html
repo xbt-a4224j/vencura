@@ -117,7 +117,7 @@
           <rect x="256" y="58" width="366" height="74" rx="9" fill="#fff" stroke="#cfe0cf" filter="url(#sh)"/>
           <text class="lbl" x="439" y="80" text-anchor="middle" font-weight="700">Feature modules</text>
           <text class="lblsm" x="439" y="98" text-anchor="middle">auth · wallets · balances</text>
-          <text class="lblsm" x="439" y="114" text-anchor="middle">transactions · policy · admin</text>
+          <text class="lblsm" x="439" y="114" text-anchor="middle">transactions · admin</text>
           <!-- signer + lock (custody primitives) -->
           <rect x="256" y="146" width="178" height="78" rx="9" fill="#e6f4ec" stroke="#bcdcc7" filter="url(#sh)"/>
           <text class="lbl" x="345" y="170" text-anchor="middle" font-weight="700">Signer 🔑</text>
@@ -356,7 +356,7 @@
             <text class="lblsm" x="466" y="101" text-anchor="middle">preflight reads allowance + balanceOf → names any shortfall, never broadcasts a doomed pull</text>
           </svg>
         </figure>
-        <p class="proves"><b>Proves:</b> ERC-20 support with the on-chain allowance as the authorization gate (not an off-chain allowlist).</p>
+        <p class="proves"><b>Proves:</b> ERC-20 support with the on-chain allowance as the authorization gate.</p>
         <p class="note">Deploying a fresh token and reset/seed are operator-only (they need the admin key). The token above is already deployed, so distribute → approve → transferFrom needs no special access.</p>
       </div>
 

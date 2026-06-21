@@ -105,7 +105,7 @@ cat <<EOF
 $(printf '\033[1;32m✓ VenCura is up.\033[0m')
    Web:    http://localhost:$WEB_PORT
    API:    http://localhost:$API_PORT   (Swagger UI at /docs)
-   Login:  demo@vencura.local / demo-password   (3 funded wallets + a sample policy)
+   Login:  demo@vencura.local / demo-password   (3 funded wallets)
    E2E:    $([ "$e2e_status" -eq 0 ] && printf 'passed' || printf 'FAILED (see output above)')
    Logs:   $RUN_DIR/api.log · $RUN_DIR/web.log
    Stop:   scripts/standup.sh stop      (or re-run this script to restart fresh)

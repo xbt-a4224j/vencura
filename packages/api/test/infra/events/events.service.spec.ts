@@ -44,10 +44,10 @@ describe('EventsService', () => {
 
   it('record() persists an audit row and also surfaces it on the live ring', async () => {
     const { svc, create } = makeService();
-    await svc.record({ userId: 'u1', walletId: 'w1', type: 'policy.changed', msg: 'policy set' });
+    await svc.record({ userId: 'u1', walletId: 'w1', type: 'wallet.created', msg: 'wallet created' });
     expect(create).toHaveBeenCalledWith({
-      data: { userId: 'u1', walletId: 'w1', type: 'policy.changed', detail: undefined },
+      data: { userId: 'u1', walletId: 'w1', type: 'wallet.created', detail: undefined },
     });
-    expect(svc.since(0).lines.at(-1)?.msg).toBe('policy set');
+    expect(svc.since(0).lines.at(-1)?.msg).toBe('wallet created');
   });
 });

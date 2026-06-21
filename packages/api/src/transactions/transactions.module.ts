@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { BalancesModule } from '../balances/balances.module';
-import { PolicyModule } from '../policy/policy.module';
 import { SignerModule } from '../signer/signer.module';
 import { WalletsModule } from '../wallets/wallets.module';
 import { ActivityController, UserActivityController } from './activity.controller';
@@ -18,7 +17,7 @@ import { TransactionsService } from './transactions.service';
 // ChainModule + LockModule are @Global, so ChainService and LOCK inject without re-importing.
 // BalancesModule is imported so the confirmation watcher can refresh balances on confirm.
 @Module({
-  imports: [AuthModule, BalancesModule, PolicyModule, SignerModule, WalletsModule],
+  imports: [AuthModule, BalancesModule, SignerModule, WalletsModule],
   controllers: [
     MessagesController,
     TransactionsController,

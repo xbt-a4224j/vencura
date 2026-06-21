@@ -22,7 +22,7 @@ export interface SigRow {
   walletId?: string;
   createdAt: Date;
 }
-// Durable governance events (policy.changed, wallet.created, admin.*) — the audit half of the
+// Durable governance events (wallet.created, admin.*) — the audit half of the
 // trail, alongside the on-chain (tx) and off-chain (signature) halves.
 export interface AuditRow {
   id: string;
