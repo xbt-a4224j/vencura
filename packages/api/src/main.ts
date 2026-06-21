@@ -7,13 +7,21 @@ import { config as loadEnv } from 'dotenv';
 import { ZodValidationPipe, cleanupOpenApiDoc } from 'nestjs-zod';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
+import { EventsService } from './infra/events/events.service';
+import { RingLogger } from './infra/events/ring-logger';
 
 // One root .env for the monorepo. Anchor to this file's compiled location (not cwd)
 // so it loads the same whether started via `nest start` or `node dist/main.js`.
 loadEnv({ path: resolve(__dirname, '../../../.env') });
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // bufferLogs holds early logs until we install the logger below, so nothing is lost.
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+
+  // Tee the NestJS logger into the EventsService ring buffer so the in-app "Live system log" shows
+  // the operational narration (nonce acquired, tx broadcast, confirmations…) the services already
+  // emit — no new call sites. Logged lines never contain key material/secrets (CLAUDE.md §9).
+  app.useLogger(new RingLogger(app.get(EventsService)));
 
   // Validate every request body/param against the zod schema on its DTO (nestjs-zod).
   // One schema is both the runtime validator and the OpenAPI definition (CLAUDE.md §3.1).
