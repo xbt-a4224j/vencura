@@ -269,19 +269,60 @@ function Landing({ onPick }: { onPick: (view: 'user' | 'admin' | 'playground') =
           <p>The end-to-end product — balances, send ETH or tokens, sign messages.</p>
         </button>
       </div>
-      <section className="why-card">
-        <h3>What makes a custodial wallet hard — and where it’s handled</h3>
-        <ul>
-          <li>
-            <b>Concurrency.</b> Racing sends collide on the account nonce. A per-wallet Postgres advisory
-            lock (<code>pg_advisory_xact_lock</code>) serializes read-nonce → sign → broadcast, so they
-            can’t. <em>Proof: Playground <code>05</code> — 5 simultaneous sends, consecutive nonces, zero collisions.</em>
-          </li>
-          <li>
-            <b>Idempotency.</b> A retried send must not double-broadcast. A unique key makes it exactly-once.
-            <em> Proof: Playground <code>04</code> — the SDK auto-generates the key on every send.</em>
-          </li>
-        </ul>
+      <section className="trace">
+        <h3>The four core actions — UI → SDK → API</h3>
+        <table className="trace-table">
+          <thead>
+            <tr>
+              <th>UI feature</th>
+              <th>SDK call</th>
+              <th>API endpoint</th>
+              <th>What it does</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>“Provision wallet” button</td>
+              <td>
+                <code>v.wallets.provision()</code>
+              </td>
+              <td>
+                <code>POST /wallets/provision</code>
+              </td>
+              <td>Generates an AES-256-GCM-encrypted key server-side and master-funds the wallet (one per account).</td>
+            </tr>
+            <tr>
+              <td>Balance card · Refresh</td>
+              <td>
+                <code>v.wallets.getBalance()</code>
+              </td>
+              <td>
+                <code>GET /wallets/:id/balance</code>
+              </td>
+              <td>Chain-read confirmed + pending → available; cached, stale-while-revalidate.</td>
+            </tr>
+            <tr>
+              <td>“Sign message” form</td>
+              <td>
+                <code>v.wallets.signMessage()</code>
+              </td>
+              <td>
+                <code>POST /wallets/:id/messages</code>
+              </td>
+              <td>Off-chain proof of ownership (EIP-191); key decrypted in memory only at sign time.</td>
+            </tr>
+            <tr>
+              <td>“Send” form (ETH / ERC-20)</td>
+              <td>
+                <code>v.transactions.send()</code>
+              </td>
+              <td>
+                <code>POST /wallets/:id/transactions</code>
+              </td>
+              <td>Per-wallet nonce-serialized, idempotent broadcast; policy enforced before signing.</td>
+            </tr>
+          </tbody>
+        </table>
       </section>
       <p className="landing-foot">
         <a href="/walkthrough.html" target="_blank" rel="noreferrer">
