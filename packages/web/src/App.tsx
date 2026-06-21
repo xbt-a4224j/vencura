@@ -454,7 +454,17 @@ function SendForm({
   // as a prominent "track on Etherscan" link so it isn't lost in the activity feed.
   const [resolved, setResolved] = useState<{ address: string; name?: string } | null>(null);
   const [resolving, setResolving] = useState(false);
-  const [sent, setSent] = useState<{ txHash: string; name?: string } | null>(null);
+  // Keep the full send params + idempotency key so the "safe retry" can resend with the SAME key —
+  // the server returns the existing tx instead of broadcasting again (exactly-once).
+  const [sent, setSent] = useState<{
+    txHash: string;
+    name?: string;
+    key: string;
+    to: string;
+    asset: string;
+    amount: string;
+  } | null>(null);
+  const [retryNote, setRetryNote] = useState('');
 
   // A 0x address passes through; an ENS name resolves via mainnet (debounced).
   useEffect(() => {
@@ -515,13 +525,40 @@ function SendForm({
         throw new Error('Enter a valid amount.');
       }
       if (wei <= 0n) throw new Error('Amount must be greater than 0.');
-      const tx = await v.transactions.send({ walletId: wallet.id, to: addr, asset, amount: wei.toString() });
-      if (tx.txHash) setSent({ txHash: tx.txHash, name: resolved?.name });
+      const key = crypto.randomUUID();
+      const tx = await v.transactions.send({ walletId: wallet.id, to: addr, asset, amount: wei.toString(), idempotencyKey: key });
+      if (tx.txHash) setSent({ txHash: tx.txHash, name: resolved?.name, key, to: addr, asset, amount: wei.toString() });
+      setRetryNote('');
       setAmount('');
       setTo('');
       onSent();
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Resend with the SAME idempotency key — the server returns the existing tx, proving exactly-once.
+  const retrySafe = async () => {
+    if (!sent) return;
+    setBusy(true);
+    setRetryNote('');
+    try {
+      const tx = await v.transactions.send({
+        walletId: wallet.id,
+        to: sent.to,
+        asset: sent.asset,
+        amount: sent.amount,
+        idempotencyKey: sent.key,
+      });
+      setRetryNote(
+        tx.txHash === sent.txHash
+          ? `✓ idempotent — same key returned the same tx (${shortHex(sent.txHash)}); not re-broadcast`
+          : `⚠ unexpected — returned a different tx ${shortHex(tx.txHash ?? '')}`,
+      );
+    } catch (e) {
+      setRetryNote(`✗ ${(e as Error).message}`);
     } finally {
       setBusy(false);
     }
@@ -552,7 +589,10 @@ function SendForm({
         </label>
 
         <label className="field" htmlFor={`amount-${wallet.id}`}>
-          <span>Amount (ETH)</span>
+          <span>
+            Amount (ETH)
+            {policy?.perTxLimit ? ` · max ${toEth(policy.perTxLimit)}/tx` : ''}
+          </span>
           <input
             id={`amount-${wallet.id}`}
             type="number"
@@ -563,7 +603,7 @@ function SendForm({
           />
         </label>
 
-        <button type="submit" disabled={busy || amount.length === 0 || !addr}>
+        <button type="submit" disabled={busy || amount.length === 0 || !addr || (preflight ? !preflight.ok : false)}>
           {busy ? 'Sending…' : 'Send'}
         </button>
       </div>
@@ -582,13 +622,27 @@ function SendForm({
         </p>
       )}
       {sent && (
-        <p className="hint">
-          ✓ Sent{sent.name ? ` to ${sent.name}` : ''} — track your transaction:{' '}
-          <a href={explorerTx(sent.txHash)} target="_blank" rel="noreferrer">
-            on Etherscan ↗
-          </a>
-          <CopyButton value={sent.txHash} label="copy tx" />
-        </p>
+        <div className="hint">
+          <p style={{ margin: '0 0 6px' }}>
+            ✓ Sent{sent.name ? ` to ${sent.name}` : ''} — track it:{' '}
+            <a href={explorerTx(sent.txHash)} target="_blank" rel="noreferrer">
+              on Etherscan ↗
+            </a>
+            <CopyButton value={sent.txHash} label="copy tx" />
+          </p>
+          <p className="bal-sub" style={{ margin: 0 }}>
+            idempotency key <code>{shortHex(sent.key)}</code>
+            <CopyButton value={sent.key} label="⧉" />{' '}
+            <button type="button" className="copybtn" onClick={() => void retrySafe()} disabled={busy}>
+              retry (won’t double-broadcast)
+            </button>
+          </p>
+          {retryNote && (
+            <p className={`preflight ${retryNote.startsWith('✓') ? 'ok' : 'bad'}`} style={{ marginBottom: 0 }}>
+              {retryNote}
+            </p>
+          )}
+        </div>
       )}
       {error && <p role="alert">{error}</p>}
     </form>
