@@ -4,16 +4,10 @@ import type { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { createTestClient, http, parseEther } from 'viem';
 import { generatePrivateKey, privateKeyToAddress } from 'viem/accounts';
-import { ADMIN_EMAIL, DEMO_PASSWORD, type Hex } from '@vencura/shared';
+import { ADMIN_EMAIL, DEMO_PASSWORD, type Hex, type SeedResult } from '@vencura/shared';
 import { encrypt } from '../signer/aes-256-gcm';
 
 const WALLET_COUNT = 1; // one wallet per account
-
-export interface SeedResult {
-  email: string;
-  password: string;
-  wallets: { id: string; address: string; funded: boolean }[];
-}
 
 function masterKey(): Buffer {
   const hex = process.env.MASTER_ENCRYPTION_KEY ?? '';
@@ -30,7 +24,7 @@ function demoFundedKey(): Hex | null {
 }
 
 /** Best-effort fund a wallet on a local anvil node; no-op (logged) on a real RPC. */
-async function fundOnAnvil(address: `0x${string}`): Promise<boolean> {
+async function fundOnAnvil(address: Hex): Promise<boolean> {
   const test = createTestClient({ mode: 'anvil', transport: http(process.env.RPC_URL!) });
   try {
     await test.setBalance({ address, value: parseEther('10') });
@@ -64,7 +58,7 @@ export async function seedDemo(prisma: PrismaClient): Promise<SeedResult> {
       data: { userId: user.id, address, ...encrypt(privateKey, key) },
       select: { id: true, address: true },
     });
-    const funded = await fundOnAnvil(address as `0x${string}`);
+    const funded = await fundOnAnvil(address as Hex);
     wallets.push({ ...wallet, funded });
   }
 

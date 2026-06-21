@@ -29,14 +29,6 @@ export class EncryptedKeySigner implements Signer {
     return { address, ...envelope };
   }
 
-  async getAddress(walletId: string): Promise<string> {
-    const wallet = await this.prisma.wallet.findUniqueOrThrow({
-      where: { id: walletId },
-      select: { address: true },
-    });
-    return wallet.address;
-  }
-
   async signMessage(walletId: string, message: string): Promise<string> {
     const envelope = await this.prisma.wallet.findUniqueOrThrow({
       where: { id: walletId },

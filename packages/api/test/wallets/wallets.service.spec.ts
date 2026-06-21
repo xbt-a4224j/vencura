@@ -9,7 +9,6 @@ const prismaMock = { wallet: { create: vi.fn(), findMany: vi.fn() } };
 const eventsMock = { record: vi.fn().mockResolvedValue(undefined), emit: vi.fn() };
 const signerMock = {
   createKey: vi.fn(),
-  getAddress: vi.fn(),
   signMessage: vi.fn(),
   signTransaction: vi.fn(),
 };

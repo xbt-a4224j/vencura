@@ -27,7 +27,7 @@ export interface BalanceLine {
   asset: string;
   symbol: string;
   confirmed: string; // base units (wei / token units) — never a float
-  available: string; // confirmed − pending − gas reserve
+  available: string; // confirmed − pending
   asOfBlock: number | null;
 }
 export interface BalanceView {

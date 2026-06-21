@@ -48,7 +48,6 @@ Custody is isolated behind one interface, so the *custody model* is swappable wi
 
 ```ts
 interface Signer {
-  getAddress(walletId): Promise<Hex>;
   signMessage(walletId, msg): Promise<Hex>;
   signTransaction(walletId, tx): Promise<Hex>;
 }

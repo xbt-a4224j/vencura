@@ -367,7 +367,7 @@ class AdminApi {
  *
  *   const v = new Vencura({ basePath: BasePath.Production });
  *   await v.auth.login({ email, password });
- *   const w = await v.wallets.create();
+ *   const w = await v.wallets.provision();
  *   const tx = await v.transactions.sendAndConfirm({ walletId: w.id, to: 'vitalik.eth', asset: 'ETH', amount: '10000000000000' });
  */
 export class Vencura {

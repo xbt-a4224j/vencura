@@ -1,5 +1,5 @@
 /* VenCura admin — light enterprise theme (T-040, #41). Design tokens + element styling,
-   so most surfaces are themed with no markup change; a few classes (.app, .tabs, .pill,
+   so most surfaces are themed with no markup change; a few classes (.app, .tablist, .pill,
    .copybtn, .bal-*) handle layout + status. Palette = docs/study/ux-redressal.md §2.
    AA contrast, visible focus rings, reduced-motion respected. */
 :root {
@@ -39,11 +39,6 @@ body {
 .app > header h1 { font-size: 20px; margin: 0; letter-spacing: .2px; }
 .app > header h1::before { content: "◆ "; color: var(--accent); }
 
-/* Tabs */
-.tabs { display: flex; gap: 6px; margin-bottom: 20px; }
-.tabs button { background: transparent; border: 1px solid var(--line); color: var(--muted); }
-.tabs button:disabled { background: var(--panel-2); color: var(--ink); border-color: var(--accent); opacity: 1; }
-
 /* Cards: wallets / sections render as <li>/<section> */
 ul { list-style: none; margin: 12px 0; padding: 0; }
 section > ul > li, .app > section, li {
@@ -53,7 +48,7 @@ section > ul > li, .app > section, li {
   padding: 14px 16px;
   margin: 10px 0;
 }
-li li, .tabs button { margin: 4px 0; }
+li li { margin: 4px 0; }
 
 h2, h3, h4 { margin: 18px 0 8px; font-weight: 600; }
 h3, h4 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
@@ -132,18 +127,6 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
 /* Corner account menu (sign-in dropdown / signed-in switch-user) */
 .account { font-size: 13px; color: var(--muted); }
 .account.signed-in { display: inline-flex; align-items: center; gap: 8px; }
-.account > summary {
-  list-style: none; display: inline-block; padding: 6px 12px; border-radius: 8px;
-  border: 1px solid var(--line); background: var(--panel-2); color: var(--ink);
-}
-.account > summary::-webkit-details-marker { display: none; }
-.account[open] { position: relative; }
-.account-form {
-  position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; min-width: 250px;
-  display: flex; flex-direction: column; gap: 6px;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-  padding: 14px 16px; box-shadow: 0 10px 30px rgba(16, 24, 40, .12);
-}
 
 /* Status pills */
 .pill {
@@ -156,7 +139,7 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
 .pill.received { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 55%, transparent); background: color-mix(in srgb, var(--ok) 16%, transparent); }
 .pill.failed { color: var(--fail); border-color: color-mix(in srgb, var(--fail) 45%, transparent); background: color-mix(in srgb, var(--fail) 12%, transparent); }
 
-/* Editable wallet nickname */
+/* Wallet owner label (read-only) */
 .nick { font-weight: 600; color: var(--ink); margin-right: 6px; }
 
 
@@ -203,7 +186,6 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
 /* Header status bar — network + last-updated + refresh */
 .statusbar { display: flex; align-items: center; gap: 14px; font-size: 12.5px; color: var(--muted); margin: -8px 0 18px; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .statusbar .net { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ink); }
-.statusbar .clock { font-variant-numeric: tabular-nums; color: var(--ink); }
 .statusbar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 20%, transparent); }
 
 /* Landing page — two tiles (User / Admin) */
@@ -255,7 +237,6 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
 
 /* Account picker (User view) */
 .picker label { display: inline; }
-.picker select { min-width: 240px; }
 
 /* Inline link-style button (← Home, etc.) */
 .link { background: transparent; color: var(--accent-ink); border: none; padding: 4px 6px; font-size: 13px; }

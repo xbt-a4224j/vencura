@@ -1,13 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import type { LogLine } from '@vencura/shared';
 import { PrismaService } from '../prisma/prisma.service';
-
-export interface LogLine {
-  seq: number;
-  at: string;
-  level: 'info' | 'warn' | 'error';
-  msg: string;
-}
 
 // One event source, two sinks (the design behind the Activity tab's two subviews):
 //   • emit()   → ephemeral ring buffer only — the live "system log" the UI tails (GET /events).

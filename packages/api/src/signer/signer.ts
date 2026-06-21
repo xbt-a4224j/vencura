@@ -9,7 +9,6 @@ export interface NewKey extends EncryptedEnvelope {
  *  (EncryptedKeySigner → ShamirSigner → MPC) without touching consumers. */
 export interface Signer {
   createKey(): Promise<NewKey>;
-  getAddress(walletId: string): Promise<string>;
   signMessage(walletId: string, message: string): Promise<string>;
   signTransaction(walletId: string, request: unknown): Promise<string>;
 }

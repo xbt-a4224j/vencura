@@ -97,7 +97,7 @@ function useChainHead() {
 
 // Shared status bar: network + block/gas (as of last fetch) + an "updated" stamp. Updates aren't
 // live — the Refresh button re-fetches the chain head and (if provided) the caller's data.
-function StatusBar({ onRefresh }: { lastUpdated?: string; onRefresh?: () => void }) {
+function StatusBar({ onRefresh }: { onRefresh?: () => void }) {
   const { head, refresh } = useChainHead();
   const [headAt, setHeadAt] = useState('');
   // Stamp the fetch time whenever a fresh head arrives.
@@ -141,7 +141,6 @@ function StatusBar({ onRefresh }: { lastUpdated?: string; onRefresh?: () => void
 function useWallets(accountId: string | undefined) {
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [error, setError] = useState('');
-  const [lastUpdated, setLastUpdated] = useState('');
   const refresh = useCallback(() => {
     if (!accountId) {
       setWallets([]);
@@ -150,16 +149,13 @@ function useWallets(accountId: string | undefined) {
     setError('');
     return v.wallets
       .list()
-      .then((w) => {
-        setWallets(w);
-        setLastUpdated(new Date().toLocaleTimeString());
-      })
+      .then((w) => setWallets(w))
       .catch((err) => setError((err as Error).message));
   }, [accountId]);
   useEffect(() => {
     void refresh();
   }, [refresh]);
-  return { wallets, refresh, lastUpdated, error };
+  return { wallets, refresh, error };
 }
 
 // Accessible tablist: role=tab + aria-selected, ←/→/Home/End keyboard nav. The active tab is the
@@ -454,7 +450,7 @@ function Landing({ onPick }: { onPick: (view: 'user' | 'admin' | 'playground') =
 function UserView({ onExit }: { onExit: () => void }) {
   const { current, signOut } = useAuth();
   // Only the non-admin user's wallets (the admin session never drives the User view).
-  const { wallets, refresh, lastUpdated } = useWallets(
+  const { wallets, refresh } = useWallets(
     current && current.email !== ADMIN_EMAIL ? current.id : undefined,
   );
 
@@ -480,7 +476,7 @@ function UserView({ onExit }: { onExit: () => void }) {
           </button>
         </span>
       </header>
-      <StatusBar lastUpdated={lastUpdated} onRefresh={() => void refresh()} />
+      <StatusBar onRefresh={() => void refresh()} />
       <UserTokenPanel wallets={wallets} />
       <h2 className="cap">Your wallets</h2>
       <p className="bal-sub">
@@ -1970,7 +1966,7 @@ function AdminView({ onExit }: { onExit: () => void }) {
   useEffect(() => {
     if (!actingAsAdmin && accounts.length > 0) void signIn(accounts[0]).catch(() => undefined);
   }, [actingAsAdmin, accounts, signIn]);
-  const { wallets, refresh, lastUpdated, error } = useWallets(actingAsAdmin ? current?.id : undefined);
+  const { wallets, refresh, error } = useWallets(actingAsAdmin ? current?.id : undefined);
   const [tab, setTab] = useHashTab('overview');
 
   return (
@@ -1989,7 +1985,7 @@ function AdminView({ onExit }: { onExit: () => void }) {
           </button>
         </span>
       </header>
-      <StatusBar lastUpdated={lastUpdated} onRefresh={() => void refresh()} />
+      <StatusBar onRefresh={() => void refresh()} />
       <DemoBanner />
       {error && <p role="alert">{error}</p>}
       <Tabs tabs={ADMIN_TABS} active={tab} onChange={setTab} />

@@ -1,22 +1,11 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
-import { NATIVE_ASSET, type Hex } from '@vencura/shared';
+import { NATIVE_ASSET, type BalanceView, type Hex } from '@vencura/shared';
 import { ChainService } from '../infra/chain/chain.service';
 import { TRACKED_TOKENS } from '../infra/chain/chain.constants';
 import { PrismaService } from '../infra/prisma/prisma.service';
 import { WalletsService } from '../wallets/wallets.service';
 
 const STALE_MS = 15_000; // serve cache; revalidate in the background if older than this
-
-export interface BalanceView {
-  walletId: string;
-  balances: Array<{
-    asset: string;
-    symbol: string;
-    confirmed: string;
-    available: string;
-    asOfBlock: number | null;
-  }>;
-}
 
 @Injectable()
 export class BalancesService {

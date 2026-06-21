@@ -32,11 +32,6 @@ describe('EncryptedKeySigner', () => {
     expect(privateKeyToAddress(privateKey as `0x${string}`)).toBe(key.address);
   });
 
-  it('getAddress reads the stored address and never returns key material', async () => {
-    prismaMock.wallet.findUniqueOrThrow.mockResolvedValue({ address: '0xabc' });
-    await expect(signer.getAddress('w1')).resolves.toBe('0xabc');
-  });
-
   it('fails fast when MASTER_ENCRYPTION_KEY is malformed', async () => {
     process.env.MASTER_ENCRYPTION_KEY = 'too-short';
     // Nest instantiates singleton providers eagerly during compile(), so the

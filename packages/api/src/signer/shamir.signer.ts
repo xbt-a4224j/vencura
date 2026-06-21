@@ -47,14 +47,6 @@ export class ShamirSigner implements Signer {
     };
   }
 
-  async getAddress(walletId: string): Promise<string> {
-    const wallet = await this.prisma.wallet.findUniqueOrThrow({
-      where: { id: walletId },
-      select: { address: true },
-    });
-    return wallet.address;
-  }
-
   signMessage(walletId: string, message: string): Promise<string> {
     return this.withReconstructedKey(walletId, (account) => account.signMessage({ message }));
   }

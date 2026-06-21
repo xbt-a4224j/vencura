@@ -2,7 +2,7 @@
  * Example: read a wallet's balance (confirmed + available).
  *   pnpm --filter @vencura/sdk exec tsx examples/02-get-balance.ts
  *
- * Balance is read from chain and cached; `available` = confirmed − pending − gas reserve.
+ * Balance is read from chain and cached; `available` = confirmed − pending.
  */
 import { aWallet, connect } from './_client';
 

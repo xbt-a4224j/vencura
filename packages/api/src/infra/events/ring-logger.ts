@@ -1,5 +1,6 @@
 import { ConsoleLogger } from '@nestjs/common';
-import type { EventsService, LogLine } from './events.service';
+import type { EventsService } from './events.service';
+import type { LogLine } from '@vencura/shared';
 
 // Nest's own framework logs (route mapping, DI bootstrap, etc.) — kept OUT of the in-app live log
 // so it stays operational signal (nonce acquired, tx broadcast, confirmations) rather than noise.

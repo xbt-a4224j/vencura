@@ -9,7 +9,7 @@ import { SIGNER, type Signer } from '../signer/signer';
 import { WalletsService } from './wallets.service';
 
 /** Seed funding handed to each freshly provisioned wallet from the master wallet. */
-export const PROVISION_ETH = parseEther('0.001');
+const PROVISION_ETH = parseEther('0.001');
 
 /**
  * One wallet per account. On first sign-in the web calls POST /wallets/provision:

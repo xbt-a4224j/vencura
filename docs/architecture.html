@@ -180,7 +180,6 @@ ciphertext + a wrapped data key.</div>
 <p>The heart of the project. A pluggable <code>Signer</code> interface decouples "how we hold the key" from the rest of
 the system:</p>
 <pre><code>interface Signer {
-  getAddress(walletId): Promise&lt;Address&gt;
   signMessage(walletId, msg): Promise&lt;Hex&gt;
   signTransaction(walletId, tx): Promise&lt;Hex&gt;
 }</code></pre>
@@ -202,7 +201,7 @@ The signer is the only place key material is ever in plaintext, and only for mic
 <div class="step"><div class="n">3</div><div class="b">Persist <code>address, encrypted_private_key</code>. Return the <strong>address only</strong> — the key never leaves the server.</div></div>
 
 <h3>getBalance</h3>
-<div class="step"><div class="n">1</div><div class="b">Return the <strong>cached</strong> confirmed balance instantly + the derived <em>available</em> balance (confirmed − pending outbound − gas reserve).</div></div>
+<div class="step"><div class="n">1</div><div class="b">Return the <strong>cached</strong> confirmed balance instantly + the derived <em>available</em> balance (confirmed − pending outbound).</div></div>
 <div class="step"><div class="n">2</div><div class="b">Stale-while-revalidate: kick off an async refresh from chain; push the corrected value when it lands.</div></div>
 
 <h3>signMessage</h3>
@@ -241,7 +240,7 @@ co-signers, provider webhooks) is documented in §10 but intentionally not built
 <ul>
   <li><strong>Confirmed</strong> — last value read from chain (cached, with <code>as_of_block</code>).</li>
   <li><strong>Pending</strong> — outbound txs broadcast but not yet mined (and detected incoming).</li>
-  <li><strong>Available</strong> = confirmed − pending outbound − gas reserve → what the UI shows as spendable.</li>
+  <li><strong>Available</strong> = confirmed − pending outbound → what the UI shows as spendable.</li>
 </ul>
 <p>On send, we apply an <strong>optimistic</strong> pending debit immediately for snappy UX, then reconcile to the
 confirmed value when the watcher sees the receipt. Reads are <strong>stale-while-revalidate</strong>. <strong>Reorgs:</strong>

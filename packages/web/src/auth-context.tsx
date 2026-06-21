@@ -9,7 +9,6 @@ type AuthResultLike = { accessToken: string; user: Account };
 interface AuthCtx {
   accounts: Account[]; // every account — the User-view picker + the Admin list
   current: Account | null; // the signed-in account
-  ready: boolean; // initial account list + session restore finished
   signIn: (account: Account) => Promise<void>; // Admin one-click login with the shared demo password
   signOut: () => void;
   createAccount: (email: string) => Promise<Account>; // Admin: register with the shared password
@@ -26,7 +25,6 @@ const Ctx = createContext<AuthCtx | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [current, setCurrent] = useState<Account | null>(null);
-  const [ready, setReady] = useState(false);
 
   const reload = useCallback(async () => {
     const list = await v.auth.accounts();
@@ -83,12 +81,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         tokenStore.clear(); // expired/invalid — drop it so we don't send a dead bearer
         localStorage.removeItem(LAST_KEY);
       }
-    })().finally(() => setReady(true));
+    })();
   }, [reload]);
 
   return (
     <Ctx.Provider
-      value={{ accounts, current, ready, signIn, signOut, createAccount, reload, loginUser, registerUser }}
+      value={{ accounts, current, signIn, signOut, createAccount, reload, loginUser, registerUser }}
     >
       {children}
     </Ctx.Provider>
