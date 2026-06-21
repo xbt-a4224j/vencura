@@ -320,6 +320,15 @@ export function Playground({ onExit }: { onExit: () => void }) {
             <button className="pg2-run" onClick={() => void run()} disabled={busy}>
               {busy ? `Running… ${elapsed}s` : 'Run ▶  (⌘/Ctrl-Enter)'}
             </button>
+            <button
+              type="button"
+              className="copybtn"
+              onClick={() => setCode(ex.code)}
+              disabled={busy || code === ex.code}
+              title="restore this example's original code"
+            >
+              Reset
+            </button>
             {busy && (
               <span className="pg2-status">
                 ⏳ {elapsed}s{ex.mutates ? ' · broadcasting + waiting for on-chain confirmation (~15–30s)' : ' · calling the API'}

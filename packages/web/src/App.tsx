@@ -6,6 +6,7 @@ import {
   ADMIN_EMAIL,
   adminKeyStore,
   type BalanceLine,
+  DEMO_PASSWORD,
   type LogLine,
   type Policy,
   v,
@@ -239,29 +240,59 @@ function Landing({ onPick }: { onPick: (view: 'user' | 'admin' | 'playground') =
         <h1>VenCura</h1>
         <p className="tagline">custodial Ethereum wallets, over an API</p>
       </header>
+      <p className="reviewer-ribbon">
+        <strong>Reviewer? Start here →</strong> <b>Playground</b> (the typed SDK, live) → <b>Admin</b> (the
+        ops platform) → <b>User</b> (the end-to-end product). The senior bits — the per-wallet{' '}
+        <b>nonce lock</b> and <b>idempotency</b> — are Playground examples <code>05</code> &amp; <code>04</code>.
+      </p>
       <div className="tiles">
-        <button type="button" className="tile" onClick={() => onPick('user')}>
+        <button type="button" className="tile" onClick={() => onPick('playground')}>
+          <span className="tile-step">start here</span>
           <span className="tile-emoji" aria-hidden>
-            👛
+            🧪
           </span>
-          <h2>User</h2>
-          <p>Pick an account and use your wallets — balances, send ETH or tokens, sign messages.</p>
+          <h2>Playground</h2>
+          <p>A live TypeScript interpreter over the typed SDK — run the six examples against the API.</p>
         </button>
         <button type="button" className="tile" onClick={() => onPick('admin')}>
           <span className="tile-emoji" aria-hidden>
             🛠️
           </span>
           <h2>Admin</h2>
-          <p>Create accounts, seed or reset demo data, set policies, and inspect the chain.</p>
+          <p>The custody-ops console — wallets, policy limits, the chain inspector, audit + live system log.</p>
         </button>
-        <button type="button" className="tile" onClick={() => onPick('playground')}>
+        <button type="button" className="tile" onClick={() => onPick('user')}>
           <span className="tile-emoji" aria-hidden>
-            🧪
+            👛
           </span>
-          <h2>Playground</h2>
-          <p>Tinker with the typed SDK live — run wallet, send, and token calls against the API.</p>
+          <h2>User</h2>
+          <p>The end-to-end product — balances, send ETH or tokens, sign messages.</p>
         </button>
       </div>
+      <section className="why-card">
+        <h3>What makes a custodial wallet hard — and where it’s handled</h3>
+        <ul>
+          <li>
+            <b>Concurrency.</b> Racing sends collide on the account nonce. A per-wallet Postgres advisory
+            lock (<code>pg_advisory_xact_lock</code>) serializes read-nonce → sign → broadcast, so they
+            can’t. <em>Proof: Playground <code>05</code> — 5 simultaneous sends, consecutive nonces, zero collisions.</em>
+          </li>
+          <li>
+            <b>Idempotency.</b> A retried send must not double-broadcast. A unique key makes it exactly-once.
+            <em> Proof: Playground <code>04</code> — the SDK auto-generates the key on every send.</em>
+          </li>
+        </ul>
+      </section>
+      <p className="landing-foot">
+        <a href="/walkthrough.html" target="_blank" rel="noreferrer">
+          Architecture &amp; walkthrough ↗
+        </a>{' '}
+        ·{' '}
+        <a href="/api/docs" target="_blank" rel="noreferrer">
+          API · Swagger ↗
+        </a>{' '}
+        · per-IP rate-limited · keys AES-256-GCM encrypted, never returned by any endpoint
+      </p>
     </main>
   );
 }
@@ -313,8 +344,10 @@ function UserView({ onExit }: { onExit: () => void }) {
 function UserAuth({ onExit }: { onExit: () => void }) {
   const { loginUser, registerUser } = useAuth();
   const [existing, setExisting] = useState<Account | null | undefined>(undefined); // undefined = loading
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  // Prefilled for the demo: it's an openly shared password (see the Demo-mode banner), so a reviewer
+  // can click straight through instead of hitting an empty-password wall.
+  const [email, setEmail] = useState('demo@vencura.app');
+  const [password, setPassword] = useState(DEMO_PASSWORD);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -388,8 +421,9 @@ function UserAuth({ onExit }: { onExit: () => void }) {
         )}
         <p className="bal-sub">
           {mode === 'login'
-            ? 'This demo has one user account — log in to manage your wallets.'
-            : 'No user yet — register the single demo user. After this, registration is closed.'}
+            ? 'Demo — the shared password is prefilled, just click Log in.'
+            : 'No user yet — fields are prefilled; click Register to create the demo user (registration then closes).'}{' '}
+          <code>demo password: {DEMO_PASSWORD}</code>
         </p>
         {error && <p role="alert">{error}</p>}
       </section>
