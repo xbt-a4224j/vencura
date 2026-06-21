@@ -1,5 +1,5 @@
 // VenCura base schema. The chain is the source of truth; Postgres is a derived,
-// cached projection (CLAUDE.md §4). Money is stored as bigint strings, never floats (§7).
+// cached projection Money is stored as bigint strings, never floats.
 
 datasource db {
   provider = "postgresql"

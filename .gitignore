@@ -22,8 +22,12 @@ prisma/dev.db*
 # Vercel link artifact (org/project ids) — never commit
 .vercel/
 
-# Local per-block study guides (learning aids, not deliverables)
+# Local build notes / learning aids — kept locally, not part of the deliverable
 docs/study/
+CLAUDE.md
+DEVLOG.md
+tickets.md
+docs/METHODOLOGY.md
 
 # Unrequested design/plan docs — brainstorming stays in chat, not committed
 docs/specs/

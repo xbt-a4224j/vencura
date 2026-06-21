@@ -9,7 +9,7 @@ message**, and **send a transaction** — for the native asset (**ETH**) and **E
 
 > Custodial-wallet platform: the centerpiece is **key custody** (AES-256-GCM at rest behind a pluggable
 > `Signer`), **transaction correctness under concurrency** (per-wallet nonce lock + idempotency), and a clear
-> custodial → MPC → non-custodial story. See [`CLAUDE.md`](CLAUDE.md) and [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md).
+> custodial → MPC → non-custodial story. See [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md).
 
 ## Live deployment
 
@@ -92,8 +92,6 @@ packages/
   web/      React/TS admin UI (load-bearing for every feature)
   shared/   shared types / zod schemas
 docs/       architecture, security writeup
-DEVLOG.md   append-only, per-ticket teaching log — read this to learn the codebase
-tickets.md  the plan (GitHub issues)
 ```
 
 ## Scripts
@@ -123,9 +121,8 @@ committed — only [`.env.example`](.env.example) is.
 
 ## Status
 
-Built block-by-block; releases are tagged by semantic-release on `main`. Current: **v0.4.0** (Block 4 —
-sendTransaction + concurrency; the four core wallet actions all work end-to-end). The full plan lives in
-[`tickets.md`](tickets.md).
+Built incrementally; releases are tagged by semantic-release on `main`. The four core wallet actions
+(create, balance, sign, send) all work end-to-end, with per-wallet nonce serialization and idempotency.
 
 ## Architecture diagrams
 

@@ -20,18 +20,18 @@ async function bootstrap() {
 
   // Tee the NestJS logger into the EventsService ring buffer so the in-app "Live system log" shows
   // the operational narration (nonce acquired, tx broadcast, confirmations…) the services already
-  // emit — no new call sites. Logged lines never contain key material/secrets (CLAUDE.md §9).
+  // emit — no new call sites. Logged lines never contain key material/secrets.
   app.useLogger(new RingLogger(app.get(EventsService)));
 
   // Validate every request body/param against the zod schema on its DTO (nestjs-zod).
-  // One schema is both the runtime validator and the OpenAPI definition (CLAUDE.md §3.1).
+  // One schema is both the runtime validator and the OpenAPI definition.
   app.useGlobalPipes(new ZodValidationPipe());
 
   // One consistent JSON error shape (RFC-7807-ish) for every uncaught error, with
-  // chain-error mapping and no stack-trace/secret leakage (CLAUDE.md §10).
+  // chain-error mapping and no stack-trace/secret leakage.
   app.useGlobalFilters(new AllExceptionsFilter());
 
-  // Auto-generated OpenAPI + Swagger UI at /docs — demoability (CLAUDE.md §5) and
+  // Auto-generated OpenAPI + Swagger UI at /docs — demoability and
   // the source for the generated SDK (T-025). cleanupOpenApiDoc finalizes the zod-derived
   // schemas in the document (nestjs-zod v5).
   const config = new DocumentBuilder()

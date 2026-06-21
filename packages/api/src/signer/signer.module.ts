@@ -6,7 +6,7 @@ import { SIGNER } from './signer';
 // Exposes the Signer behind its DI token so consumers depend on the seam, not the impl.
 // SIGNER=shamir selects the 2-of-2 Shamir custody model; anything else → encrypted-key
 // (default). Swapping custody is a one-line env change with zero caller changes — that's
-// the whole point of the Signer seam (CLAUDE.md §4).
+// the whole point of the Signer seam.
 @Module({
   providers: [
     EncryptedKeySigner,

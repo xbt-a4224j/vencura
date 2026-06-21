@@ -5,7 +5,7 @@ export interface NewKey extends EncryptedEnvelope {
   address: string;
 }
 
-/** The one custody abstraction (CLAUDE.md §3/§4). Swap the implementation
+/** The one custody abstraction. Swap the implementation
  *  (EncryptedKeySigner → ShamirSigner → MPC) without touching consumers. */
 export interface Signer {
   createKey(): Promise<NewKey>;

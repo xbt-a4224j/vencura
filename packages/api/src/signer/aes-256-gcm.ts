@@ -3,7 +3,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 const ALGORITHM = 'aes-256-gcm';
 const IV_BYTES = 12; // GCM standard nonce length
 
-/** The encrypted-key columns on the Wallet model (CLAUDE.md §4). Hex-encoded. */
+/** The encrypted-key columns on the Wallet model. Hex-encoded. */
 export interface EncryptedEnvelope {
   encryptedPrivateKey: string;
   encryptionIv: string;

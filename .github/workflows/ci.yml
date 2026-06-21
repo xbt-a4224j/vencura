@@ -51,10 +51,9 @@ jobs:
       - name: Build
         run: pnpm build
 
-  # Gated DB integration tests (CC-6): exercise the REAL Postgres advisory lock + the policy
-  # daily-limit race against an ephemeral Postgres. The mock-based `verify` job can't catch a
-  # regression in the actual serialization primitive (the DEVLOG records two such bugs that
-  # slipped the mock suite), so we run the RUN_DB_TESTS-gated specs here on every push.
+  # Gated DB integration tests: exercise the REAL Postgres advisory lock + the policy daily-limit
+  # race against an ephemeral Postgres. The mock-based `verify` job can't catch a regression in the
+  # actual serialization primitive, so we run the RUN_DB_TESTS-gated specs here on every push.
   db-tests:
     runs-on: ubuntu-latest
     services:

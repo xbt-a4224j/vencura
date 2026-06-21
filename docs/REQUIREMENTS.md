@@ -1,8 +1,8 @@
 # VenCura — Product Requirements (North Star)
 
-> The complete requirement set the implementation must satisfy. Build to **all** of this, governed by the
-> **Prime Directive** in `CLAUDE.md` (thorough + professional, minimal bloat/overengineering, readable, lean on
-> accepted libraries). Optional items are stretch — see Block 7 in `tickets.md`.
+> The complete requirement set the implementation satisfies, governed by a **prime directive**: thorough +
+> professional, with minimal bloat/overengineering, readable code, and accepted libraries over reinvention.
+> Optional items are stretch goals.
 
 ## Overview
 VenCura is an API platform that generates **custodial wallets** on the backend with support for basic actions,
@@ -44,8 +44,8 @@ creativity within the problem.
   Fund test wallets via a Sepolia faucet.
 - Deliverables include **architecture notes** — decisions made, known weaknesses, and any concerns with the implementation.
 
-## How this maps to our build
-- **Core requirements + focus areas** → Blocks 1–6 in `tickets.md`.
-- **Optional ideas** → Block 7 (stretch); a couple deliberately scoped light (high effort / tangential to the custody story).
-- Everything is governed by the **Prime Directive** in `CLAUDE.md`: maximize thoroughness and professionalism, minimize
-  bloat/overengineering/unreadability, reuse accepted libraries over reinventing.
+## How this maps to the build
+- **Core requirements + focus areas** are all implemented.
+- **Optional ideas** are stretch; a couple are deliberately scoped light (high effort / tangential to the custody story).
+- The whole build follows one prime directive: maximize thoroughness and professionalism, minimize
+  bloat/overengineering/unreadability, and reuse accepted libraries over reinventing.
