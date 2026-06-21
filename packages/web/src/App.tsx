@@ -270,7 +270,7 @@ function Landing({ onPick }: { onPick: (view: 'user' | 'admin' | 'playground') =
         </button>
       </div>
       <section className="trace">
-        <h3>The four core actions — UI → SDK → API</h3>
+        <h3>Each UI action, the SDK call, and the endpoint behind it</h3>
         <table className="trace-table">
           <thead>
             <tr>
@@ -282,6 +282,16 @@ function Landing({ onPick }: { onPick: (view: 'user' | 'admin' | 'playground') =
           </thead>
           <tbody>
             <tr>
+              <td>Sign in (User / Admin)</td>
+              <td>
+                <code>v.auth.login()</code>
+              </td>
+              <td>
+                <code>POST /auth/login</code>
+              </td>
+              <td>bcrypt-checked; issues a JWT. Session restored via <code>v.auth.me()</code>.</td>
+            </tr>
+            <tr>
               <td>“Provision wallet” button</td>
               <td>
                 <code>v.wallets.provision()</code>
@@ -290,6 +300,16 @@ function Landing({ onPick }: { onPick: (view: 'user' | 'admin' | 'playground') =
                 <code>POST /wallets/provision</code>
               </td>
               <td>Generates an AES-256-GCM-encrypted key server-side and master-funds the wallet (one per account).</td>
+            </tr>
+            <tr>
+              <td>Wallet list</td>
+              <td>
+                <code>v.wallets.list()</code>
+              </td>
+              <td>
+                <code>GET /wallets</code>
+              </td>
+              <td>Every wallet for the signed-in account.</td>
             </tr>
             <tr>
               <td>Balance card · Refresh</td>
@@ -321,8 +341,112 @@ function Landing({ onPick }: { onPick: (view: 'user' | 'admin' | 'playground') =
               </td>
               <td>Per-wallet nonce-serialized, idempotent broadcast; policy enforced before signing.</td>
             </tr>
+            <tr>
+              <td>Policy editor (limits)</td>
+              <td>
+                <code>v.wallets.setPolicy()</code>
+              </td>
+              <td>
+                <code>PUT /wallets/:id/policy</code>
+              </td>
+              <td>Per-tx and daily caps, checked before signing.</td>
+            </tr>
+            <tr>
+              <td>Activity feed</td>
+              <td>
+                <code>v.activity.forWallet()</code>
+              </td>
+              <td>
+                <code>GET /wallets/:id/activity</code>
+              </td>
+              <td>Unified on-chain sends + off-chain signatures, newest first.</td>
+            </tr>
+            <tr>
+              <td>Chain inspector</td>
+              <td>
+                <code>v.chain.head()</code>
+              </td>
+              <td>
+                <code>GET /chain/head</code>
+              </td>
+              <td>Current Sepolia block height — liveness of the RPC.</td>
+            </tr>
+            <tr>
+              <td>“Start over” (Admin)</td>
+              <td>
+                <code>v.admin.reset()</code>
+              </td>
+              <td>
+                <code>POST /admin/reset</code>
+              </td>
+              <td>Wipes + reseeds the demo data (dev-gated).</td>
+            </tr>
           </tbody>
         </table>
+      </section>
+      <section className="sysmap">
+        <h3>How it fits together</h3>
+        <svg
+          className="sysmap-svg"
+          viewBox="0 0 880 340"
+          role="img"
+          aria-label="Architecture: the React web app calls the typed SDK, which calls the NestJS API over REST. The API holds the pluggable AES-256-GCM signer, the per-wallet nonce lock, the confirmation/balance pollers, and the pre-sign policy engine. It persists to Postgres (a cached projection) and reads from / broadcasts to Ethereum Sepolia via Infura, which is the source of truth."
+        >
+          <defs>
+            <marker id="vc-arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L7,3 L0,6 Z" fill="var(--muted)" />
+            </marker>
+          </defs>
+
+          <rect x="12" y="138" width="150" height="74" rx="9" fill="var(--panel)" stroke="var(--line)" />
+          <text x="87" y="170" textAnchor="middle" fontSize="14" fontWeight="600" fill="var(--ink)">Web</text>
+          <text x="87" y="188" textAnchor="middle" fontSize="11" fill="var(--muted)">React admin (the UI)</text>
+
+          <rect x="198" y="138" width="156" height="74" rx="9" fill="var(--panel)" stroke="var(--line)" />
+          <text x="276" y="168" textAnchor="middle" fontSize="13" fontWeight="600" fill="var(--ink)">@vencura/sdk</text>
+          <text x="276" y="186" textAnchor="middle" fontSize="11" fill="var(--muted)">typed TS client</text>
+
+          <rect x="390" y="34" width="232" height="282" rx="10" fill="color-mix(in srgb, var(--accent) 7%, var(--panel))" stroke="var(--line)" />
+          <text x="506" y="58" textAnchor="middle" fontSize="14" fontWeight="600" fill="var(--ink)">NestJS API</text>
+          <text x="506" y="75" textAnchor="middle" fontSize="11" fill="var(--muted)">REST + OpenAPI · JWT auth</text>
+
+          <rect x="406" y="92" width="200" height="46" rx="7" fill="var(--panel)" stroke="var(--line)" />
+          <text x="506" y="112" textAnchor="middle" fontSize="12" fontWeight="600" fill="var(--ink)">Signer</text>
+          <text x="506" y="128" textAnchor="middle" fontSize="10.5" fill="var(--muted)">AES-256-GCM · pluggable</text>
+
+          <rect x="406" y="146" width="200" height="46" rx="7" fill="var(--panel)" stroke="var(--line)" />
+          <text x="506" y="166" textAnchor="middle" fontSize="12" fontWeight="600" fill="var(--ink)">Nonce lock</text>
+          <text x="506" y="182" textAnchor="middle" fontSize="10.5" fill="var(--muted)">pg_advisory_xact_lock</text>
+
+          <rect x="406" y="200" width="200" height="46" rx="7" fill="var(--panel)" stroke="var(--line)" />
+          <text x="506" y="220" textAnchor="middle" fontSize="12" fontWeight="600" fill="var(--ink)">Pollers</text>
+          <text x="506" y="236" textAnchor="middle" fontSize="10.5" fill="var(--muted)">confirmations · balances</text>
+
+          <rect x="406" y="254" width="200" height="40" rx="7" fill="var(--panel)" stroke="var(--line)" />
+          <text x="506" y="278" textAnchor="middle" fontSize="11" fill="var(--muted)">Policy engine — enforced pre-sign</text>
+
+          <rect x="662" y="88" width="206" height="86" rx="9" fill="var(--panel)" stroke="var(--line)" />
+          <text x="765" y="116" textAnchor="middle" fontSize="13" fontWeight="600" fill="var(--ink)">Postgres</text>
+          <text x="765" y="134" textAnchor="middle" fontSize="10.5" fill="var(--muted)">encrypted keys · nonces · tx ledger</text>
+          <text x="765" y="150" textAnchor="middle" fontSize="10.5" fill="var(--muted)">a derived, cached projection</text>
+
+          <rect x="662" y="206" width="206" height="86" rx="9" fill="var(--panel)" stroke="var(--line)" />
+          <text x="765" y="234" textAnchor="middle" fontSize="13" fontWeight="600" fill="var(--ink)">Ethereum Sepolia</text>
+          <text x="765" y="252" textAnchor="middle" fontSize="10.5" fill="var(--muted)">Infura RPC · viem</text>
+          <text x="765" y="268" textAnchor="middle" fontSize="10.5" fill="var(--muted)">chain = source of truth</text>
+
+          <line x1="164" y1="175" x2="196" y2="175" stroke="var(--muted)" strokeWidth="1.4" markerEnd="url(#vc-arrow)" />
+          <line x1="356" y1="175" x2="388" y2="175" stroke="var(--muted)" strokeWidth="1.4" markerEnd="url(#vc-arrow)" />
+          <text x="372" y="168" textAnchor="middle" fontSize="9.5" fill="var(--muted)">REST</text>
+          <line x1="624" y1="131" x2="660" y2="131" stroke="var(--muted)" strokeWidth="1.4" markerEnd="url(#vc-arrow)" />
+          <text x="642" y="123" textAnchor="middle" fontSize="9.5" fill="var(--muted)">Prisma</text>
+          <line x1="624" y1="249" x2="660" y2="249" stroke="var(--muted)" strokeWidth="1.4" markerEnd="url(#vc-arrow)" />
+          <text x="642" y="241" textAnchor="middle" fontSize="9.5" fill="var(--muted)">viem</text>
+        </svg>
+        <p className="sysmap-cap">
+          Chain is the source of truth; Postgres is a derived, cached projection. The private key is encrypted
+          at rest and decrypted in memory only at sign time — never logged, never returned by any endpoint.
+        </p>
       </section>
       <p className="landing-foot">
         <a href="/walkthrough.html" target="_blank" rel="noreferrer">
