@@ -70,9 +70,11 @@
       <header class="lead">
         <h1>VenCura — Reviewer Walkthrough</h1>
         <p class="sub">
-          A custodial Ethereum-wallet API + admin. This is the 8-step happy path that exercises the four
-          required operations and the three things the design is really about: <b>key custody</b>,
-          <b>correctness under concurrency</b>, and <b>chain-as-source-of-truth</b>. ~10 minutes, no setup.
+          A custodial Ethereum-wallet API + admin. This is the happy path that exercises the four required
+          operations and the three things the design is really about: <b>key custody</b>,
+          <b>correctness under concurrency</b>, and <b>chain-as-source-of-truth</b>. The landing page has three
+          doors — start at the <b>Playground</b> (the typed SDK, live), then <b>Admin</b> (the ops console),
+          then <b>User</b> (the end-to-end product). ~10 minutes, no setup.
         </p>
         <div class="links">
           <a class="ext" href="https://vencura-alpha.vercel.app" target="_blank" rel="noreferrer">▶ Open the app ↗</a>
@@ -184,36 +186,66 @@
 
       <!-- STEP 1 -->
       <div class="step">
-        <h3><span class="num">1</span> Open &amp; sign in</h3>
-        <div class="row do"><span class="tag">Do</span><p>Open <a class="ext" href="https://vencura-alpha.vercel.app" target="_blank" rel="noreferrer">the app ↗</a>. A <b>Demo mode</b> banner explains auth is bypassed with one shared password. Pick <b>User</b> (choose the account — password is prefilled — and <b>Log in</b>) or <b>Admin</b> for the operator console.</p></div>
-        <div class="row see"><span class="tag">See</span><p>You land in the console. <b>Reload the page</b> — you stay signed in and on the same view.</p></div>
+        <h3><span class="num">1</span> Open the landing page → start in the Playground</h3>
+        <div class="row do"><span class="tag">Do</span><p>Open <a class="ext" href="https://vencura-alpha.vercel.app" target="_blank" rel="noreferrer">the app ↗</a>. The landing page has <b>three tiles</b> — 🧪 <b>Playground</b> (start here), 🛠️ <b>Admin</b>, 👛 <b>User</b> — plus a “Reviewer? Start here” ribbon. Open the <b>Playground</b> first.</p></div>
+        <div class="row see"><span class="tag">See</span><p>A live in-browser TypeScript editor over the typed SDK, preloaded with <b>six runnable examples</b>: <code>01 provision</code>, <code>02 balance</code>, <code>03 sign</code>, <code>04 send</code>, <code>05 concurrency</code>, <code>06 token flow</code>. Run <code>01</code>–<code>03</code> (read-only) and, when you want a real tx, <code>04</code>/<code>06</code> (tagged <code>tx</code> — broadcasts to Sepolia, ~15–30s). The senior bits — the per-wallet <b>nonce lock</b> (<code>05</code>) and <b>idempotency</b> (<code>04</code>) — live here.</p></div>
         <figure>
-          <svg viewBox="0 0 820 96" role="img" aria-label="Login flow">
-            <rect x="10" y="34" width="150" height="34" rx="6" fill="#fff" stroke="#c8cdd6"/>
-            <text class="lblsm" x="85" y="55" text-anchor="middle">Browser</text>
-            <line x1="160" y1="51" x2="250" y2="51" stroke="#9aa2af" stroke-width="1.5"/><polygon points="250,51 242,47 242,55" fill="#9aa2af"/>
-            <text class="lblmono" x="205" y="44" text-anchor="middle">POST /auth/login</text>
-            <rect x="252" y="34" width="150" height="34" rx="6" fill="#eef1f6" stroke="#d3d9e2"/>
-            <text class="lblsm" x="327" y="55" text-anchor="middle">auth module</text>
-            <line x1="402" y1="51" x2="492" y2="51" stroke="#9aa2af" stroke-width="1.5"/><polygon points="492,51 484,47 484,55" fill="#9aa2af"/>
-            <text class="lblsm" x="447" y="44" text-anchor="middle">verify (argon2)</text>
-            <rect x="494" y="34" width="120" height="34" rx="6" fill="#fff" stroke="#c8cdd6"/>
-            <text class="lblsm" x="554" y="55" text-anchor="middle">Postgres users</text>
-            <line x1="614" y1="51" x2="700" y2="51" stroke="#9aa2af" stroke-width="1.5"/><polygon points="700,51 692,47 692,55" fill="#9aa2af"/>
-            <text class="lblsm" x="657" y="44" text-anchor="middle">JWT (1d)</text>
-            <rect x="702" y="34" width="108" height="34" rx="6" fill="#e9efe9" stroke="#cfe0cf"/>
-            <text class="lblsm" x="756" y="55" text-anchor="middle">localStorage</text>
-            <text class="lblsm" x="410" y="86" text-anchor="middle" fill="var(--muted)">reload → GET /auth/me restores the session from the stored token (sticky until the JWT expires)</text>
+          <svg viewBox="0 0 820 96" role="img" aria-label="Playground over the typed SDK">
+            <rect x="10" y="34" width="170" height="34" rx="6" fill="#eef2ff" stroke="#c7d2fe"/>
+            <text class="lblsm" x="95" y="55" text-anchor="middle">Playground editor</text>
+            <line x1="180" y1="51" x2="266" y2="51" stroke="#9aa2af" stroke-width="1.5"/><polygon points="266,51 258,47 258,55" fill="#9aa2af"/>
+            <text class="lblsm" x="223" y="44" text-anchor="middle">v.wallets / v.transactions</text>
+            <rect x="268" y="34" width="150" height="34" rx="6" fill="#eef1f6" stroke="#d3d9e2"/>
+            <text class="lblsm" x="343" y="55" text-anchor="middle">typed SDK</text>
+            <line x1="418" y1="51" x2="504" y2="51" stroke="#9aa2af" stroke-width="1.5"/><polygon points="504,51 496,47 496,55" fill="#9aa2af"/>
+            <text class="lblmono" x="461" y="44" text-anchor="middle">REST /api/*</text>
+            <rect x="506" y="34" width="150" height="34" rx="6" fill="#e9efe9" stroke="#cfe0cf"/>
+            <text class="lblsm" x="581" y="55" text-anchor="middle">NestJS API</text>
+            <line x1="656" y1="51" x2="742" y2="51" stroke="#9aa2af" stroke-width="1.5"/><polygon points="742,51 734,47 734,55" fill="#9aa2af"/>
+            <rect x="744" y="34" width="66" height="34" rx="6" fill="#fff7ed" stroke="#f0e0c0"/>
+            <text class="lblsm" x="777" y="55" text-anchor="middle">Sepolia</text>
+            <text class="lblsm" x="410" y="86" text-anchor="middle" fill="var(--muted)">same SDK the web app uses — the OpenAPI-generated client, exercised live in the browser</text>
           </svg>
         </figure>
-        <p class="proves"><b>Proves:</b> custodial auth — a per-user JWT; the server-side admin key is never shown to the client.</p>
+        <p class="proves"><b>Proves:</b> a real typed SDK over the OpenAPI spec — every UI action below maps to one of these calls.</p>
       </div>
 
       <!-- STEP 2 -->
       <div class="step">
-        <h3><span class="num">2</span> Create &amp; fund a wallet</h3>
-        <div class="row do"><span class="tag">Do</span><p>Go to the <b>Wallets</b> tab. Your wallet is auto-provisioned and master-funded on first load (or create one).</p></div>
+        <h3><span class="num">2</span> Sign in — User vs Admin</h3>
+        <div class="row do"><span class="tag">Do</span><p>From the landing page open <b>User</b>: it's a <b>single self-registered account</b> — if none exists yet you <b>Register</b> with an email + a password you choose (registration then closes); on later visits the email is known and you just <b>Log in</b>. For the ops console open <b>Admin</b>: it's a <b>system account</b> (<code>admin@vencura.local</code>, passwordless) gated by the operator key — paste the <code>x-admin-key</code> to connect.</p></div>
+        <div class="row see"><span class="tag">See</span><p>You land in the chosen console. <b>Reload</b> — you stay signed in and on the same view (the JWT is restored from <code>localStorage</code>).</p></div>
+        <figure>
+          <svg viewBox="0 0 820 110" role="img" aria-label="Two sign-in paths">
+            <rect x="10" y="14" width="150" height="34" rx="6" fill="#fff" stroke="#c8cdd6"/>
+            <text class="lblsm" x="85" y="35" text-anchor="middle">User</text>
+            <line x1="160" y1="31" x2="250" y2="31" stroke="#9aa2af" stroke-width="1.5"/><polygon points="250,31 242,27 242,35" fill="#9aa2af"/>
+            <text class="lblmono" x="205" y="24" text-anchor="middle">register / login</text>
+            <rect x="252" y="14" width="170" height="34" rx="6" fill="#eef1f6" stroke="#d3d9e2"/>
+            <text class="lblsm" x="337" y="35" text-anchor="middle">argon2 verify · JWT</text>
+            <rect x="10" y="62" width="150" height="34" rx="6" fill="#fff" stroke="#c8cdd6"/>
+            <text class="lblsm" x="85" y="83" text-anchor="middle">Admin</text>
+            <line x1="160" y1="79" x2="250" y2="79" stroke="#9aa2af" stroke-width="1.5"/><polygon points="250,79 242,75 242,83" fill="#9aa2af"/>
+            <text class="lblmono" x="205" y="72" text-anchor="middle">x-admin-key</text>
+            <rect x="252" y="62" width="170" height="34" rx="6" fill="#e9efe9" stroke="#cfe0cf"/>
+            <text class="lblsm" x="337" y="83" text-anchor="middle">system session (no pwd)</text>
+            <line x1="422" y1="55" x2="500" y2="55" stroke="#9aa2af" stroke-width="1.5"/><polygon points="500,55 492,51 492,59" fill="#9aa2af"/>
+            <rect x="502" y="38" width="160" height="34" rx="6" fill="#e9efe9" stroke="#cfe0cf"/>
+            <text class="lblsm" x="582" y="59" text-anchor="middle">per-identity JWT (1d)</text>
+            <line x1="662" y1="55" x2="740" y2="55" stroke="#9aa2af" stroke-width="1.5"/><polygon points="740,55 732,51 732,59" fill="#9aa2af"/>
+            <rect x="742" y="38" width="68" height="34" rx="6" fill="#eef2ff" stroke="#c7d2fe"/>
+            <text class="lblsm" x="776" y="59" text-anchor="middle">localStorage</text>
+          </svg>
+        </figure>
+        <p class="proves"><b>Proves:</b> custodial auth — a per-identity JWT; the user picks a real password, and the admin's operator key never reaches a normal user.</p>
+      </div>
+
+      <!-- STEP 3 -->
+      <div class="step">
+        <h3><span class="num">3</span> Your wallet is auto-provisioned &amp; master-funded</h3>
+        <div class="row do"><span class="tag">Do</span><p>In <b>User</b> (or Admin), open the <b>Wallets</b> tab. There is <b>no “create wallet” step</b> — one wallet per account is auto-provisioned on entry and auto-funded with ~<b>0.001 ETH</b> from the static master wallet. A fresh wallet shows “auto-funding… give it ~30s then Refresh”.</p></div>
         <div class="row see"><span class="tag">See</span><p>A wallet <b>address</b> (<code>0x…</code>) and a small ETH balance. The private key is never shown — by design.</p></div>
+        <div class="row"><span class="tag">Note</span><p>Balances and the activity feed <b>don't auto-poll</b> — use the per-wallet / status-bar <b>Refresh</b> buttons to pull fresh chain state (e.g. after a send confirms). The auto-refreshing status bar at the top shows block height / gas / last-updated + a clock.</p></div>
         <figure>
           <svg viewBox="0 0 820 110" role="img" aria-label="Wallet provisioning + key custody">
             <rect x="10" y="40" width="170" height="34" rx="6" fill="#eef1f6" stroke="#d3d9e2"/>
@@ -234,9 +266,9 @@
         <p class="proves"><b>Proves:</b> key custody — the centerpiece. AES-256-GCM at rest behind the pluggable <code>Signer</code>; key decrypted in memory only at sign time, then dropped.</p>
       </div>
 
-      <!-- STEP 3 -->
+      <!-- STEP 4 -->
       <div class="step">
-        <h3><span class="num">3</span> Read the balance</h3>
+        <h3><span class="num">4</span> Read the balance</h3>
         <div class="row do"><span class="tag">Do</span><p>On the wallet card, read <b>ETH AVAILABLE</b>; click <b>Refresh</b>.</p></div>
         <div class="row see"><span class="tag">See</span><p><b>confirmed</b> (with an as-of block) and <b>available</b> = confirmed − pending.</p></div>
         <figure>
@@ -256,9 +288,9 @@
         <p class="proves"><b>Proves:</b> getBalance — chain-as-truth. The DB never invents a balance; it caches what the chain reports.</p>
       </div>
 
-      <!-- STEP 4 -->
+      <!-- STEP 5 -->
       <div class="step">
-        <h3><span class="num">4</span> Sign a message — off-chain proof of ownership</h3>
+        <h3><span class="num">5</span> Sign a message — off-chain proof of ownership</h3>
         <div class="row do"><span class="tag">Do</span><p>Wallets → <b>Sign a message</b> (a realistic ownership challenge is pre-filled) → <b>Sign</b>, then <b>Verify</b>.</p></div>
         <div class="row see"><span class="tag">See</span><p>An <b>EIP-191</b> signature, then <b>✓ verified — recovered 0x… = this wallet</b>. No gas, no transaction.</p></div>
         <div class="row"><span class="tag">Why</span><p>This is the primitive behind <b>passwordless “Sign-In With Ethereum”</b> and <b>gasless EIP-712 approvals</b> — a custodial wallet proving ownership / authorizing an action <em>without</em> spending gas. The Sign→Verify round-trip <em>is</em> the proof: the signature recovers to exactly this address.</p></div>
@@ -278,9 +310,9 @@
         <p class="proves"><b>Proves:</b> signMessage — deterministic EIP-191 signing through the same custody seam.</p>
       </div>
 
-      <!-- STEP 5 -->
+      <!-- STEP 6 -->
       <div class="step">
-        <h3><span class="num">5</span> Send ETH to <code>vitalik.eth</code></h3>
+        <h3><span class="num">6</span> Send ETH to <code>vitalik.eth</code></h3>
         <div class="row do"><span class="tag">Do</span><p>Wallets → <b>Send</b>: asset <b>ETH</b>, recipient <code>vitalik.eth</code>, amount <code>0.00001</code> → <b>Send</b>.</p></div>
         <div class="row see"><span class="tag">See</span><p>The activity row goes <b>PENDING → CONFIRMED</b> with a clickable <b>Etherscan tx link</b>; the ENS name resolved to <code>0xd8dA…6045</code>.</p></div>
         <figure>
@@ -307,9 +339,9 @@
         <p class="proves"><b>Proves:</b> sendTransaction end-to-end — ENS, the locked sign/broadcast critical section, and the pending→confirmed lifecycle (a poller, not the request, finalizes).</p>
       </div>
 
-      <!-- STEP 6 -->
+      <!-- STEP 7 -->
       <div class="step">
-        <h3><span class="num">6</span> Fire 5 concurrent sends — the nonce lock</h3>
+        <h3><span class="num">7</span> Fire 5 concurrent sends — the nonce lock</h3>
         <div class="row do"><span class="tag">Do</span><p>Wallets → expand <b>Concurrency demo (nonce lock)</b> → <b>Fire 5 concurrent sends</b>.</p></div>
         <div class="row see"><span class="tag">See</span><p>A green checklist: <b>unique, consecutive nonces · none blocked or dropped · serialized FIFO</b> — and the verdict “5 concurrent sends, zero contention bugs — the lock held.”</p></div>
         <figure>
@@ -333,9 +365,9 @@
         <p class="proves"><b>Proves:</b> correctness under concurrency — a first-class requirement. The advisory lock serializes the read-nonce→sign→broadcast→persist section per wallet; idempotency is backstopped by a unique constraint.</p>
       </div>
 
-      <!-- STEP 7 -->
+      <!-- STEP 8 -->
       <div class="step">
-        <h3><span class="num">7</span> ERC-20 lifecycle — approve &amp; <code>transferFrom</code></h3>
+        <h3><span class="num">8</span> ERC-20 lifecycle — approve &amp; <code>transferFrom</code></h3>
         <div class="row do"><span class="tag">Do</span><p><b>Token</b> tab shows the deployed <b>VCD</b> token + supply. <b>Distribute</b> some VCD to a holder (pick from the dropdown). Switch to the <b>User</b> view → <b>Approve admin</b> for ≥ that amount. Back in <b>Token</b> → <b>transferFrom → admin</b>.</p></div>
         <div class="row see"><span class="tag">See</span><p>Each action gets an Etherscan link. The on-chain <b>allowance</b> is the gate: a pull within allowance+balance succeeds; an over-pull is rejected with a precise message naming the exact shortfall — <em>before</em> any tx is broadcast.</p></div>
         <figure>
@@ -360,9 +392,9 @@
         <p class="note">Deploying a fresh token and reset/seed are operator-only (they need the admin key). The token above is already deployed, so distribute → approve → transferFrom needs no special access.</p>
       </div>
 
-      <!-- STEP 8 -->
+      <!-- STEP 9 -->
       <div class="step">
-        <h3><span class="num">8</span> Activity &amp; audit trail</h3>
+        <h3><span class="num">9</span> Activity &amp; audit trail</h3>
         <div class="row do"><span class="tag">Do</span><p>Open the <b>Activity</b> tab (and the per-wallet feed). Use the <b>Refresh</b> buttons — no full reload needed.</p></div>
         <div class="row see"><span class="tag">See</span><p>One newest-first stream: <b>sends</b> (contract calls labelled by method, e.g. <code>approve</code>), <b>received</b> (inbound transfers indexed from the chain), and <b>governance</b> events (e.g. <code>token.deployed</code>). Logins live in the separate live <b>system log</b>.</p></div>
         <figure>
