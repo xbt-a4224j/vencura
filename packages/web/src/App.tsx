@@ -960,8 +960,9 @@ function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
   const [message, setMessage] = useState(
     () => `I control ${wallet.address} — signed to prove ownership (off-chain, no gas).`,
   );
-  const [signature, setSignature] = useState('');
-  const [verifyOut, setVerifyOut] = useState('');
+  // Each Sign produces an immutable (message, signature) record — the signed artifact is NOT the
+  // editable textarea (that's just the composer). They accumulate so you can sign several.
+  const [signed, setSigned] = useState<{ at: string; message: string; signature: string; verify?: string }[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -993,19 +994,22 @@ function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
 
   const sign = (e: FormEvent) => {
     e.preventDefault();
-    setVerifyOut('');
-    return guard(async () => setSignature((await v.wallets.signMessage({ walletId: wallet.id, message })).signature));
+    return guard(async () => {
+      const { signature } = await v.wallets.signMessage({ walletId: wallet.id, message });
+      setSigned((prev) => [{ at: new Date().toLocaleTimeString(), message, signature }, ...prev]);
+    });
   };
 
-  // Sign → verify loop: recover the signer from (message, signature) and prove it's this wallet.
-  const verify = () =>
+  // Per-row verify: recover the signer from THAT row's (message, signature) and prove it's this wallet.
+  const verify = (idx: number) =>
     guard(async () => {
-      const signer = await recoverMessageAddress({ message, signature: signature as `0x${string}` });
-      setVerifyOut(
-        signer.toLowerCase() === wallet.address.toLowerCase()
-          ? `✓ verified — recovered ${shortHex(signer)} = this wallet`
-          : `✗ mismatch — recovered ${shortHex(signer)}`,
-      );
+      const row = signed[idx];
+      const recovered = await recoverMessageAddress({ message: row.message, signature: row.signature as `0x${string}` });
+      const out =
+        recovered.toLowerCase() === wallet.address.toLowerCase()
+          ? `✓ recovered ${shortHex(recovered)} = this wallet`
+          : `✗ mismatch — recovered ${shortHex(recovered)}`;
+      setSigned((prev) => prev.map((r, i) => (i === idx ? { ...r, verify: out } : r)));
     });
 
   const onSent = () => {
@@ -1120,19 +1124,29 @@ function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
           <button type="submit" disabled={busy || message.length === 0}>
             Sign
           </button>
-          {signature && (
-            <p>
-              signature: <code>{shortHex(signature)}</code>
-              <CopyButton value={signature} label="⧉" />{' '}
-              <button type="button" className="copybtn" onClick={verify}>
-                Verify
-              </button>
-              {verifyOut && (
-                <span className={verifyOut.startsWith('✓') ? 'verdict ok' : 'verdict bad'}> {verifyOut}</span>
-              )}
-            </p>
-          )}
         </form>
+        {signed.length > 0 && (
+          <div className="act-scroll signed-list">
+            <table className="act-table">
+              <thead>
+                <tr><th>Time</th><th>Message (signed — immutable)</th><th>Signature</th><th>Verify</th></tr>
+              </thead>
+              <tbody>
+                {signed.map((sg, i) => (
+                  <tr key={`${sg.at}-${i}`}>
+                    <td>{sg.at}</td>
+                    <td className="signed-msg">{sg.message}</td>
+                    <td><code>{shortHex(sg.signature)}</code><CopyButton value={sg.signature} label="⧉" /></td>
+                    <td>
+                      <button type="button" className="copybtn" onClick={() => verify(i)} disabled={busy}>Verify</button>
+                      {sg.verify && <span className={sg.verify.startsWith('✓') ? 'verdict ok' : 'verdict bad'}> {sg.verify}</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </details>
       {error && <p role="alert">{error}</p>}
     </li>
