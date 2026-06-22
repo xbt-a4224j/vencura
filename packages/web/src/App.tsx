@@ -1108,12 +1108,15 @@ function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
           and confirm it’s this wallet.
         </p>
         <form onSubmit={sign}>
-          <label htmlFor={`msg-${wallet.id}`}>Message to sign</label>
-          <textarea
-            id={`msg-${wallet.id}`}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-          />
+          <label className="field" htmlFor={`msg-${wallet.id}`}>
+            <span>Message to sign</span>
+            <textarea
+              id={`msg-${wallet.id}`}
+              rows={3}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+            />
+          </label>
           <button type="submit" disabled={busy || message.length === 0}>
             Sign
           </button>
