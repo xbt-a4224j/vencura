@@ -39,6 +39,26 @@ function build(prisma: unknown, wallets: unknown) {
     .then((m) => m.get(ProvisioningService));
 }
 
+describe('ProvisioningService.findMaster', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.DEMO_FUNDED_PRIVKEY;
+  });
+
+  it('fails fast when the master key is unset — no best-effort admin-wallet fallback', async () => {
+    const prisma = {
+      user: { findUnique: vi.fn() },
+      wallet: { findFirst: vi.fn() },
+    };
+    const svc = await build(prisma, {});
+
+    await expect(svc.findMaster()).rejects.toThrow(/master/i);
+    // The old fallback enumerated the admin account; the Sepolia-only model must not.
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(prisma.wallet.findFirst).not.toHaveBeenCalled();
+  });
+});
+
 describe('ProvisioningService.provision', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -46,6 +66,7 @@ describe('ProvisioningService.provision', () => {
   });
 
   it('is idempotent: a second call returns the same wallet and does NOT fund again', async () => {
+    process.env.DEMO_FUNDED_PRIVKEY = `0x${'11'.repeat(32)}`; // master resolved by derived address
     const create = vi.fn().mockResolvedValue({ id: 'w-new', address: '0xnew' });
     // first findFirst (user has no wallet) → null; afterward the wallet exists.
     let userWallet: { id: string; address: string } | null = null;
@@ -53,13 +74,12 @@ describe('ProvisioningService.provision', () => {
       wallet: {
         findFirst: vi.fn().mockImplementation(({ where }: { where: { userId?: string; address?: string } }) => {
           if (where.userId === 'user-1') return Promise.resolve(userWallet); // caller's wallet
-          if (where.userId === 'demo-user') return Promise.resolve({ id: 'master', address: '0xmaster' });
+          if (where.address) return Promise.resolve({ id: 'master', address: where.address }); // master by key
           return Promise.resolve(null);
         }),
         findUnique: vi.fn().mockResolvedValue({ nextNonce: 0, address: '0xmaster' }),
         update: vi.fn().mockResolvedValue({}),
       },
-      user: { findUnique: vi.fn().mockResolvedValue({ id: 'demo-user' }) },
       transaction: { create: vi.fn().mockResolvedValue({}) },
     };
     const wallets = {

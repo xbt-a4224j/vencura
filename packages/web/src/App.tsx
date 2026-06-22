@@ -1823,10 +1823,9 @@ function SettingsTab({ onChange }: { onChange: () => void }) {
     setBusy(true);
     try {
       const res = await v.admin.seed();
-      const funded = res.wallets.filter((w) => w.funded).length;
       await reload(); // demo account now appears in the User-view picker
       onChange(); // refresh the wallet-scoped panels
-      setSeedMsg(`Seeded ${res.email} — ${res.wallets.length} wallets, ${funded} funded.`);
+      setSeedMsg(`Seeded ${res.email} — ${res.wallets.length} wallets (fund via Sepolia faucet).`);
     } catch (err) {
       setError((err as Error).message);
     } finally {

@@ -9,7 +9,7 @@ async function main() {
     const result = await seedDemo(prisma);
     console.log('seeded demo user:', result.email, `(password: ${result.password})`);
     for (const w of result.wallets) {
-      console.log(`  wallet ${w.address} — ${w.funded ? 'funded 10 ETH' : 'not funded'}`);
+      console.log(`  wallet ${w.address} — fund via Sepolia faucet`);
     }
   } finally {
     await prisma.$disconnect();

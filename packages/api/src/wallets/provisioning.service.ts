@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ADMIN_EMAIL, NATIVE_ASSET, type Hex } from '@vencura/shared';
+import { NATIVE_ASSET, type Hex } from '@vencura/shared';
 import { parseEther } from 'viem';
 import { privateKeyToAddress } from 'viem/accounts';
 import { ChainService } from '../infra/chain/chain.service';
@@ -29,26 +29,19 @@ export class ProvisioningService {
     @Inject(SIGNER) private readonly signer: Signer,
   ) {}
 
-  /** The master wallet that funds new accounts. When DEMO_FUNDED_PRIVKEY is set it's the
-   *  wallet at that address (seed wallet 0); otherwise fall back to the demo user's oldest
-   *  wallet (best-effort, logged). Returns null if no master can be located. */
+  /** The master wallet that funds new accounts: the wallet at the address derived from the
+   *  configured master key. Sepolia-only — the key is REQUIRED; we fail fast if it's unset or
+   *  invalid rather than silently leaving wallets unfunded. Returns null only when the key is
+   *  valid but its wallet row hasn't been seeded yet. */
   async findMaster(): Promise<{ id: string; address: string } | null> {
     const priv = process.env.DEMO_FUNDED_PRIVKEY ?? '';
-    if (/^0x[0-9a-fA-F]{64}$/.test(priv)) {
-      const address = privateKeyToAddress(priv as Hex);
-      const w = await this.prisma.wallet.findFirst({ where: { address }, select: { id: true, address: true } });
-      if (w) return w;
-      this.logger.warn(`master address ${address} from DEMO_FUNDED_PRIVKEY has no wallet row`);
-      return null;
+    if (!/^0x[0-9a-fA-F]{64}$/.test(priv)) {
+      throw new Error('master wallet key (DEMO_FUNDED_PRIVKEY) is not configured');
     }
-    const admin = await this.prisma.user.findUnique({ where: { email: ADMIN_EMAIL } });
-    if (!admin) return null;
-    this.logger.warn("DEMO_FUNDED_PRIVKEY unset — using the admin account's oldest wallet as master (best-effort)");
-    return this.prisma.wallet.findFirst({
-      where: { userId: admin.id },
-      orderBy: { createdAt: 'asc' },
-      select: { id: true, address: true },
-    });
+    const address = privateKeyToAddress(priv as Hex);
+    const w = await this.prisma.wallet.findFirst({ where: { address }, select: { id: true, address: true } });
+    if (!w) this.logger.warn(`master address ${address} has no wallet row yet`);
+    return w;
   }
 
   /** Idempotent: if the user already has a wallet, return it (no second fund). */

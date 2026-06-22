@@ -1,8 +1,8 @@
-// Demo seed routine: one user, a few funded wallets. Idempotent on the
-// demo email. Reused by `pnpm db:seed` (prisma/seed.ts) and the dev-gated POST /admin/seed.
+// Demo seed routine: one user with one wallet. Idempotent on the demo email.
+// Reused by `pnpm db:seed` (prisma/seed.ts) and the dev-gated POST /admin/seed.
+// Funding is NOT done here — the master wallet is funded externally via a Sepolia faucet.
 import type { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
-import { createTestClient, http, parseEther } from 'viem';
 import { generatePrivateKey, privateKeyToAddress } from 'viem/accounts';
 import { ADMIN_EMAIL, DEMO_PASSWORD, type Hex, type SeedResult } from '@vencura/shared';
 import { encrypt } from '../signer/aes-256-gcm';
@@ -21,18 +21,6 @@ function masterKey(): Buffer {
 function demoFundedKey(): Hex | null {
   const k = process.env.DEMO_FUNDED_PRIVKEY ?? '';
   return /^0x[0-9a-fA-F]{64}$/.test(k) ? (k as Hex) : null;
-}
-
-/** Best-effort fund a wallet on a local anvil node; no-op (logged) on a real RPC. */
-async function fundOnAnvil(address: Hex): Promise<boolean> {
-  const test = createTestClient({ mode: 'anvil', transport: http(process.env.RPC_URL!) });
-  try {
-    await test.setBalance({ address, value: parseEther('10') });
-    return true;
-  } catch {
-    console.log('funding skipped (non-anvil RPC)');
-    return false;
-  }
 }
 
 /** Create the demo user + wallets. Idempotent: wipes the demo user's wallets first. */
@@ -58,8 +46,7 @@ export async function seedDemo(prisma: PrismaClient): Promise<SeedResult> {
       data: { userId: user.id, address, ...encrypt(privateKey, key) },
       select: { id: true, address: true },
     });
-    const funded = await fundOnAnvil(address as Hex);
-    wallets.push({ ...wallet, funded });
+    wallets.push(wallet);
   }
 
   return { email: ADMIN_EMAIL, password: DEMO_PASSWORD, wallets };

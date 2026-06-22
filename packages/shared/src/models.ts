@@ -108,5 +108,5 @@ export interface ContractReadResult {
 export interface SeedResult {
   email: string;
   password: string;
-  wallets: { id: string; address: string; funded: boolean }[];
+  wallets: { id: string; address: string }[];
 }
