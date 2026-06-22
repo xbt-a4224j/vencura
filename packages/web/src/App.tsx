@@ -464,12 +464,12 @@ function UserView({ onExit }: { onExit: () => void }) {
         </span>
       </header>
       <StatusBar onRefresh={() => void refresh()} />
-      <UserTokenPanel wallets={wallets} />
       <h2 className="cap">Your wallets</h2>
       <p className="bal-sub">
         Create as many wallets as you like — each can hold ETH and tokens, send, and sign.
       </p>
       <WalletsTab wallets={wallets} onChange={refresh} email={user.email} />
+      <UserTokenPanel wallets={wallets} />
     </main>
   );
 }
