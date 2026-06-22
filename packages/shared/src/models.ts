@@ -88,15 +88,10 @@ export interface ChainHead {
   gasGwei: number;
 }
 
-/** The singleton demo ERC-20 (or null if none deployed). */
+/** The fixed ERC-20 the app operates on: address + owner/spender (the master wallet). */
 export interface TokenInfo {
   address: string;
   owner: string;
-}
-export interface DeployTokenResult {
-  address: string;
-  owner: string;
-  txHash: string;
 }
 
 /** Result of a generic contract read (eth_call + decode). */

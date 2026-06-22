@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { privateKeyToAddress } from 'viem/accounts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '@/infra/prisma/prisma.service';
 import { ChainService } from '@/infra/chain/chain.service';
@@ -65,6 +66,32 @@ async function build(prisma: ReturnType<typeof makePrisma>) {
   }).compile();
   return moduleRef.get(TransactionsService);
 }
+
+describe('TransactionsService.getDemoToken', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.TOKEN_ADDRESS;
+    delete process.env.DEMO_FUNDED_PRIVKEY;
+  });
+
+  it('returns the configured token address with the master wallet as owner/spender', async () => {
+    const priv = `0x${'22'.repeat(32)}` as `0x${string}`;
+    process.env.DEMO_FUNDED_PRIVKEY = priv;
+    process.env.TOKEN_ADDRESS = '0x3870f83ef336e983ed9bf2327dc19673bb5c872b';
+    const svc = await build(makePrisma());
+
+    expect(svc.getDemoToken()).toEqual({
+      address: '0x3870f83ef336e983ed9bf2327dc19673bb5c872b',
+      owner: privateKeyToAddress(priv),
+    });
+  });
+
+  it('fails fast when TOKEN_ADDRESS is not configured', async () => {
+    process.env.DEMO_FUNDED_PRIVKEY = `0x${'22'.repeat(32)}`;
+    const svc = await build(makePrisma());
+    expect(() => svc.getDemoToken()).toThrow(/TOKEN_ADDRESS/);
+  });
+});
 
 describe('TransactionsService concurrency + idempotency', () => {
   beforeEach(() => vi.clearAllMocks());

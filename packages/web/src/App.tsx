@@ -1464,7 +1464,6 @@ function HolderField({
 // allowance is the gate (replacing the old off-chain allowlist).
 function TokenTab({ wallets }: { wallets: Wallet[] }) {
   const [token, setToken] = useState<{ address: string; owner: string } | null | undefined>(undefined);
-  const [deployFrom, setDeployFrom] = useState('');
   const [busy, setBusy] = useState(false);
   // Result of the last action: a line of text plus an optional tx hash so we can deep-link to the
   // explorer (like the wallet activity feed), instead of only printing a truncated hash.
@@ -1514,9 +1513,6 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
       document.removeEventListener('visibilitychange', refetch);
     };
   }, []);
-  useEffect(() => {
-    if (!deployFrom && wallets[0]) setDeployFrom(wallets[0].id);
-  }, [wallets, deployFrom]);
   // Total minted supply + the owner's remaining balance (= what's left to distribute). Re-read after
   // each action (msg changes) so the headroom updates once a distribute confirms.
   useEffect(() => {
@@ -1543,12 +1539,6 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
       .catch((e) => setResult({ text: (e as Error).message }))
       .finally(() => setBusy(false));
   };
-  const deploy = () =>
-    run(async () => {
-      const t = await v.tokens.deploy({ walletId: deployFrom });
-      await load();
-      return { text: `✓ deployed ${t.address}`, txHash: t.txHash };
-    });
   const distribute = () =>
     run(async () => {
       if (!ownerWallet) throw new Error('owner wallet not found locally');
@@ -1595,27 +1585,15 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
   return (
     <section>
       <p className="bal-sub">
-        Deploy a demo ERC-20, distribute it to the user, then — once the user approves the admin —
-        pull their tokens with <code>transferFrom</code>. The on-chain allowance is the gate.
+        The admin holds a fixed ERC-20 (VCD). Distribute it to the user, then — once the user approves
+        the admin — pull their tokens with <code>transferFrom</code>. The on-chain allowance is the gate.
       </p>
       {token === undefined ? (
         <p className="bal-sub">Loading…</p>
       ) : !token ? (
-        <div className="form-grid">
-          <label className="field" htmlFor="deploy-from">
-            <span>Deploy from (funded wallet)</span>
-            <select id="deploy-from" value={deployFrom} onChange={(e) => setDeployFrom(e.target.value)}>
-              {wallets.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {shortHex(w.address)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button onClick={deploy} disabled={busy || !deployFrom}>
-            {busy ? 'Deploying…' : 'Deploy demo token'}
-          </button>
-        </div>
+        <p className="bal-sub" role="alert">
+          Token unavailable — <code>TOKEN_ADDRESS</code> is not configured on the API.
+        </p>
       ) : (
         <>
           <p>

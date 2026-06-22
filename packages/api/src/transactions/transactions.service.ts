@@ -1,8 +1,8 @@
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { NATIVE_ASSET, type ContractWriteInput, type Hex, type SendTransactionInput } from '@vencura/shared';
-import { type Abi, encodeDeployData, encodeFunctionData, erc20Abi, parseEther } from 'viem';
-import { DEMO_TOKEN_ABI, DEMO_TOKEN_BYTECODE } from '../admin/demo-token.artifact';
+import { type Abi, encodeFunctionData, erc20Abi } from 'viem';
+import { privateKeyToAddress } from 'viem/accounts';
 import { ChainService } from '../infra/chain/chain.service';
 import { EventsService } from '../infra/events/events.service';
 import { LOCK, type Lock } from '../infra/lock/lock';
@@ -116,54 +116,16 @@ export class TransactionsService {
     });
   }
 
-  /** Deploy the demo ERC-20 from `walletId` (the funded admin wallet owns the full supply), then
-   *  record it as the singleton demo token. Reuses the locked nonce/sign/broadcast critical section;
-   *  the ~block-time receipt wait happens OUTSIDE the lock so it doesn't stall the wallet. */
-  async deployDemoToken(walletId: string, userId: string) {
-    const wallet = await this.wallets.findOwnedOrThrow(walletId, userId);
-    const supply = parseEther('1000000'); // 1,000,000 VCD, all minted to the deployer
-    const data = encodeDeployData({ abi: DEMO_TOKEN_ABI, bytecode: DEMO_TOKEN_BYTECODE, args: [supply] }) as Hex;
-
-    const hash = await this.lock.withWalletLock(walletId, async () => {
-      const w = await this.prisma.wallet.findUnique({ where: { id: walletId } });
-      const pending = await this.chain.getPendingNonce(wallet.address as Hex);
-      const nonce = Math.max(pending, w!.nextNonce);
-      const request = await this.chain.prepareTransaction({ from: wallet.address as Hex, data, nonce }); // no `to` = deploy
-      const raw = (await this.signer.signTransaction(walletId, request)) as Hex;
-      let txHash: Hex;
-      try {
-        txHash = await this.chain.sendRawTransaction(raw);
-      } catch (e) {
-        throw new BadRequestException((e as Error).message);
-      }
-      await this.prisma.wallet.update({ where: { id: walletId }, data: { nextNonce: nonce + 1 } });
-      this.logger.log(`demo token deploy broadcast: ${txHash} (nonce ${nonce})`);
-      return txHash;
-    });
-
-    const receipt = await this.chain.waitForReceipt(hash);
-    if (!receipt.contractAddress) throw new BadRequestException('deploy produced no contract address');
-    const saved = await this.prisma.demoToken.upsert({
-      where: { id: 'singleton' },
-      create: { id: 'singleton', address: receipt.contractAddress, owner: wallet.address },
-      update: { address: receipt.contractAddress, owner: wallet.address },
-    });
-    this.logger.log(`demo token deployed: ${saved.address} (owner ${saved.owner})`);
-    // Durable governance event: deploying the token mints the full supply to the admin. Record it
-    // in the audit trail so the mint is a first-class action, not only inferred from the chain index.
-    await this.events.record({
-      userId,
-      walletId,
-      type: 'token.deployed',
-      detail: { address: saved.address, owner: saved.owner, supply: supply.toString(), txHash: hash },
-      msg: `token deployed: ${saved.address} (1,000,000 VCD minted to ${saved.owner})`,
-    });
-    return { address: saved.address, owner: saved.owner, txHash: hash };
-  }
-
-  /** The current demo token (address + owner=spender) or null. */
-  getDemoToken() {
-    return this.prisma.demoToken.findUnique({ where: { id: 'singleton' }, select: { address: true, owner: true } });
+  /** The fixed ERC-20 the app operates on: a pre-deployed Sepolia token (TOKEN_ADDRESS) whose full
+   *  supply is held by the master/admin wallet. `owner` (= the approve/transferFrom spender) is that
+   *  wallet's address, derived from the master key. Config-driven — fails fast if TOKEN_ADDRESS is unset. */
+  getDemoToken(): { address: string; owner: string } {
+    const address = process.env.TOKEN_ADDRESS ?? '';
+    if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
+      throw new Error('TOKEN_ADDRESS is not configured');
+    }
+    const owner = privateKeyToAddress((process.env.DEMO_FUNDED_PRIVKEY ?? '') as Hex);
+    return { address, owner };
   }
 
   list(walletId: string, userId: string) {

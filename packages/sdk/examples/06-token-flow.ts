@@ -14,11 +14,7 @@ async function main() {
   const v = await connect();
   const owner = await aWallet(v); // the deployment's admin wallet owns the demo token + supply
 
-  let token = await v.tokens.get();
-  if (!token) {
-    const d = await v.tokens.deploy({ walletId: owner.id });
-    token = { address: d.address, owner: d.owner };
-  }
+  const token = await v.tokens.get(); // fixed pre-deployed VCD token (admin owns the supply)
   console.log('token:', token.address);
 
   // Owner approves itself as spender for 50, then pulls 50 within the allowance.

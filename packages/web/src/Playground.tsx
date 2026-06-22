@@ -116,11 +116,7 @@ return {
     flow: ['approve', 'allowance', 'transferFrom'],
     code: `// ERC-20 approve → allowance → transferFrom via the typed token helpers (single-wallet/self demo).
 const owner = await v.wallets.provision();
-let token = await v.tokens.get();
-if (!token) {
-  const d = await v.tokens.deploy({ walletId: owner.id });
-  token = { address: d.address, owner: d.owner };
-}
+const token = await v.tokens.get(); // fixed pre-deployed VCD token
 log('token', token.address);
 const appr = await v.tokens.approve({ walletId: owner.id, token: token.address, spender: owner.address, amount: parseEther('50').toString() });
 log('approve sent, waiting…');

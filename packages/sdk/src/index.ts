@@ -6,7 +6,6 @@ import {
   type BalanceView,
   type ChainHead,
   type ContractReadResult,
-  type DeployTokenResult,
   type Holder,
   type LogLine,
   type SeedResult,
@@ -288,13 +287,9 @@ class TokensApi {
     private readonly http: Http,
     private readonly tx: TransactionsApi,
   ) {}
-  /** Deploy the demo ERC-20 from a funded wallet (mints the supply to it). */
-  deploy(p: { walletId: string }): Promise<DeployTokenResult> {
-    return this.http.request<DeployTokenResult>(`/wallets/${p.walletId}/deploy-token`, { method: 'POST', auth: true });
-  }
-  /** The current demo token (address + owner), or null. */
-  get(): Promise<TokenInfo | null> {
-    return this.http.request<TokenInfo | null>('/token', { auth: true });
+  /** The fixed ERC-20 (address + owner/spender). */
+  get(): Promise<TokenInfo> {
+    return this.http.request<TokenInfo>('/token', { auth: true });
   }
   // Typed conveniences over the generic contract endpoints — amounts are base-unit strings.
   transfer(p: { walletId: string; token: string; to: string; amount: string }): Promise<Transaction> {
