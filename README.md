@@ -21,7 +21,7 @@ message**, and **send a transaction** — for the native asset (**ETH**) and **E
 
 Web on **Vercel**, API on **Railway** (Docker), Postgres on **Neon**, RPC on **Sepolia**. The web calls the API
 same-origin via a `/api/*` rewrite. Register an account to try it; live balance/send needs a Sepolia-funded
-wallet (faucet link in the admin). Per-IP rate limiting is enabled.
+wallet (faucet link in the admin).
 
 > 📋 **New here? Follow the [reviewer walkthrough](docs/reviewer-walkthrough.html)** — an 8-step, ~10-minute
 > guided tour of the live app (with a diagram for every step) that exercises the four required operations and
@@ -62,9 +62,7 @@ Once `pnpm dev` is up, click straight in:
 
 The web app proxies `/api` → the API on port `3000`, so the SPA and API share an origin (no CORS in dev).
 
-**Logging in:** use the seeded demo account — **`demo@vencura.local`** / **`demo-password`** — or register a
-new user. No demo data yet? Run `pnpm --filter @vencura/api db:seed` (or click **Seed demo data** in the
-Admin tab) to create the demo user plus three pre-funded wallets on the local anvil chain.
+**Logging in:** register a user in the **User** tab, or use the seeded account — **`admin@vencura.local`** / **`seed-password`** (run `pnpm --filter @vencura/api db:seed` to (re)create it). New wallets are auto-funded a small amount from the seeded master wallet.
 
 ## Environment variables
 
@@ -114,7 +112,7 @@ With the stack running, the API serves:
 
 ## Security & custody
 
-**Security writeup** — see [`docs/security.md`](docs/security.md) (T-036, in progress).
+**Security writeup** — see [`docs/SECURITY.md`](docs/SECURITY.md).
 
 Secrets (`MASTER_ENCRYPTION_KEY`, `JWT_SECRET`, DB URL, RPC key) come from the environment and are never
 committed — only [`.env.example`](.env.example) is.

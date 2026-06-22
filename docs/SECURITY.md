@@ -48,6 +48,7 @@ Custody is isolated behind one interface, so the *custody model* is swappable wi
 
 ```ts
 interface Signer {
+  createKey(): Promise<NewKey>;
   signMessage(walletId, msg): Promise<Hex>;
   signTransaction(walletId, tx): Promise<Hex>;
 }
@@ -74,7 +75,7 @@ sign:    wallets row ──decrypt(masterKey)──▶ privkey (in RAM) ──si
 | Stage | Key location | Status | Trade-off |
 | --- | --- | --- | --- |
 | **Encrypted-key** | full key in DB, encrypted; master key in env | **built** | simplest correct custody; single master key is the weak point |
-| **`ShamirSigner`** (2-of-2 split) | key split into 2 shares, reconstructed transiently; full key never persisted | **designed (bonus, not built)** | no single stored secret reconstructs the key at rest |
+| **`ShamirSigner`** (2-of-2 split) | key split into 2 shares, reconstructed transiently; full key never persisted | **built (bonus, `SIGNER=shamir`)** | no single stored secret reconstructs the key at rest |
 | **MPC / threshold (`MpcSigner`)** | key *never exists whole* — distributed signing across parties | **designed, not built** | the production answer (this is Fireblocks' domain); removes the "key exists somewhere" risk entirely |
 | **Non-custodial** | user holds the key; platform never sees it | **designed, not built** | strongest, but changes the product (no server-side signing) |
 

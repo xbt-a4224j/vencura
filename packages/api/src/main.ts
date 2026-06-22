@@ -7,6 +7,7 @@ import { config as loadEnv } from 'dotenv';
 import { ZodValidationPipe, cleanupOpenApiDoc } from 'nestjs-zod';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
+import { httpLogging } from './common/http-logging.middleware';
 import { EventsService } from './infra/events/events.service';
 import { RingLogger } from './infra/events/ring-logger';
 
@@ -30,6 +31,11 @@ async function bootstrap() {
   // One consistent JSON error shape (RFC-7807-ish) for every uncaught error, with
   // chain-error mapping and no stack-trace/secret leakage.
   app.useGlobalFilters(new AllExceptionsFilter());
+
+  // Log one line per API call (method/path/status/duration) — the per-request narration the live
+  // system log and demo rely on. Outermost middleware (before guards) so every request is logged,
+  // including 401/403/404 that never reach a handler. Path/method/status only; never request bodies.
+  app.use(httpLogging);
 
   // Auto-generated OpenAPI + Swagger UI at /docs — demoability and
   // the source for the generated SDK (T-025). cleanupOpenApiDoc finalizes the zod-derived

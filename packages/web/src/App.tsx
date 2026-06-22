@@ -837,7 +837,7 @@ function ActivityFeed({ wallet, refreshKey }: { wallet: Wallet; refreshKey: numb
                   {time} <span className="pill audit">{it.type}</span>
                 </li>
               );
-            return null; // unknown / not-yet-deployed kind — render nothing, never a blank pill
+            return null; // unknown / future activity kind — render nothing, never a blank pill
           })}
         </ul>
       )}
@@ -1443,9 +1443,9 @@ function HolderField({
   );
 }
 
-// Admin Token tab: deploy a demo ERC-20 (admin owns the supply), distribute it to the user, then —
+// Admin Token tab: the pre-deployed ERC-20 (admin holds the supply), distribute it to the user, then —
 // once the user approves the admin as spender — pull their tokens via transferFrom. The on-chain
-// allowance is the gate (replacing the old off-chain allowlist).
+// allowance is the gate.
 function TokenTab({ wallets }: { wallets: Wallet[] }) {
   const [token, setToken] = useState<{ address: string; owner: string } | null | undefined>(undefined);
   const [busy, setBusy] = useState(false);
@@ -1663,8 +1663,8 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
   );
 }
 
-// User-side demo-token panel: shows the token + lets the user approve the admin (spender) so the
-// admin can transferFrom their tokens. Hidden until a token has been deployed.
+// User-side token panel: shows the token + lets the user approve the admin (spender) so the
+// admin can transferFrom their tokens. Hidden until the token loads.
 function UserTokenPanel({ wallets }: { wallets: Wallet[] }) {
   const [token, setToken] = useState<{ address: string; owner: string } | null>(null);
   const [walletId, setWalletId] = useState('');
@@ -1706,9 +1706,9 @@ function UserTokenPanel({ wallets }: { wallets: Wallet[] }) {
 
   return (
     <section>
-      <h2 className="cap">Demo token (ERC-20)</h2>
+      <h2 className="cap">Token (ERC-20)</h2>
       <p className="bal-sub">
-        The admin issued a demo token (<HashLink value={token.address} href={explorerAddress(token.address)} />).
+        The admin holds the platform's ERC-20 token (<HashLink value={token.address} href={explorerAddress(token.address)} />).
         Approve the admin as a spender to let them move your tokens via <code>transferFrom</code>.
       </p>
       <div className="form-grid">

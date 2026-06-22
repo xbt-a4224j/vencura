@@ -151,7 +151,7 @@ Postgres advisory locks + a unique-key constraint + scheduled pollers (no Redis)
 <tr><th>Component</th><th>Role</th></tr>
 <tr><td><strong>Admin UI + TS SDK</strong></td><td>React/TS admin to exercise the API; a typed SDK package + example scripts (example code + a framework-agnostic client).</td></tr>
 <tr><td><strong>NestJS API</strong></td><td>Modules: Auth (JWT), Wallets, Transactions, Balances, Signer. DI + guards/interceptors fit auth cleanly; a clean, conventional Node/TS structure.</td></tr>
-<tr><td><strong>Postgres + Prisma</strong></td><td>Durable source of <em>derived</em> state: users, wallets (encrypted keys), transactions, cached balances, policies, shared-access grants, idempotency records.</td></tr>
+<tr><td><strong>Postgres + Prisma</strong></td><td>Durable source of <em>derived</em> state: users, wallets (encrypted keys), transactions, cached balances, idempotency records.</td></tr>
 <tr><td><strong>Concurrency (Postgres)</strong></td><td>Per-wallet nonce serialization via <code>pg_advisory_xact_lock</code> (behind a <code>Lock</code> interface), idempotency via a unique constraint, and <code>@nestjs/schedule</code> pollers over pending rows — no Redis/queue.</td></tr>
 <tr><td><strong>Key encryption</strong></td><td>Each wallet's private key is encrypted with AES-256-GCM using a master key from env/secret. No external KMS — kept deliberately simple.</td></tr>
 <tr><td><strong>Ethereum / Infura (Sepolia)</strong></td><td>JSON-RPC for balance/nonce/receipts, tx broadcast, and a websocket subscription (new blocks + ERC-20 <code>Transfer</code> logs) for event-driven refresh.</td></tr>
@@ -170,7 +170,6 @@ transactions   id, wallet_id, idempotency_key, tx_hash, nonce,
                block_number, gas_used, created_at
 wallet_balances wallet_id, asset, confirmed_balance (bigint str),
                as_of_block, updated_at
-wallet_access  wallet_id, user_id, role ('owner'|'spender'|'viewer')   -- shared access
 audit_log      id, actor_user_id, wallet_id, action, metadata, created_at</code></pre>
 <div class="callout"><strong>Note the discipline:</strong> amounts are stored as <em>bigint strings</em> (wei / token base units),
 never JS floats. Balances are cached (with <code>as_of_block</code>), not authoritative. Key material lives only as
@@ -249,9 +248,9 @@ a balance isn't treated as final until N confirmations.</p>
 <h2 class="sec" id="security"><span class="num">10</span>Security considerations</h2>
 <ul>
   <li><strong>Keys:</strong> AES-256-GCM encryption at rest; decrypt in memory only; never logged, never returned by the API.</li>
-  <li><strong>Auth &amp; authz:</strong> JWT; every wallet action checks ownership/shared-access role.</li>
+  <li><strong>Auth &amp; authz:</strong> JWT; every wallet action checks ownership (404 on a wallet that isn't yours).</li>
   <li><strong>Transport &amp; secrets:</strong> TLS; the master encryption key + DB creds in env/secrets manager, never in code.</li>
-  <li><strong>Abuse:</strong> rate limiting; idempotency; audit log of every sensitive action.</li>
+  <li><strong>Abuse:</strong> idempotency; audit log of every sensitive action.</li>
   <li><strong>Chain correctness:</strong> authoritative nonce/balance checks; reorg-aware confirmations; amounts as bigints.</li>
   <li><strong>Honest weaknesses (for the writeup):</strong> a fully custodial model is a honeypot — a compromised master key +
   DB is catastrophic; the real mitigation is MPC/non-custodial, which is why the <code>Signer</code> abstraction matters.</li>

@@ -37,3 +37,7 @@ docs/superpowers/
 # Local app-standup runtime (pids + logs)
 .standup/
 .vercel
+
+# stray local screenshots / scratch images (not deliverables)
+img_*.png
+Screenshot*.png
