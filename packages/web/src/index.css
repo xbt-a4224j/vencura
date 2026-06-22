@@ -319,12 +319,6 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
   border-radius: 8px; background: var(--panel-2); color: var(--ink);
 }
 .pg2-maps { border-top: 1px dashed var(--line); padding-top: 12px; }
-.pg2-reqtag {
-  display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
-  padding: 2px 8px; border-radius: 999px; background: var(--panel-2); color: var(--muted); border: 1px solid var(--line);
-}
-.pg2-reqtag.req { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); background: color-mix(in srgb, var(--ok) 8%, transparent); }
-.pg2-req { margin-left: 8px; font-family: var(--mono); font-size: 12.5px; color: var(--ink); background: none; padding: 0; }
 .pg2-note { font-size: 12.5px; color: var(--muted); margin: 8px 0; }
 .pg2-flow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .pg2-flowstep { display: inline-flex; align-items: center; gap: 6px; }

@@ -8,8 +8,6 @@ import { v } from './vencura';
 type Example = {
   file: string;
   mutates?: boolean; // broadcasts a real Sepolia tx
-  req: boolean; // a take-home requirement (vs beyond-brief)
-  maps: string; // the requirement / capability it demonstrates
   note: string; // one-line, reviewer-facing
   flow: string[]; // tiny flow diagram (steps)
   code: string;
@@ -21,8 +19,6 @@ type Example = {
 const EXAMPLES: Example[] = [
   {
     file: '01-create-wallet.ts',
-    req: true,
-    maps: 'A user can create at least one account/wallet',
     note: 'Key is generated + AES-256-GCM encrypted server-side; you only ever see the address.',
     flow: ['account', 'encrypt key', 'address'],
     code: `// Provision the account's wallet (one per account). The platform generates + encrypts the
@@ -34,8 +30,6 @@ return wallet.address;
   },
   {
     file: '02-get-balance.ts',
-    req: true,
-    maps: 'getBalance() → balance',
     note: 'Chain is the source of truth; the DB is a cache. available = confirmed − pending − gas reserve.',
     flow: ['chain', 'cache', 'available'],
     code: `// Confirmed + available balance. available = confirmed − pending − a small gas reserve.
@@ -46,8 +40,6 @@ return balances;
   },
   {
     file: '03-sign-message.ts',
-    req: true,
-    maps: 'signMessage(msg) → signedMessage',
     note: 'EIP-191 off-chain signature; recover the signer to prove it’s this wallet. No gas, no tx.',
     flow: ['message', 'sign (key)', 'recover ✓'],
     code: `// Off-chain proof of ownership (EIP-191) — no gas. Sign, then recover the signer locally and
@@ -63,8 +55,6 @@ return { signature, matches: recovered.toLowerCase() === wallet.address.toLowerC
   {
     file: '04-send-transaction.ts',
     mutates: true,
-    req: true,
-    maps: 'sendTransaction(to, amount) → transactionHash',
     note: 'The core send — with an auto idempotency key (exactly-once on retry) and on-chain confirmation.',
     flow: ['sign', 'broadcast', 'confirm'],
     code: `// Broadcasts a REAL Sepolia tx (1 wei to self). sendAndConfirm auto-generates an idempotency
@@ -82,8 +72,6 @@ return await v.transactions.sendAndConfirm({
   {
     file: '05-concurrency.ts',
     mutates: true,
-    req: false,
-    maps: 'Beyond the brief — correctness under concurrency',
     note: 'Racing sends would collide on the nonce; the per-wallet Postgres advisory lock serializes them.',
     flow: ['5 sends', 'nonce lock', 'n … n+4'],
     code: `// Fire N sends at ONE wallet simultaneously. The per-wallet Postgres advisory lock serializes the
@@ -110,8 +98,6 @@ return {
   {
     file: '06-token-flow.ts',
     mutates: true,
-    req: true,
-    maps: 'Support the native asset AND tokens (ERC-20)',
     note: 'approve → allowance → transferFrom via typed token helpers — the on-chain allowance is the gate.',
     flow: ['approve', 'allowance', 'transferFrom'],
     code: `// ERC-20 approve → allowance → transferFrom via the typed token helpers (single-wallet/self demo).
@@ -329,10 +315,8 @@ export function Playground({ onExit }: { onExit: () => void }) {
 
           <pre className="pg2-output">{out || '— output —'}</pre>
 
-          {/* Reviewer aid: how this example maps to the take-home requirements. */}
-          <section className="pg2-maps" aria-label="how this maps to the brief">
-            <span className={ex.req ? 'pg2-reqtag req' : 'pg2-reqtag'}>{ex.req ? 'Required' : 'Beyond brief'}</span>
-            <code className="pg2-req">{ex.maps}</code>
+          {/* Per-example note + flow. */}
+          <section className="pg2-maps" aria-label="example note">
             <p className="pg2-note">{ex.note}</p>
             <div className="pg2-flow">
               {ex.flow.map((step, i) => (
