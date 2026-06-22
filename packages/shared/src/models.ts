@@ -17,6 +17,17 @@ export interface Wallet {
   createdAt?: string;
 }
 
+/** Admin operator console: every platform wallet with owner email, cached ETH balance (wei bigint
+ *  string), and whether it's the operator's own wallet — the only one the operator can act on. */
+export interface WalletOverview {
+  id: string;
+  address: string;
+  email: string;
+  self: boolean;
+  confirmed: string;
+  asOfBlock: number | null;
+}
+
 /** A platform wallet for the admin holder picker (address + owner email). */
 export interface Holder {
   address: string;

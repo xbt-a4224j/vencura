@@ -36,4 +36,12 @@ export class WalletsController {
     if (user.email !== ADMIN_EMAIL) throw new ForbiddenException();
     return this.wallets.listHolders();
   }
+
+  /** Admin operator console: every platform wallet (owner email + cached balance + self flag) so the
+   *  operator can oversee all custodied wallets. Same admin-identity gate as holders. */
+  @Get('all')
+  all(@CurrentUser() user: { id: string; email: string }) {
+    if (user.email !== ADMIN_EMAIL) throw new ForbiddenException();
+    return this.wallets.listAll(user.id);
+  }
 }

@@ -55,4 +55,16 @@ describe('WalletsService', () => {
     await service.list('user-1');
     expect(prismaMock.wallet.findMany.mock.calls[0][0]).toMatchObject({ where: { userId: 'user-1' } });
   });
+
+  it('listAll maps every wallet to an overview: owner email, self flag, cached balance (0 fallback)', async () => {
+    prismaMock.wallet.findMany.mockResolvedValue([
+      { id: 'w1', address: '0xADMIN', userId: 'admin-1', user: { email: 'admin@vencura.local' }, balances: [{ confirmed: '1000', asOfBlock: 42 }] },
+      { id: 'w2', address: '0xUSER', userId: 'user-9', user: { email: 'u@example.com' }, balances: [] },
+    ]);
+    const out = await service.listAll('admin-1');
+    expect(out).toEqual([
+      { id: 'w1', address: '0xADMIN', email: 'admin@vencura.local', self: true, confirmed: '1000', asOfBlock: 42 },
+      { id: 'w2', address: '0xUSER', email: 'u@example.com', self: false, confirmed: '0', asOfBlock: null },
+    ]);
+  });
 });

@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { NATIVE_ASSET, type WalletOverview } from '@vencura/shared';
 import { PrismaService } from '../infra/prisma/prisma.service';
 import { EventsService } from '../infra/events/events.service';
 import { SIGNER, type Signer } from '../signer/signer';
@@ -38,6 +39,30 @@ export class WalletsService {
       select: { id: true, address: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  /** Admin operator console: every platform wallet with owner email, cached ETH balance, and a
+   *  `self` flag (the operator's own wallet — the only one it can act on). Read-only projection
+   *  from Postgres; no chain calls. Gated to the admin identity at the controller. */
+  async listAll(adminUserId: string): Promise<WalletOverview[]> {
+    const wallets = await this.prisma.wallet.findMany({
+      select: {
+        id: true,
+        address: true,
+        userId: true,
+        user: { select: { email: true } },
+        balances: { where: { asset: NATIVE_ASSET }, select: { confirmed: true, asOfBlock: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    return wallets.map((w) => ({
+      id: w.id,
+      address: w.address,
+      email: w.user.email,
+      self: w.userId === adminUserId,
+      confirmed: w.balances[0]?.confirmed ?? '0',
+      asOfBlock: w.balances[0]?.asOfBlock ?? null,
+    }));
   }
 
   /** Every wallet across all users (address + owner email) — the admin's holder picker for the

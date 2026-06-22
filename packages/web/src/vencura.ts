@@ -5,6 +5,7 @@ import {
   type LogLine,
   Vencura,
   type Wallet,
+  type WalletOverview,
 } from '@vencura/sdk';
 
 const TOKEN_KEY = 'vencura.token';
@@ -34,4 +35,4 @@ export const adminKeyStore = {
 export const v = new Vencura({ basePath: '/api', tokenStore, adminKey: () => adminKeyStore.get() });
 
 // Re-export the response models the components type against (single source: @vencura/shared).
-export type { Account, ActivityItem, BalanceLine, LogLine, Wallet };
+export type { Account, ActivityItem, BalanceLine, LogLine, Wallet, WalletOverview };

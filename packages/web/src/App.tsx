@@ -1,5 +1,5 @@
 import { type FormEvent, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { isAddress, parseEther, recoverMessageAddress } from 'viem';
+import { isAddress, parseEther } from 'viem';
 import {
   type Account,
   type ActivityItem,
@@ -8,6 +8,7 @@ import {
   type LogLine,
   v,
   type Wallet,
+  type WalletOverview,
 } from './vencura';
 import { AuthProvider, useAuth } from './auth-context';
 import { looksLikeEns, resolveEns, reverseResolveEns } from './ens';
@@ -957,12 +958,10 @@ function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
   const [balances, setBalances] = useState<BalanceLine[] | null>(null);
   // A realistic default payload so signing demonstrates a *use* (proving wallet ownership off-chain),
   // not "sign a blank box". This is the shape of a Sign-In-With-Ethereum / gasless-approval challenge.
-  const [message, setMessage] = useState(
-    () => `I control ${wallet.address} — signed to prove ownership (off-chain, no gas).`,
-  );
-  // Each Sign produces an immutable (message, signature) record — the signed artifact is NOT the
-  // editable textarea (that's just the composer). They accumulate so you can sign several.
-  const [signed, setSigned] = useState<{ at: string; message: string; signature: string; verify?: string }[]>([]);
+  // The signed message lands immutably in the Activity feed — never echoed back into this editable
+  // composer. After a successful sign, the box resets to a fresh draft.
+  const defaultMsg = `I control ${wallet.address} — signed to prove ownership (off-chain, no gas).`;
+  const [message, setMessage] = useState(defaultMsg);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -995,22 +994,11 @@ function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
   const sign = (e: FormEvent) => {
     e.preventDefault();
     return guard(async () => {
-      const { signature } = await v.wallets.signMessage({ walletId: wallet.id, message });
-      setSigned((prev) => [{ at: new Date().toLocaleTimeString(), message, signature }, ...prev]);
+      await v.wallets.signMessage({ walletId: wallet.id, message });
+      setMessage(defaultMsg); // reset the composer
+      setRefreshKey((k) => k + 1); // surface the new signature in the Activity feed
     });
   };
-
-  // Per-row verify: recover the signer from THAT row's (message, signature) and prove it's this wallet.
-  const verify = (idx: number) =>
-    guard(async () => {
-      const row = signed[idx];
-      const recovered = await recoverMessageAddress({ message: row.message, signature: row.signature as `0x${string}` });
-      const out =
-        recovered.toLowerCase() === wallet.address.toLowerCase()
-          ? `✓ recovered ${shortHex(recovered)} = this wallet`
-          : `✗ mismatch — recovered ${shortHex(recovered)}`;
-      setSigned((prev) => prev.map((r, i) => (i === idx ? { ...r, verify: out } : r)));
-    });
 
   const onSent = () => {
     setRefreshKey((k) => k + 1);
@@ -1108,8 +1096,8 @@ function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
         <summary>Sign a message</summary>
         <p className="bal-sub">
           Off-chain proof of ownership — no gas, no transaction. The same primitive behind passwordless
-          “Sign-In With Ethereum” and gasless EIP-712 approvals. Sign, then <b>Verify</b> to recover the signer
-          and confirm it’s this wallet.
+          “Sign-In With Ethereum” and gasless EIP-712 approvals. Each signed message appears immutably in
+          the Activity feed above — it can’t be edited after the fact.
         </p>
         <form onSubmit={sign}>
           <label className="field" htmlFor={`msg-${wallet.id}`}>
@@ -1125,28 +1113,6 @@ function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
             Sign
           </button>
         </form>
-        {signed.length > 0 && (
-          <div className="act-scroll signed-list">
-            <table className="act-table">
-              <thead>
-                <tr><th>Time</th><th>Message (signed — immutable)</th><th>Signature</th><th>Verify</th></tr>
-              </thead>
-              <tbody>
-                {signed.map((sg, i) => (
-                  <tr key={`${sg.at}-${i}`}>
-                    <td>{sg.at}</td>
-                    <td className="signed-msg">{sg.message}</td>
-                    <td><code>{shortHex(sg.signature)}</code><CopyButton value={sg.signature} label="⧉" /></td>
-                    <td>
-                      <button type="button" className="copybtn" onClick={() => verify(i)} disabled={busy}>Verify</button>
-                      {sg.verify && <span className={sg.verify.startsWith('✓') ? 'verdict ok' : 'verdict bad'}> {sg.verify}</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </details>
       {error && <p role="alert">{error}</p>}
     </li>
@@ -1871,6 +1837,109 @@ const ADMIN_TABS = [
   { id: 'activity', label: 'Activity' },
   { id: 'settings', label: 'Settings' },
 ];
+// Read-only view of a wallet the operator does NOT own: owner, address, cached ETH balance, and recent
+// activity. No send/sign — those are gated to the wallet's owning identity (findOwnedOrThrow), so the
+// operator can oversee custodied wallets without being able to move other tenants' funds.
+function ReadOnlyWalletCard({
+  overview,
+  activity,
+  labels,
+}: {
+  overview: WalletOverview;
+  activity: ActivityItem[];
+  labels: Wallet[];
+}) {
+  return (
+    <li>
+      <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span className="nick">{overview.email}</span>
+        <a href={explorerAddress(overview.address)} target="_blank" rel="noreferrer" title={overview.address}>
+          <code>{overview.address}</code> ↗
+        </a>
+        <CopyButton value={overview.address} label="⧉" />
+        <span className="pill">read-only</span>
+      </div>
+      <div className="bal-grid">
+        <div className="bal-line">
+          <span className="bal-label">ETH confirmed</span>
+          <span className="bal-amt" title={`${overview.confirmed} wei`}>
+            {toEth(overview.confirmed)} ETH
+          </span>
+          <span className="bal-sub">
+            cached projection{overview.asOfBlock ? ` · block ${overview.asOfBlock}` : ''}
+          </span>
+        </div>
+      </div>
+      <h4>Activity</h4>
+      <ActivityTable items={activity} wallets={labels} />
+    </li>
+  );
+}
+
+// Admin operator console — Wallets tab: every custodied wallet across the platform. The operator's own
+// wallet gets the full action panel (WalletItem); all others render read-only (address + cached balance
+// + activity), because sends/signatures are scoped to each wallet's owning identity.
+function AdminWalletsTab({ adminEmail }: { adminEmail: string }) {
+  const [rows, setRows] = useState<WalletOverview[]>([]);
+  const [acts, setActs] = useState<ActivityItem[]>([]);
+  const [error, setError] = useState('');
+  const load = useCallback(() => {
+    setError('');
+    return Promise.all([v.wallets.all(), v.activity.all()])
+      .then(([w, a]) => {
+        setRows(w);
+        setActs(a);
+      })
+      .catch((e) => setError((e as Error).message));
+  }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (error) return <p role="alert">{error}</p>;
+  if (rows.length === 0) return <p className="bal-sub">Loading wallets…</p>;
+
+  const self = rows.find((r) => r.self);
+  const others = rows.filter((r) => !r.self);
+  const labels: Wallet[] = rows.map((r) => ({ id: r.id, address: r.address }));
+  const itemsFor = (id: string) => acts.filter((a) => (a as { walletId?: string | null }).walletId === id);
+
+  return (
+    <section>
+      <p className="bal-sub">
+        Every custodied wallet across the platform. The operator's own wallet is fully actionable; all
+        others are <strong>read-only</strong> — sends and signatures are gated to each wallet's owning
+        identity (<code>findOwnedOrThrow</code>), so the operator can oversee funds without moving them.
+      </p>
+      <h3 className="cap">Operator · {adminEmail}</h3>
+      {self ? (
+        <ul>
+          <WalletItem wallet={{ id: self.id, address: self.address }} email={adminEmail} />
+        </ul>
+      ) : (
+        <p className="bal-sub">No operator wallet provisioned yet.</p>
+      )}
+      <h3 className="cap">
+        Custodied wallets ({others.length}){' '}
+        <button type="button" className="copybtn" onClick={() => void load()}>
+          Refresh
+        </button>
+      </h3>
+      {others.length === 0 ? (
+        <p className="bal-sub">
+          No other accounts have provisioned a wallet yet. Register a user and provision one, then Refresh.
+        </p>
+      ) : (
+        <ul>
+          {others.map((o) => (
+            <ReadOnlyWalletCard key={o.id} overview={o} activity={itemsFor(o.id)} labels={labels} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function AdminView({ onExit }: { onExit: () => void }) {
   const { admin, active, enterAdmin } = useAuth();
   // Entering the Admin view mints (or re-activates) the system admin session — no password.
@@ -1951,7 +2020,7 @@ function AdminView({ onExit }: { onExit: () => void }) {
       <Tabs tabs={ADMIN_TABS} active={tab} onChange={setTab} />
       <div role="tabpanel" aria-labelledby={`tab-${tab}`}>
         {tab === 'overview' && <OverviewTab wallets={wallets} onGoWallets={() => setTab('wallets')} />}
-        {tab === 'wallets' && <WalletsTab wallets={wallets} onChange={refresh} email={admin?.email ?? ''} />}
+        {tab === 'wallets' && <AdminWalletsTab adminEmail={admin?.email ?? ''} />}
         {tab === 'token' && <TokenTab wallets={wallets} />}
         {tab === 'activity' && <ActivityTab wallets={wallets} />}
         {tab === 'settings' && <SettingsTab />}

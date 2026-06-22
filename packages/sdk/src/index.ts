@@ -12,6 +12,7 @@ import {
   type TokenInfo,
   type Transaction,
   type Wallet,
+  type WalletOverview,
 } from '@vencura/shared';
 
 export * from '@vencura/shared';
@@ -208,6 +209,10 @@ class WalletsApi {
   /** Admin-only: every platform wallet (address + owner email) for the holder picker. */
   holders(): Promise<Holder[]> {
     return this.http.request<Holder[]>('/wallets/holders', { auth: true });
+  }
+  /** Admin operator console: every platform wallet (owner email + cached balance + self flag). */
+  all(): Promise<WalletOverview[]> {
+    return this.http.request<WalletOverview[]>('/wallets/all', { auth: true });
   }
   getBalance(p: { walletId: string }): Promise<BalanceView> {
     return this.http.request<BalanceView>(`/wallets/${p.walletId}/balance`, { auth: true });
