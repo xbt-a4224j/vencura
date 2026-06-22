@@ -24,10 +24,10 @@ export class AuthService {
     if (await this.prisma.user.findUnique({ where: { email } })) {
       throw new ConflictException('email already registered');
     }
-    // Single-user demo: exactly one self-registered (non-admin) account. Once it exists,
-    // registration is closed — the User view loads that one account, no picker.
-    if (await this.prisma.user.findFirst({ where: { isDemo: false } })) {
-      throw new ConflictException('registration is closed — this demo allows one user account');
+    // Single-tenant: exactly one self-registered (non-system) account. Once it exists,
+    // registration is closed — the User view loads that one account.
+    if (await this.prisma.user.findFirst({ where: { isSystem: false } })) {
+      throw new ConflictException('registration is closed — only one user account is allowed');
     }
     const passwordHash = await argon2.hash(password);
     const user = await this.prisma.user.create({ data: { email, passwordHash } });
@@ -62,7 +62,7 @@ export class AuthService {
    *  view: null → show register, else → show login for that one account. */
   singleUser(): Promise<Account | null> {
     return this.prisma.user.findFirst({
-      where: { isDemo: false },
+      where: { isSystem: false },
       select: { id: true, email: true },
       orderBy: { createdAt: 'asc' },
     });

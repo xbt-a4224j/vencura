@@ -14,6 +14,6 @@ export class TokenController {
 
   @Get('token')
   current() {
-    return this.transactions.getDemoToken();
+    return this.transactions.getToken();
   }
 }

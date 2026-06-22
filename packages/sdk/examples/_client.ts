@@ -6,7 +6,7 @@
  * local DB), and only fall back to registering a throwaway account on a fresh instance where
  * registration is still open.
  */
-import { ADMIN_EMAIL, BasePath, DEMO_PASSWORD, Vencura, type Wallet } from '../src';
+import { ADMIN_EMAIL, BasePath, SEED_PASSWORD, Vencura, type Wallet } from '../src';
 
 export function client(): Vencura {
   return new Vencura({ basePath: process.env.VENCURA_API_URL ?? BasePath.Production });
@@ -16,7 +16,7 @@ export function client(): Vencura {
 export async function connect(): Promise<Vencura> {
   const v = client();
   try {
-    await v.auth.login({ email: ADMIN_EMAIL, password: DEMO_PASSWORD });
+    await v.auth.login({ email: ADMIN_EMAIL, password: SEED_PASSWORD });
   } catch {
     // Fresh instance with no demo account — register one (registration is open until the first user).
     await v.auth.register({ email: `demo+${Date.now()}@example.com`, password: 'password123' });

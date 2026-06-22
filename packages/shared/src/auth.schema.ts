@@ -18,12 +18,12 @@ export interface Account {
   email: string;
 }
 
-/** Shared demo password. The User view signs in with this for every account (prepopulated,
- *  one click), and the seed + admin "create account" register accounts with it. Demo-only —
- *  the deployment perimeter (Vercel Authentication) is the real security boundary. */
-export const DEMO_PASSWORD = 'demo-password';
+/** The placeholder password hashed for the seeded admin/master account. The admin is normally
+ *  entered via a passwordless minted session; this only exists because the column is non-null
+ *  (and lets SDK example scripts log in as the admin). Not used by the web user flow. */
+export const SEED_PASSWORD = 'seed-password';
 
-/** The seeded operator account. It's an `isDemo` account, NOT a regular user — it never appears
+/** The seeded operator account. It's an `isSystem` account, NOT a regular user — it never appears
  *  in the User view (which is for self-registered, non-admin accounts). The single source of truth
  *  for "who is the admin", so the role check lives in one place. */
 export const ADMIN_EMAIL = 'admin@vencura.local';

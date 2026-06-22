@@ -119,12 +119,12 @@ export class TransactionsService {
   /** The fixed ERC-20 the app operates on: a pre-deployed Sepolia token (TOKEN_ADDRESS) whose full
    *  supply is held by the master/admin wallet. `owner` (= the approve/transferFrom spender) is that
    *  wallet's address, derived from the master key. Config-driven — fails fast if TOKEN_ADDRESS is unset. */
-  getDemoToken(): { address: string; owner: string } {
+  getToken(): { address: string; owner: string } {
     const address = process.env.TOKEN_ADDRESS ?? '';
     if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
       throw new Error('TOKEN_ADDRESS is not configured');
     }
-    const owner = privateKeyToAddress((process.env.DEMO_FUNDED_PRIVKEY ?? '') as Hex);
+    const owner = privateKeyToAddress((process.env.MASTER_WALLET_PRIVKEY ?? '') as Hex);
     return { address, owner };
   }
 

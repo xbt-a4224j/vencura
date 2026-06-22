@@ -42,7 +42,7 @@ function build(prisma: unknown, wallets: unknown) {
 describe('ProvisioningService.findMaster', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.DEMO_FUNDED_PRIVKEY;
+    delete process.env.MASTER_WALLET_PRIVKEY;
   });
 
   it('fails fast when the master key is unset — no best-effort admin-wallet fallback', async () => {
@@ -62,11 +62,11 @@ describe('ProvisioningService.findMaster', () => {
 describe('ProvisioningService.provision', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.DEMO_FUNDED_PRIVKEY;
+    delete process.env.MASTER_WALLET_PRIVKEY;
   });
 
   it('is idempotent: a second call returns the same wallet and does NOT fund again', async () => {
-    process.env.DEMO_FUNDED_PRIVKEY = `0x${'11'.repeat(32)}`; // master resolved by derived address
+    process.env.MASTER_WALLET_PRIVKEY = `0x${'11'.repeat(32)}`; // master resolved by derived address
     const create = vi.fn().mockResolvedValue({ id: 'w-new', address: '0xnew' });
     // first findFirst (user has no wallet) → null; afterward the wallet exists.
     let userWallet: { id: string; address: string } | null = null;

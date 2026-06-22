@@ -14,10 +14,9 @@ model User {
   id           String   @id @default(uuid())
   email        String   @unique
   passwordHash String
-  // Demo accounts (seed + admin-created) all use the shared demo password, so the one-click
-  // User-view picker lists ONLY these — real/test registrations (their own passwords) never
-  // appear and so can never 401 the picker.
-  isDemo       Boolean  @default(false)
+  // Marks the seeded system admin/operator account (entered via a passwordless minted session),
+  // as opposed to the single self-registered user. Used to keep the two identities distinct.
+  isSystem     Boolean  @default(false)
   createdAt    DateTime @default(now())
 
   wallets Wallet[]

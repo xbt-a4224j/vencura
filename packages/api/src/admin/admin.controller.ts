@@ -20,7 +20,7 @@ export class AdminController {
     this.logger.warn('admin reset: wiping all data and re-seeding');
     // user.deleteMany cascades to wallets → transactions/balances/policies (schema onDelete: Cascade).
     await this.prisma.user.deleteMany({});
-    const result = await seed.seedDemo(this.prisma);
+    const result = await seed.seedMaster(this.prisma);
     this.logger.log(`reset complete: re-seeded ${result.wallets.length} wallets`);
     return result;
   }

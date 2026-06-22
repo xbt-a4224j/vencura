@@ -34,9 +34,9 @@ export class ProvisioningService {
    *  invalid rather than silently leaving wallets unfunded. Returns null only when the key is
    *  valid but its wallet row hasn't been seeded yet. */
   async findMaster(): Promise<{ id: string; address: string } | null> {
-    const priv = process.env.DEMO_FUNDED_PRIVKEY ?? '';
+    const priv = process.env.MASTER_WALLET_PRIVKEY ?? '';
     if (!/^0x[0-9a-fA-F]{64}$/.test(priv)) {
-      throw new Error('master wallet key (DEMO_FUNDED_PRIVKEY) is not configured');
+      throw new Error('master wallet key (MASTER_WALLET_PRIVKEY) is not configured');
     }
     const address = privateKeyToAddress(priv as Hex);
     const w = await this.prisma.wallet.findFirst({ where: { address }, select: { id: true, address: true } });
