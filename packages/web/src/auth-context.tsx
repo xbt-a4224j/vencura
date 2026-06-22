@@ -48,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!tokens.current.admin) {
       const r = await v.auth.adminSession();
       tokens.current.admin = r.accessToken;
+      tokenStore.set(r.accessToken);
       setAdmin(r.user);
     } else {
       tokenStore.set(tokens.current.admin);

@@ -23,9 +23,9 @@ Web on **Vercel**, API on **Railway** (Docker), Postgres on **Neon**, RPC on **S
 same-origin via a `/api/*` rewrite. Register an account to try it; live balance/send needs a Sepolia-funded
 wallet (faucet link in the admin).
 
-> 📋 **New here? Follow the [reviewer walkthrough](docs/reviewer-walkthrough.html)** — an 8-step, ~10-minute
-> guided tour of the live app (with a diagram for every step) that exercises the four required operations and
-> the design thesis: key custody, concurrency-correctness, and chain-as-truth.
+> **New here?** Follow the [reviewer walkthrough](docs/reviewer-walkthrough.html) — a guided tour of the
+> live app (with a diagram per step) that exercises the four required operations: key custody,
+> concurrency-correctness, and chain-as-truth. ~10 minutes, no local setup.
 
 ## Quick start
 
@@ -117,11 +117,6 @@ With the stack running, the API serves:
 Secrets (`MASTER_ENCRYPTION_KEY`, `JWT_SECRET`, DB URL, RPC key) come from the environment and are never
 committed — only [`.env.example`](.env.example) is.
 
-## Status
-
-Built incrementally; releases are tagged by semantic-release on `main`. The four core wallet actions
-(create, balance, sign, send) all work end-to-end, with per-wallet nonce serialization and idempotency.
-
 ## Architecture diagrams
 
 ### System architecture
@@ -186,62 +181,48 @@ sequenceDiagram
     participant Chain as Chain (viem)
     participant DB as Postgres
 
-    C->>Ctrl: POST /wallets/:id/transactions<br/>{to, amount, asset, idempotencyKey}
+    C->>Ctrl: POST /wallets/:id/transactions {to, amount, idempotencyKey}
     Ctrl->>Svc: sendTransaction(walletId, dto)
-
     Svc->>Lock: withWalletLock(walletId, fn)
-    Note over Lock,DB: pg_advisory_xact_lock acquired —<br/>concurrent same-wallet sends<br/>queue here; each gets a unique nonce
 
-    Lock->>Chain: eth_getTransactionCount(address, "pending")<br/>read LIVE nonce — never the cached value
-    Chain-->>Lock: pendingNonce
+    Note over Lock: pg_advisory_xact_lock — concurrent same-wallet sends queue here
 
-    Lock->>Signer: signTransaction(walletId, {to, value, nonce, …})
-    Note over Signer: AES-256-GCM decrypt key in memory,<br/>sign, zeroize — key never leaves signer
+    Lock->>Chain: eth_getTransactionCount("pending") — live, never cached
+    Chain-->>Lock: nonce
+    Lock->>Signer: signTransaction {to, value, nonce}
+    Note over Signer: decrypt in memory · sign · zeroize
     Signer-->>Lock: signedTx
-
     Lock->>Chain: sendRawTransaction(signedTx)
     Chain-->>Lock: txHash
+    Lock->>DB: INSERT {hash, nonce, status=pending, idempotencyKey UNIQUE}
+    Note over DB: duplicate key → return existing row, no double-send
+    Lock-->>Svc: commit (releases advisory lock)
+    Svc-->>C: 202 {hash, status: pending}
 
-    Lock->>DB: INSERT transactions (hash, nonce, status='pending',<br/>idempotencyKey UNIQUE)
-    Note over DB: Duplicate idempotencyKey → conflict<br/>→ return existing row (no double-send)
-
-    Lock-->>Svc: release lock (xact commit)
-    Svc-->>Ctrl: {hash, status: 'pending'}
-    Ctrl-->>C: 202 {hash}
-
-    Note over DB,Chain: Async — off the request path
-    loop ConfirmationWatcher (every 12 s)
-        DB->>DB: SELECT pending transactions
-        DB->>Chain: eth_getTransactionReceipt(hash)
-        Chain-->>DB: receipt (blockNumber or null)
-        DB->>DB: head − block + 1 >= CONFIRMATIONS?
-        DB->>DB: UPDATE status → 'confirmed' or 'failed'
-        DB->>DB: trigger BalanceRefresher
+    loop ConfirmationWatcher @12s
+        DB->>Chain: getTransactionReceipt(hash)
+        Chain-->>DB: receipt or null
+        DB->>DB: confirmations ≥ threshold → status=confirmed/failed
     end
 ```
 
 ### Key custody — AES-256-GCM at rest
 
 ```mermaid
-graph LR
-    subgraph WalletCreate["Wallet creation (once)"]
-        Gen["generatePrivateKey()"]
-        Enc["AES-256-GCM encrypt\n(MASTER_ENCRYPTION_KEY from env)"]
-        Store["Store in DB:\nencryptedKey · iv · authTag\nAddress stored in plaintext"]
-        Gen --> Enc --> Store
-    end
+stateDiagram-v2
+    direction LR
+    [*] --> Generated : generatePrivateKey()
+    Generated --> Encrypted : AES-256-GCM(MASTER_KEY)
+    Encrypted --> AtRest : store {encryptedKey · iv · authTag}
 
-    subgraph SignTime["Sign time (per request)"]
-        Fetch["Fetch encrypted key from DB"]
-        Dec["AES-256-GCM decrypt\nin-memory only"]
-        Sign["sign tx / message"]
-        Zero["zeroize key bytes"]
-        Fetch --> Dec --> Sign --> Zero
-    end
+    AtRest --> InMemory : decrypt(MASTER_KEY) — sign time only
+    InMemory --> Signed : signTx / signMessage
+    Signed --> Zeroized : zeroize key bytes
+    Zeroized --> AtRest : key dropped from process
 
-    MASTER(["MASTER_ENCRYPTION_KEY\n(env / secrets manager)\nnever committed, never logged"])
-    MASTER -->|"key material"| Enc
-    MASTER -->|"key material"| Dec
-
-    Store -.->|"at sign time"| Fetch
+    note right of InMemory
+        plaintext key exists only
+        in-process, never persisted,
+        never logged, never returned
+    end note
 ```

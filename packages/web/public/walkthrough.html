@@ -57,6 +57,9 @@
       .arch { border: 1px solid var(--line); border-radius: 12px; padding: 10px; background: var(--soft); }
       footer { margin-top: 48px; border-top: 1px solid var(--line); padding-top: 18px; font-size: 13px; color: var(--muted); }
       footer a { color: var(--accent); text-decoration: none; }
+      .screenshot { margin: 16px 0 4px; }
+      .screenshot img { width: 100%; border-radius: 8px; border: 1px solid var(--line); display: block; }
+      .screenshot figcaption { font-size: 12px; color: var(--muted); margin-top: 5px; }
       /* shared SVG text styles */
       text { font-family: var(--sans); fill: var(--ink); }
       .lbl { font-size: 12px; }
@@ -187,7 +190,7 @@
       <!-- STEP 1 -->
       <div class="step">
         <h3><span class="num">1</span> Open the landing page → start in the Playground</h3>
-        <div class="row do"><span class="tag">Do</span><p>Open <a class="ext" href="https://vencura-alpha.vercel.app" target="_blank" rel="noreferrer">the app ↗</a>. The landing page has <b>three tiles</b> — 🧪 <b>Playground</b> (start here), 🛠️ <b>Admin</b>, 👛 <b>User</b> — plus a “Reviewer? Start here” ribbon. Open the <b>Playground</b> first.</p></div>
+        <div class=”row do”><span class=”tag”>Do</span><p>Open <a class=”ext” href=”https://vencura-alpha.vercel.app” target=”_blank” rel=”noreferrer”>the app ↗</a>. The landing page has <b>three tiles</b> — <b>Playground</b> (start here), <b>Admin</b>, <b>User</b> — plus a “Reviewer? Start here” ribbon. Open the <b>Playground</b> first.</p></div>
         <div class="row see"><span class="tag">See</span><p>A live in-browser TypeScript editor over the typed SDK, preloaded with <b>six runnable examples</b>: <code>01 provision</code>, <code>02 balance</code>, <code>03 sign</code>, <code>04 send</code>, <code>05 concurrency</code>, <code>06 token flow</code>. Run <code>01</code>–<code>03</code> (read-only) and, when you want a real tx, <code>04</code>/<code>06</code> (tagged <code>tx</code> — broadcasts to Sepolia, ~15–30s). The senior bits — the per-wallet <b>nonce lock</b> (<code>05</code>) and <b>idempotency</b> (<code>04</code>) — live here.</p></div>
         <figure>
           <svg viewBox="0 0 820 96" role="img" aria-label="Playground over the typed SDK">
@@ -247,23 +250,63 @@
         <div class="row see"><span class="tag">See</span><p>A wallet <b>address</b> (<code>0x…</code>) and a small ETH balance. The private key is never shown — by design.</p></div>
         <div class="row"><span class="tag">Note</span><p>Balances and the activity feed <b>don't auto-poll</b> — use the per-wallet / status-bar <b>Refresh</b> buttons to pull fresh chain state (e.g. after a send confirms). The auto-refreshing status bar at the top shows block height / gas / last-updated + a clock.</p></div>
         <figure>
-          <svg viewBox="0 0 820 110" role="img" aria-label="Wallet provisioning + key custody">
-            <rect x="10" y="40" width="170" height="34" rx="6" fill="#eef1f6" stroke="#d3d9e2"/>
-            <text class="lblmono" x="95" y="61" text-anchor="middle">POST /wallets/provision</text>
-            <line x1="180" y1="57" x2="262" y2="57" stroke="#9aa2af" stroke-width="1.5"/><polygon points="262,57 254,53 254,61" fill="#9aa2af"/>
-            <rect x="264" y="28" width="190" height="58" rx="6" fill="#e9efe9" stroke="#cfe0cf"/>
-            <text class="lbl" x="359" y="48" text-anchor="middle" font-weight="700">Signer</text>
-            <text class="lblsm" x="359" y="64" text-anchor="middle">generate key →</text>
-            <text class="lblsm" x="359" y="78" text-anchor="middle">AES-256-GCM encrypt</text>
-            <line x1="454" y1="57" x2="536" y2="57" stroke="#9aa2af" stroke-width="1.5"/><polygon points="536,57 528,53 528,61" fill="#9aa2af"/>
-            <text class="lblsm" x="495" y="50" text-anchor="middle">ciphertext</text>
-            <rect x="538" y="28" width="270" height="58" rx="6" fill="#fff" stroke="#c8cdd6"/>
-            <text class="lbl" x="673" y="48" text-anchor="middle" font-weight="700">Postgres · wallets</text>
-            <text class="lblsm" x="673" y="64" text-anchor="middle">encryptedKey · iv · authTag</text>
-            <text class="lblsm" x="673" y="78" text-anchor="middle">plaintext key never persisted</text>
+          <svg viewBox="0 0 820 200" role="img" aria-label="Key custody — wallet creation vs sign time">
+            <!-- CREATE phase header -->
+            <text class="zone" x="10" y="16" fill="#1e7a4d">WALLET CREATION (once)</text>
+            <!-- provision request -->
+            <rect x="10" y="22" width="160" height="32" rx="5" fill="#eef1f6" stroke="#d3d9e2"/>
+            <text class="lblmono" x="90" y="42" text-anchor="middle">POST /provision</text>
+            <line x1="170" y1="38" x2="208" y2="38" stroke="#9aa2af" stroke-width="1.5"/><polygon points="208,38 200,34 200,42" fill="#9aa2af"/>
+            <!-- Signer (create) -->
+            <rect x="210" y="14" width="200" height="50" rx="5" fill="#e9efe9" stroke="#cfe0cf"/>
+            <text class="lbl" x="310" y="33" text-anchor="middle" font-weight="700">Signer</text>
+            <text class="lblsm" x="310" y="48" text-anchor="middle">generateKey() →</text>
+            <text class="lblsm" x="310" y="61" text-anchor="middle">AES-256-GCM(masterKey)</text>
+            <line x1="410" y1="38" x2="448" y2="38" stroke="#9aa2af" stroke-width="1.5"/><polygon points="448,38 440,34 440,42" fill="#9aa2af"/>
+            <text class="lblsm" x="429" y="30" text-anchor="middle">ciphertext</text>
+            <!-- wallets row -->
+            <rect x="450" y="14" width="360" height="50" rx="5" fill="#fff" stroke="#c8cdd6"/>
+            <text class="lbl" x="630" y="33" text-anchor="middle" font-weight="700">wallets row</text>
+            <text class="lblsm" x="630" y="48" text-anchor="middle">{ encryptedKey · iv · authTag }</text>
+            <text class="lblsm" x="630" y="61" text-anchor="middle">plaintext key never stored</text>
+            <!-- divider -->
+            <line x1="10" y1="80" x2="810" y2="80" stroke="#e8eaed" stroke-width="1"/>
+            <!-- SIGN TIME header -->
+            <text class="zone" x="10" y="98" fill="#1e7a4d">SIGN TIME (per request)</text>
+            <!-- wallets row (read) -->
+            <rect x="10" y="104" width="200" height="52" rx="5" fill="#fff" stroke="#c8cdd6"/>
+            <text class="lbl" x="110" y="124" text-anchor="middle" font-weight="700">wallets row</text>
+            <text class="lblsm" x="110" y="139" text-anchor="middle">{ encryptedKey · iv · authTag }</text>
+            <text class="lblsm" x="110" y="152" text-anchor="middle">fetch from Postgres</text>
+            <line x1="210" y1="130" x2="248" y2="130" stroke="#9aa2af" stroke-width="1.5"/><polygon points="248,130 240,126 240,134" fill="#9aa2af"/>
+            <!-- Signer (sign) -->
+            <rect x="250" y="104" width="210" height="52" rx="5" fill="#e9efe9" stroke="#cfe0cf"/>
+            <text class="lbl" x="355" y="124" text-anchor="middle" font-weight="700">Signer</text>
+            <text class="lblsm" x="355" y="139" text-anchor="middle">decrypt(masterKey) in RAM</text>
+            <text class="lblsm" x="355" y="152" text-anchor="middle">sign → zeroize key bytes</text>
+            <line x1="460" y1="130" x2="498" y2="130" stroke="#9aa2af" stroke-width="1.5"/><polygon points="498,130 490,126 490,134" fill="#9aa2af"/>
+            <!-- signature output -->
+            <rect x="500" y="112" width="180" height="36" rx="5" fill="#fff" stroke="#c8cdd6"/>
+            <text class="lbl" x="590" y="132" text-anchor="middle" font-weight="700">0x… signature</text>
+            <text class="lblsm" x="590" y="146" text-anchor="middle">returned · logged</text>
+            <!-- MASTER_KEY note -->
+            <rect x="700" y="104" width="110" height="52" rx="5" fill="#fff8e6" stroke="#e0c97a"/>
+            <text class="lblsm" x="755" y="124" text-anchor="middle">MASTER_KEY</text>
+            <text class="lblsm" x="755" y="138" text-anchor="middle">from env</text>
+            <text class="lblsm" x="755" y="152" text-anchor="middle">never in DB</text>
+            <!-- arrow from wallets row (create) down to wallets row (sign) showing persistence -->
+            <line x1="630" y1="64" x2="630" y2="75" stroke="#c8cdd6" stroke-width="1" stroke-dasharray="3 2"/>
           </svg>
         </figure>
         <p class="proves"><b>Proves:</b> key custody — the centerpiece. AES-256-GCM at rest behind the pluggable <code>Signer</code>; key decrypted in memory only at sign time, then dropped.</p>
+        <figure class="screenshot">
+          <img src="img_6.png" alt="Screenshot 1 — wallet card showing address, ETH balance, and activity feed after auto-funding" />
+          <figcaption>Screenshot #1 — wallet auto-provisioned, balance visible, activity feed populated</figcaption>
+        </figure>
+        <figure class="screenshot">
+          <img src="admin_overview.png" alt="Admin wallets tab showing all platform wallets — admin and user — with balances and activity" />
+          <figcaption>Admin console — system-wide wallet overview (read-only operator view of all custodied wallets)</figcaption>
+        </figure>
       </div>
 
       <!-- STEP 4 -->
@@ -308,6 +351,10 @@
           </svg>
         </figure>
         <p class="proves"><b>Proves:</b> signMessage — deterministic EIP-191 signing through the same custody seam.</p>
+        <figure class="screenshot">
+          <img src="img_1.png" alt="Screenshot 2 — sign message panel with EIP-191 signature and verified result in activity feed" />
+          <figcaption>Screenshot #2 — message signed, signature in activity feed, composer reset</figcaption>
+        </figure>
       </div>
 
       <!-- STEP 6 -->
@@ -315,6 +362,10 @@
         <h3><span class="num">6</span> Send ETH to <code>vitalik.eth</code></h3>
         <div class="row do"><span class="tag">Do</span><p>Wallets → <b>Send</b>: asset <b>ETH</b>, recipient <code>vitalik.eth</code>, amount <code>0.00001</code> → <b>Send</b>.</p></div>
         <div class="row see"><span class="tag">See</span><p>The activity row goes <b>PENDING → CONFIRMED</b> with a clickable <b>Etherscan tx link</b>; the ENS name resolved to <code>0xd8dA…6045</code>.</p></div>
+        <figure class="screenshot">
+          <img src="ss_demo3.png" alt="Screenshot 3 — send ETH form with vitalik.eth resolved, transaction pending in activity feed" />
+          <figcaption>Screenshot #3 — send ETH to vitalik.eth (ENS resolved), tx pending → confirmed</figcaption>
+        </figure>
         <figure>
           <svg viewBox="0 0 820 110" role="img" aria-label="Send ETH pipeline">
             <rect x="6" y="40" width="120" height="34" rx="6" fill="#eef1f6" stroke="#d3d9e2"/>
@@ -345,24 +396,48 @@
         <div class="row do"><span class="tag">Do</span><p>Wallets → expand <b>Concurrency demo (nonce lock)</b> → <b>Fire 5 concurrent sends</b>.</p></div>
         <div class="row see"><span class="tag">See</span><p>A green checklist: <b>unique, consecutive nonces · none blocked or dropped · serialized FIFO</b> — and the verdict “5 concurrent sends, zero contention bugs — the lock held.”</p></div>
         <figure>
-          <svg viewBox="0 0 820 150" role="img" aria-label="Per-wallet nonce lock">
-            <rect x="10" y="14" width="120" height="22" rx="5" fill="#eef1f6" stroke="#d3d9e2"/><text class="lblsm" x="70" y="29" text-anchor="middle">send #1</text>
-            <rect x="10" y="40" width="120" height="22" rx="5" fill="#eef1f6" stroke="#d3d9e2"/><text class="lblsm" x="70" y="55" text-anchor="middle">send #2</text>
-            <rect x="10" y="66" width="120" height="22" rx="5" fill="#eef1f6" stroke="#d3d9e2"/><text class="lblsm" x="70" y="81" text-anchor="middle">send #3 (race)</text>
-            <rect x="10" y="92" width="120" height="22" rx="5" fill="#eef1f6" stroke="#d3d9e2"/><text class="lblsm" x="70" y="107" text-anchor="middle">send #4</text>
-            <rect x="10" y="118" width="120" height="22" rx="5" fill="#eef1f6" stroke="#d3d9e2"/><text class="lblsm" x="70" y="133" text-anchor="middle">send #5</text>
-            <line x1="130" y1="77" x2="196" y2="77" stroke="#9aa2af" stroke-width="1.5"/><polygon points="196,77 188,73 188,81" fill="#9aa2af"/>
-            <rect x="198" y="50" width="180" height="54" rx="8" fill="#e9efe9" stroke="#cfe0cf"/>
-            <text class="lbl" x="288" y="72" text-anchor="middle" font-weight="700">pg_advisory_xact_lock</text>
-            <text class="lblsm" x="288" y="90" text-anchor="middle">one wallet → one at a time</text>
-            <line x1="378" y1="77" x2="444" y2="77" stroke="#9aa2af" stroke-width="1.5"/><polygon points="444,77 436,73 436,81" fill="#9aa2af"/>
-            <rect x="446" y="44" width="364" height="66" rx="8" fill="#fff" stroke="#c8cdd6"/>
-            <text class="lblsm" x="628" y="64" text-anchor="middle">read max(chain pending, nextNonce) → sign → broadcast → ++nonce</text>
-            <text class="lblmono" x="628" y="86" text-anchor="middle">nonce n, n+1, n+2, n+3, n+4</text>
-            <text class="lblsm" x="628" y="102" text-anchor="middle" fill="var(--ok)">unique · consecutive · no double-spend</text>
+          <svg viewBox="0 0 820 192" role="img" aria-label="Per-wallet nonce lock — Gantt timeline of 5 concurrent sends serialized">
+            <!-- vertical arrival marker -->
+            <line x1="82" y1="14" x2="82" y2="172" stroke="#c7d2fe" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <text class="zone" x="82" y="10" text-anchor="middle" fill="#3650c4">t=0</text>
+            <!-- critical section header -->
+            <text class="zone" x="305" y="10" text-anchor="middle">lock held</text>
+            <!-- row 1: send #1 — active immediately x=82-172 -->
+            <text class="lblsm" x="78" y="35" text-anchor="end">send #1</text>
+            <rect x="82" y="22" width="90" height="22" rx="4" fill="#e6f4ec" stroke="#1e8e5a" stroke-width="1.5"/>
+            <text class="lblmono" x="178" y="37">nonce n</text>
+            <!-- row 2: send #2 — wait 82-172, active 172-262 -->
+            <text class="lblsm" x="78" y="67" text-anchor="end">send #2</text>
+            <rect x="82" y="54" width="90" height="22" rx="4" fill="#f5f6f8" stroke="#bdc3cb" stroke-dasharray="4 3"/>
+            <rect x="172" y="54" width="90" height="22" rx="4" fill="#e6f4ec" stroke="#1e8e5a" stroke-width="1.5"/>
+            <text class="lblmono" x="268" y="69">nonce n+1</text>
+            <!-- row 3: send #3 — wait 82-262, active 262-352 -->
+            <text class="lblsm" x="78" y="99" text-anchor="end">send #3</text>
+            <rect x="82" y="86" width="180" height="22" rx="4" fill="#f5f6f8" stroke="#bdc3cb" stroke-dasharray="4 3"/>
+            <rect x="262" y="86" width="90" height="22" rx="4" fill="#e6f4ec" stroke="#1e8e5a" stroke-width="1.5"/>
+            <text class="lblmono" x="358" y="101">nonce n+2</text>
+            <!-- row 4: send #4 — wait 82-352, active 352-442 -->
+            <text class="lblsm" x="78" y="131" text-anchor="end">send #4</text>
+            <rect x="82" y="118" width="270" height="22" rx="4" fill="#f5f6f8" stroke="#bdc3cb" stroke-dasharray="4 3"/>
+            <rect x="352" y="118" width="90" height="22" rx="4" fill="#e6f4ec" stroke="#1e8e5a" stroke-width="1.5"/>
+            <text class="lblmono" x="448" y="133">nonce n+3</text>
+            <!-- row 5: send #5 — wait 82-442, active 442-532 -->
+            <text class="lblsm" x="78" y="163" text-anchor="end">send #5</text>
+            <rect x="82" y="150" width="360" height="22" rx="4" fill="#f5f6f8" stroke="#bdc3cb" stroke-dasharray="4 3"/>
+            <rect x="442" y="150" width="90" height="22" rx="4" fill="#e6f4ec" stroke="#1e8e5a" stroke-width="1.5"/>
+            <text class="lblmono" x="538" y="165">nonce n+4</text>
+            <!-- legend -->
+            <rect x="648" y="152" width="14" height="12" rx="2" fill="#e6f4ec" stroke="#1e8e5a" stroke-width="1.5"/>
+            <text class="lblsm" x="667" y="163" text-anchor="start">lock held</text>
+            <rect x="648" y="170" width="14" height="12" rx="2" fill="#f5f6f8" stroke="#bdc3cb" stroke-dasharray="4 3"/>
+            <text class="lblsm" x="667" y="181" text-anchor="start">queued</text>
           </svg>
         </figure>
         <p class="proves"><b>Proves:</b> correctness under concurrency — a first-class requirement. The advisory lock serializes the read-nonce→sign→broadcast→persist section per wallet; idempotency is backstopped by a unique constraint.</p>
+        <figure class="screenshot">
+          <img src="img_demo4.png" alt="Screenshot 4 — concurrency demo results showing 5 sends with unique consecutive nonces, no contention" />
+          <figcaption>Screenshot #4 — 5 concurrent sends serialized through the nonce lock, all confirmed</figcaption>
+        </figure>
       </div>
 
       <!-- STEP 8 -->
@@ -371,21 +446,35 @@
         <div class="row do"><span class="tag">Do</span><p><b>Token</b> tab shows the deployed <b>VCD</b> token + supply. <b>Distribute</b> some VCD to a holder (pick from the dropdown). Switch to the <b>User</b> view → <b>Approve admin</b> for ≥ that amount. Back in <b>Token</b> → <b>transferFrom → admin</b>.</p></div>
         <div class="row see"><span class="tag">See</span><p>Each action gets an Etherscan link. The on-chain <b>allowance</b> is the gate: a pull within allowance+balance succeeds; an over-pull is rejected with a precise message naming the exact shortfall — <em>before</em> any tx is broadcast.</p></div>
         <figure>
-          <svg viewBox="0 0 820 120" role="img" aria-label="approve then transferFrom">
-            <rect x="10" y="30" width="150" height="40" rx="6" fill="#fff" stroke="#c8cdd6"/>
-            <text class="lblsm" x="85" y="48" text-anchor="middle">Holder (user)</text>
-            <text class="lblsm" x="85" y="62" text-anchor="middle">approve(admin, M)</text>
-            <line x1="160" y1="50" x2="250" y2="50" stroke="#9aa2af" stroke-width="1.5"/><polygon points="250,50 242,46 242,54" fill="#9aa2af"/>
-            <text class="lblsm" x="205" y="43" text-anchor="middle">sets allowance</text>
-            <rect x="252" y="30" width="160" height="40" rx="6" fill="#e9efe9" stroke="#cfe0cf"/>
-            <text class="lbl" x="332" y="48" text-anchor="middle" font-weight="700">allowance = M</text>
-            <text class="lblsm" x="332" y="62" text-anchor="middle">on-chain, the gate</text>
-            <line x1="412" y1="50" x2="498" y2="50" stroke="#9aa2af" stroke-width="1.5"/><polygon points="498,50 490,46 490,54" fill="#9aa2af"/>
-            <rect x="500" y="30" width="180" height="40" rx="6" fill="#fff" stroke="#c8cdd6"/>
-            <text class="lblsm" x="590" y="48" text-anchor="middle">Admin transferFrom(≤ M)</text>
-            <text class="lblsm" x="590" y="62" text-anchor="middle">pulls to admin</text>
-            <rect x="252" y="84" width="428" height="26" rx="5" fill="#f5f5f0" stroke="#e0e0d4"/>
-            <text class="lblsm" x="466" y="101" text-anchor="middle">preflight reads allowance + balanceOf → names any shortfall, never broadcasts a doomed pull</text>
+          <svg viewBox="0 0 820 178" role="img" aria-label="ERC-20 allowance state machine">
+            <!-- initial dot -->
+            <circle cx="105" cy="34" r="7" fill="#1a1d23"/>
+            <line x1="105" y1="41" x2="105" y2="52" stroke="#1a1d23" stroke-width="1.5"/>
+            <polygon points="101,48 105,56 109,48" fill="#1a1d23"/>
+            <!-- state: no allowance -->
+            <rect x="20" y="56" width="170" height="46" rx="10" fill="#fff" stroke="#c8cdd6" stroke-width="1.5"/>
+            <text class="lbl" x="105" y="75" text-anchor="middle" font-weight="700">no allowance</text>
+            <text class="lblsm" x="105" y="91" text-anchor="middle">initial · depleted</text>
+            <!-- state: approved(M) -->
+            <rect x="620" y="56" width="180" height="46" rx="10" fill="#e6f4ec" stroke="#1e8e5a" stroke-width="1.5"/>
+            <text class="lbl" x="710" y="75" text-anchor="middle" font-weight="700">approved(M)</text>
+            <text class="lblsm" x="710" y="91" text-anchor="middle">on-chain allowance = M</text>
+            <!-- → approve(M): top arrow left to right -->
+            <line x1="190" y1="70" x2="618" y2="70" stroke="#9aa2af" stroke-width="1.5"/>
+            <polygon points="614,66 622,70 614,74" fill="#9aa2af"/>
+            <text class="lblmono" x="404" y="59" text-anchor="middle">approve(M)</text>
+            <!-- ← transferFrom(M) / approve(0): bottom arrow right to left -->
+            <line x1="620" y1="92" x2="192" y2="92" stroke="#9aa2af" stroke-width="1.5"/>
+            <polygon points="196,88 188,92 196,96" fill="#9aa2af"/>
+            <text class="lblmono" x="404" y="112" text-anchor="middle">transferFrom(M) · approve(0)</text>
+            <!-- self-loop: transferFrom(x &lt; M) -->
+            <path d="M680,56 C668,14 760,14 748,56" fill="none" stroke="#9aa2af" stroke-width="1.5"/>
+            <polygon points="744,52 749,61 754,53" fill="#9aa2af"/>
+            <text class="lblmono" x="714" y="10" text-anchor="middle">transferFrom(x &lt; M)</text>
+            <text class="lblsm" x="714" y="24" text-anchor="middle">M → M−x</text>
+            <!-- preflight note -->
+            <rect x="190" y="132" width="440" height="26" rx="5" fill="#f5f5f0" stroke="#e0e0d4"/>
+            <text class="lblsm" x="410" y="149" text-anchor="middle">preflight checks allowance + balanceOf before any broadcast</text>
           </svg>
         </figure>
         <p class="proves"><b>Proves:</b> ERC-20 support with the on-chain allowance as the authorization gate.</p>
@@ -416,6 +505,10 @@
           </svg>
         </figure>
         <p class="proves"><b>Proves:</b> transaction history (on-chain + off-chain) and a durable audit trail — and that incoming transfers, which the platform didn’t initiate, are still surfaced.</p>
+        <figure class="screenshot">
+          <img src="ss_6.png" alt="Screenshot 5 — Activity tab showing full audit trail: sends, signed messages, received transfers" />
+          <figcaption>Screenshot #5 — Activity tab: full audit trail across all event types</figcaption>
+        </figure>
       </div>
 
       <footer>

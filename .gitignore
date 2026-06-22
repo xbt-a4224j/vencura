@@ -41,3 +41,5 @@ docs/superpowers/
 # stray local screenshots / scratch images (not deliverables)
 img_*.png
 Screenshot*.png
+# but include walkthrough screenshots in public/
+!packages/web/public/*.png
