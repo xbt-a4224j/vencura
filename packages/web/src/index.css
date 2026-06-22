@@ -258,15 +258,6 @@ details summary { cursor: pointer; color: var(--accent-ink); font-size: 13px; }
   background: var(--panel); margin-bottom: -1px;
 }
 
-/* ── Demo-mode banner (trust narrative: auth bypassed on purpose) ─────────────────── */
-.demobanner {
-  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-  font-size: 12.5px; color: var(--pending); background: color-mix(in srgb, var(--pending) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--pending) 30%, transparent); border-radius: 8px;
-  padding: 7px 12px; margin: 0 0 16px;
-}
-.demobanner strong { color: var(--pending); }
-
 /* ── Overview summary tiles ──────────────────────────────────────────────────────── */
 .summary-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 8px 0 20px; }
 .stat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }

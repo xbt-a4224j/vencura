@@ -1,9 +1,7 @@
 import {
   type Account,
   type ActivityItem,
-  ADMIN_EMAIL,
   type BalanceLine,
-  DEMO_PASSWORD,
   type LogLine,
   Vencura,
   type Wallet,
@@ -26,8 +24,6 @@ export const adminKeyStore = {
   set: (k: string) => localStorage.setItem(ADMIN_KEY, k),
 };
 
-// Constants now come from the SDK (which re-exports @vencura/shared) — no more duplicated copies.
-export { ADMIN_EMAIL, DEMO_PASSWORD };
 
 /**
  * The single SDK client the whole app drives. Same-origin: the SPA is served alongside the API

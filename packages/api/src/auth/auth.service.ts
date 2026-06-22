@@ -2,7 +2,6 @@ import { ConflictException, Injectable, Logger, UnauthorizedException } from '@n
 import { JwtService } from '@nestjs/jwt';
 import { ADMIN_EMAIL, type Account, type LoginInput, type RegisterInput } from '@vencura/shared';
 import * as argon2 from 'argon2';
-import { isDemoMode } from '../common/demo-mode';
 import { EventsService } from '../infra/events/events.service';
 import { PrismaService } from '../infra/prisma/prisma.service';
 
@@ -50,21 +49,13 @@ export class AuthService {
     return this.issue(user);
   }
 
-  /** Accounts for the User-view picker — id + email only, never any secret. Login still
-   *  goes through `login()` with the shared demo password; this just populates the dropdown. */
-  async listAccounts(): Promise<Account[]> {
-    // The cross-account picker exists only for the one-click demo; a real deployment uses the
-    // register/login path, so don't enumerate accounts when DEMO_MODE is off.
-    if (!isDemoMode()) return [];
-    // ONLY demo accounts (seed + admin-created) — they all use the shared demo password, so every
-    // entry the picker shows signs in on click. Real/test registrations (isDemo=false, their own
-    // passwords) are excluded so they can never 401 the picker. Demo account first as the default.
-    const users = await this.prisma.user.findMany({
-      where: { isDemo: true },
-      select: { id: true, email: true },
-      orderBy: { createdAt: 'asc' },
-    });
-    return [...users].sort((a, b) => Number(b.email === ADMIN_EMAIL) - Number(a.email === ADMIN_EMAIL));
+  /** Mint a session for the system admin/operator account (no password). The admin is a seeded
+   *  system identity, not a person; the controller gates this on the admin key. */
+  async adminSession(): Promise<AuthResult> {
+    const admin = await this.prisma.user.findUnique({ where: { email: ADMIN_EMAIL } });
+    if (!admin) throw new UnauthorizedException('admin account is not seeded');
+    this.logger.log('admin session issued');
+    return this.issue(admin);
   }
 
   /** The single self-registered (non-admin) user, or null if none exists yet. Drives the User

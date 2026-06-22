@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { transform } from 'sucrase';
 import { parseEther, recoverMessageAddress } from 'viem';
 import { NATIVE_ASSET } from '@vencura/sdk';
-import { ADMIN_EMAIL, DEMO_PASSWORD, v } from './vencura';
+import { v } from './vencura';
 
 type Example = {
   file: string;
@@ -144,7 +144,7 @@ declare const v: {
     login(p: { email: string; password: string }): Promise<{ accessToken: string; user: Account }>;
     register(p: { email: string; password: string }): Promise<{ accessToken: string; user: Account }>;
     me(): Promise<Account>;
-    accounts(): Promise<Account[]>;
+    adminSession(): Promise<{ accessToken: string; user: Account }>;
     singleUser(): Promise<Account | null>;
   };
   wallets: {
@@ -163,8 +163,7 @@ declare const v: {
     contractWrite(p: { walletId: string; address: string; abi: unknown; functionName: string; args?: unknown[]; value?: string }): Promise<Transaction>;
   };
   tokens: {
-    get(): Promise<TokenInfo | null>;
-    deploy(p: { walletId: string }): Promise<{ address: string; owner: string; txHash: string }>;
+    get(): Promise<TokenInfo>;
     transfer(p: { walletId: string; token: string; to: string; amount: string }): Promise<Transaction>;
     approve(p: { walletId: string; token: string; spender: string; amount: string }): Promise<Transaction>;
     allowance(p: { token: string; owner: string; spender: string }): Promise<bigint>;
@@ -179,8 +178,6 @@ declare const v: {
   };
   chain: { head(): Promise<{ network: string; blockNumber: number; gasGwei: number }> };
   admin: {
-    createAccount(p: { email: string }): Promise<Account>;
-    seed(): Promise<any>;
     reset(): Promise<any>;
   };
 };
@@ -203,10 +200,10 @@ export function Playground({ onExit }: { onExit: () => void }) {
   const configured = useRef(false);
   const ex = EXAMPLES[active];
 
-  // Auto-login as the demo admin so calls work out of the box.
+  // Auto-mint the admin session so calls work out of the box (needs the admin key in Settings).
   useEffect(() => {
     v.auth
-      .login({ email: ADMIN_EMAIL, password: DEMO_PASSWORD })
+      .adminSession()
       .then(() => setAuthed(true))
       .catch(() => setAuthed(false));
   }, []);

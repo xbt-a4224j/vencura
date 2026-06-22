@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiHeader, ApiTags } from '@nestjs/swagger';
+import { AdminGuard } from '../admin/admin.guard';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './current-user.decorator';
 import { LoginDto, RegisterDto } from './dto';
@@ -21,11 +22,14 @@ export class AuthController {
     return this.auth.login(dto);
   }
 
-  // Accounts for the User-view picker (id + email only). The web has no typed login: it lists
-  // accounts here and signs in with the shared demo password. register/login are the real path.
-  @Get('accounts')
-  listAccounts() {
-    return this.auth.listAccounts();
+  // Mint a session for the system admin/operator account — no password. Gated by the admin key
+  // (the admin is a system identity, not a person); the Admin view calls this to act as the admin.
+  @Post('admin-session')
+  @HttpCode(200)
+  @ApiHeader({ name: 'x-admin-key', description: 'Admin API key', required: true })
+  @UseGuards(AdminGuard)
+  adminSession() {
+    return this.auth.adminSession();
   }
 
   // The single self-registered user (or null) — the User view shows register if null, else login.

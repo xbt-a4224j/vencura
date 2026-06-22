@@ -1,6 +1,7 @@
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
+import { ADMIN_EMAIL } from '@vencura/shared';
 import * as argon2 from 'argon2';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '@/infra/prisma/prisma.service';
@@ -66,14 +67,18 @@ describe('AuthService', () => {
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
-  // The User-view picker lists accounts; login still uses the shared demo password.
-  it('listAccounts returns id + email only (no secrets), oldest first', async () => {
-    prismaMock.user.findMany.mockResolvedValue([{ id: 'u1', email: 'a@b.com' }]);
-    const accounts = await service.listAccounts();
-    expect(prismaMock.user.findMany.mock.calls[0][0]).toMatchObject({
-      select: { id: true, email: true },
-      orderBy: { createdAt: 'asc' },
-    });
-    expect(accounts).toEqual([{ id: 'u1', email: 'a@b.com' }]);
+  // The admin/operator is a system account entered without a password (gated by the admin key at
+  // the controller). adminSession mints its JWT directly from the seeded ADMIN_EMAIL row.
+  it('adminSession issues a token for the seeded admin account — no password', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ id: 'admin-1', email: ADMIN_EMAIL });
+    const result = await service.adminSession();
+    expect(prismaMock.user.findUnique.mock.calls[0][0]).toMatchObject({ where: { email: ADMIN_EMAIL } });
+    expect(jwt.verify(result.accessToken)).toMatchObject({ sub: 'admin-1', email: ADMIN_EMAIL });
+    expect(result.user).toEqual({ id: 'admin-1', email: ADMIN_EMAIL });
+  });
+
+  it('adminSession throws if the admin account is not seeded', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null);
+    await expect(service.adminSession()).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });

@@ -3,10 +3,8 @@ import { isAddress, parseEther, recoverMessageAddress } from 'viem';
 import {
   type Account,
   type ActivityItem,
-  ADMIN_EMAIL,
   adminKeyStore,
   type BalanceLine,
-  DEMO_PASSWORD,
   type LogLine,
   v,
   type Wallet,
@@ -214,17 +212,6 @@ function useHashTab(fallback: string): [string, (id: string) => void] {
     setTab(id);
   };
   return [tab, set];
-}
-
-// Demo-mode banner: auth is deliberately bypassed for the demo — say so, and point at the prod design.
-function DemoBanner() {
-  return (
-    <p className="demobanner">
-      <strong>Demo mode</strong> — auth is bypassed (one shared password) so you can click straight
-      in. In production each account has its own credentials behind a per-user JWT; the admin key is
-      a server secret, never shown.
-    </p>
-  );
 }
 
 // Root landing page: two tiles — User (use wallets) and Admin (manage accounts / demo data).
@@ -448,15 +435,15 @@ function Landing({ onPick }: { onPick: (view: 'user' | 'admin' | 'playground') =
 // User experience: ONE self-registered account (register if none exists, else log in), then manage
 // your own wallets. No account picker — one user, arbitrarily many wallets.
 function UserView({ onExit }: { onExit: () => void }) {
-  const { current, signOut } = useAuth();
-  // Only the non-admin user's wallets (the admin session never drives the User view).
-  const { wallets, refresh } = useWallets(
-    current && current.email !== ADMIN_EMAIL ? current.id : undefined,
-  );
+  const { user, active, activateUser, signOutUser } = useAuth();
+  // Entering the User view makes the user the active identity (switches the SDK to the user's token).
+  useEffect(() => {
+    activateUser();
+  }, [activateUser]);
+  // Fetch only once the user is the active identity, so the request carries the user's token.
+  const { wallets, refresh } = useWallets(active === 'user' ? user?.id : undefined);
 
-  // The admin (a shared session) must not render as "the user" — the User view is for the
-  // self-registered, non-admin account only.
-  if (!current || current.email === ADMIN_EMAIL) return <UserAuth onExit={onExit} />;
+  if (!user) return <UserAuth onExit={onExit} />;
 
   return (
     <main className="app">
@@ -467,8 +454,8 @@ function UserView({ onExit }: { onExit: () => void }) {
           </button>
         </h1>
         <span style={{ marginLeft: 'auto' }} className="account signed-in">
-          <span>{current.email}</span>{' '}
-          <button type="button" onClick={signOut} title="Sign out">
+          <span>{user.email}</span>{' '}
+          <button type="button" onClick={signOutUser} title="Sign out">
             Sign out
           </button>{' '}
           <button type="button" className="link" onClick={onExit}>
@@ -482,7 +469,7 @@ function UserView({ onExit }: { onExit: () => void }) {
       <p className="bal-sub">
         Create as many wallets as you like — each can hold ETH and tokens, send, and sign.
       </p>
-      <WalletsTab wallets={wallets} onChange={refresh} email={current.email} />
+      <WalletsTab wallets={wallets} onChange={refresh} email={user.email} />
     </main>
   );
 }
@@ -492,10 +479,8 @@ function UserView({ onExit }: { onExit: () => void }) {
 function UserAuth({ onExit }: { onExit: () => void }) {
   const { loginUser, registerUser } = useAuth();
   const [existing, setExisting] = useState<Account | null | undefined>(undefined); // undefined = loading
-  // Prefilled for the demo: it's an openly shared password (see the Demo-mode banner), so a reviewer
-  // can click straight through instead of hitting an empty-password wall.
-  const [email, setEmail] = useState('demo@vencura.app');
-  const [password, setPassword] = useState(DEMO_PASSWORD);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -569,9 +554,8 @@ function UserAuth({ onExit }: { onExit: () => void }) {
         )}
         <p className="bal-sub">
           {mode === 'login'
-            ? 'Demo — the shared password is prefilled, just click Log in.'
-            : 'No user yet — fields are prefilled; click Register to create the demo user (registration then closes).'}{' '}
-          <code>demo password: {DEMO_PASSWORD}</code>
+            ? 'Log in to your account.'
+            : 'No user yet — register to create the single account (registration then closes).'}
         </p>
         {error && <p role="alert">{error}</p>}
       </section>
@@ -1769,62 +1753,26 @@ function UserTokenPanel({ wallets }: { wallets: Wallet[] }) {
 
 // Settings / Dev tools: the low-frequency, environment-level, or destructive controls — one tab
 // deep on purpose (audit #1/#10). Admin key shown as a status, never as the value.
-function SettingsTab({ onChange }: { onChange: () => void }) {
+function SettingsTab() {
   const [seedMsg, setSeedMsg] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [adminKey, setAdminKey] = useState(adminKeyStore.get());
   const [txLookup, setTxLookup] = useState('');
-  const [newEmail, setNewEmail] = useState('');
-  const [accountMsg, setAccountMsg] = useState('');
-  const { accounts, createAccount, reload, signOut } = useAuth();
-
-  const addAccount = async (e: FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setAccountMsg('');
-    setBusy(true);
-    try {
-      const acct = await createAccount(newEmail.trim().toLowerCase());
-      setNewEmail('');
-      setAccountMsg(`Created ${acct.email} — it now appears in the User view's account picker.`);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const seed = async () => {
-    setError('');
-    setSeedMsg('');
-    setBusy(true);
-    try {
-      const res = await v.admin.seed();
-      await reload(); // demo account now appears in the User-view picker
-      onChange(); // refresh the wallet-scoped panels
-      setSeedMsg(`Seeded ${res.email} — ${res.wallets.length} wallets (fund via Sepolia faucet).`);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const startOver = async () => {
-    // Reset wipes ALL accounts and re-seeds the demo — the active account is replaced.
-    if (!window.confirm('Wipe ALL data and re-seed the demo? This cannot be undone.')) return;
+    // Reset wipes ALL data and re-seeds the master/admin account. The registered user is wiped and
+    // both sessions become stale, so reload the page to re-establish a clean state.
+    if (!window.confirm('Wipe ALL data and re-seed? This removes the registered user. Cannot be undone.')) return;
     setError('');
     setSeedMsg('');
     setBusy(true);
     try {
-      const res = await v.admin.reset();
-      signOut(); // the old session's account no longer exists
-      await reload(); // AdminView re-signs in as the fresh demo account
-      setSeedMsg(`Reset complete — re-seeded ${res.email}.`);
+      await v.admin.reset();
+      localStorage.removeItem('vencura.userToken');
+      window.location.reload();
     } catch (err) {
       setError((err as Error).message);
-    } finally {
       setBusy(false);
     }
   };
@@ -1840,9 +1788,9 @@ function SettingsTab({ onChange }: { onChange: () => void }) {
         )}
       </h3>
       <p className="bal-sub">
-        Gates only seed/reset — creating wallets and sending don't need it. In production
-        it's a server-side secret, never shown; here you paste the dev key to enable the destructive
-        actions below.
+        Gates only reset (and the admin session) — creating wallets and sending don't need it. In
+        production it's a server-side secret, never shown; here you paste the dev key to enable the
+        destructive action below.
       </p>
       <label htmlFor="admin-key-input">x-admin-key</label>{' '}
       <input
@@ -1856,38 +1804,11 @@ function SettingsTab({ onChange }: { onChange: () => void }) {
         }}
       />
 
-      <h3>Accounts</h3>
+      <h3>Start over</h3>
       <p className="bal-sub">
-        Accounts you create here appear in the <strong>User</strong> view's picker and sign in with
-        the shared demo password.
+        Wipes all data and re-seeds the master/admin account. The on-chain ETH and token persist under
+        the fixed master key — only the database projection is rebuilt.
       </p>
-      <form onSubmit={addAccount}>
-        <label htmlFor="new-account-email">New account email</label>{' '}
-        <input
-          id="new-account-email"
-          type="email"
-          autoComplete="email"
-          placeholder="name@demo.local"
-          value={newEmail}
-          onChange={(e) => setNewEmail(e.target.value)}
-        />{' '}
-        <button type="submit" disabled={busy || !newEmail.trim()}>
-          {busy ? 'Working…' : 'Create account'}
-        </button>
-      </form>
-      {accountMsg && <p>{accountMsg}</p>}
-      {accounts.length > 0 && (
-        <ul>
-          {accounts.map((a) => (
-            <li key={a.id}>{a.email}</li>
-          ))}
-        </ul>
-      )}
-
-      <h3>Demo data</h3>
-      <button onClick={seed} disabled={busy}>
-        {busy ? 'Seeding…' : 'Seed demo data'}
-      </button>{' '}
       <button onClick={startOver} disabled={busy}>
         {busy ? 'Working…' : 'Start over (reset all)'}
       </button>
@@ -1899,10 +1820,8 @@ function SettingsTab({ onChange }: { onChange: () => void }) {
         <a href={FAUCET_URL} target="_blank" rel="noreferrer">
           Sepolia faucet ↗
         </a>{' '}
-        — fund a wallet address to enable live sends.{' '}
-        <button onClick={onChange} disabled={busy}>
-          Force balance refresh
-        </button>
+        — fund a wallet address to enable live sends. Use the top-right <strong>Refresh</strong> to
+        re-read balances.
       </p>
       <label>
         Look up a tx hash on Etherscan{' '}
@@ -1925,9 +1844,9 @@ function SettingsTab({ onChange }: { onChange: () => void }) {
   );
 }
 
-// Admin experience: a tabbed custody-ops console. Signs in as an account (the demo user by
-// default) so wallet-scoped panels resolve; seed/reset use the admin key. The network heartbeat
-// stays outside the tabs (global state); the active tab lives in the URL hash (deep-linkable).
+// Admin experience: a tabbed custody-ops console. Mints the system admin session (operator key, no
+// password) so wallet-scoped panels resolve; reset uses the same key. The network heartbeat stays
+// outside the tabs (global state); the active tab lives in the URL hash (deep-linkable).
 const ADMIN_TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'wallets', label: 'Wallets' },
@@ -1936,15 +1855,63 @@ const ADMIN_TABS = [
   { id: 'settings', label: 'Settings' },
 ];
 function AdminView({ onExit }: { onExit: () => void }) {
-  const { accounts, current, signIn } = useAuth();
-  // Always act as the admin: if no session, or a (stale) non-admin user is signed in, switch to
-  // the admin account. listAccounts only returns isDemo accounts, so accounts[0] is the admin.
-  const actingAsAdmin = current?.email === ADMIN_EMAIL;
+  const { admin, active, enterAdmin } = useAuth();
+  // Entering the Admin view mints (or re-activates) the system admin session — no password.
+  const [authErr, setAuthErr] = useState('');
+  const [keyInput, setKeyInput] = useState(adminKeyStore.get());
+  const connect = useCallback(() => {
+    setAuthErr('');
+    void enterAdmin().catch((e) => setAuthErr((e as Error).message));
+  }, [enterAdmin]);
+  // On entry, mint/activate the admin session (gated by the operator key).
   useEffect(() => {
-    if (!actingAsAdmin && accounts.length > 0) void signIn(accounts[0]).catch(() => undefined);
-  }, [actingAsAdmin, accounts, signIn]);
-  const { wallets, refresh, error } = useWallets(actingAsAdmin ? current?.id : undefined);
+    connect();
+  }, [connect]);
+  // Fetch only once the admin is the active identity, so the request carries the admin's token.
+  const { wallets, refresh, error } = useWallets(active === 'admin' ? admin?.id : undefined);
   const [tab, setTab] = useHashTab('overview');
+
+  // The admin is a system account entered with the operator key. Until the session mints, gate the
+  // console behind a key prompt (the key input otherwise lives inside the console — a chicken-and-egg).
+  if (!admin) {
+    return (
+      <main className="app">
+        <header>
+          <h1>
+            <button type="button" className="logobtn" onClick={onExit}>
+              VenCura
+            </button>{' '}
+            · Admin
+          </h1>
+          <button type="button" className="link" style={{ marginLeft: 'auto' }} onClick={onExit}>
+            ← Home
+          </button>
+        </header>
+        <section className="picker">
+          <h3>Connect as admin</h3>
+          <p className="bal-sub">
+            The admin is a system account entered with the operator key (<code>x-admin-key</code>).
+            Paste it to connect.
+          </p>
+          <label htmlFor="admin-gate-key">x-admin-key</label>{' '}
+          <input
+            id="admin-gate-key"
+            type="password"
+            value={keyInput}
+            placeholder="paste admin key"
+            onChange={(e) => {
+              setKeyInput(e.target.value);
+              adminKeyStore.set(e.target.value);
+            }}
+          />{' '}
+          <button type="button" onClick={connect} disabled={!keyInput.trim()}>
+            Connect
+          </button>
+          {authErr && <p role="alert">{authErr}</p>}
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="app">
@@ -1956,22 +1923,21 @@ function AdminView({ onExit }: { onExit: () => void }) {
           · Admin
         </h1>
         <span style={{ marginLeft: 'auto' }} className="account signed-in">
-          {current ? <span>acting as {current.email}</span> : <span>no account yet</span>}{' '}
+          {admin ? <span>acting as {admin.email}</span> : <span>connecting…</span>}{' '}
           <button type="button" className="link" onClick={onExit}>
             ← Home
           </button>
         </span>
       </header>
       <StatusBar onRefresh={() => void refresh()} />
-      <DemoBanner />
-      {error && <p role="alert">{error}</p>}
+      {(authErr || error) && <p role="alert">{authErr || error}</p>}
       <Tabs tabs={ADMIN_TABS} active={tab} onChange={setTab} />
       <div role="tabpanel" aria-labelledby={`tab-${tab}`}>
         {tab === 'overview' && <OverviewTab wallets={wallets} onGoWallets={() => setTab('wallets')} />}
-        {tab === 'wallets' && <WalletsTab wallets={wallets} onChange={refresh} email={current?.email ?? ''} />}
+        {tab === 'wallets' && <WalletsTab wallets={wallets} onChange={refresh} email={admin?.email ?? ''} />}
         {tab === 'token' && <TokenTab wallets={wallets} />}
         {tab === 'activity' && <ActivityTab wallets={wallets} />}
-        {tab === 'settings' && <SettingsTab onChange={refresh} />}
+        {tab === 'settings' && <SettingsTab />}
       </div>
     </main>
   );

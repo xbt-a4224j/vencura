@@ -180,9 +180,11 @@ class AuthApi {
   me(): Promise<Account> {
     return this.http.request<Account>('/auth/me', { auth: true });
   }
-  /** Demo account picker (id + email only). */
-  accounts(): Promise<Account[]> {
-    return this.http.request<Account[]>('/auth/accounts');
+  /** Mint the system admin/operator session (admin-key gated, no password); stores the JWT. */
+  async adminSession(): Promise<AuthResult> {
+    const r = await this.http.request<AuthResult>('/auth/admin-session', { method: 'POST', admin: true });
+    this.http.tokenStore.set(r.accessToken);
+    return r;
   }
   /** The single self-registered user, or null. */
   singleUser(): Promise<Account | null> {
@@ -341,13 +343,7 @@ class ChainApi {
 
 class AdminApi {
   constructor(private readonly http: Http) {}
-  /** Create a demo account (shared password + isDemo) — admin-key gated. */
-  createAccount(p: { email: string }): Promise<Account> {
-    return this.http.request<Account>('/admin/accounts', { method: 'POST', body: p, admin: true });
-  }
-  seed(): Promise<SeedResult> {
-    return this.http.request<SeedResult>('/admin/seed', { method: 'POST', admin: true });
-  }
+  /** Wipe all data and re-seed the master/admin account — admin-key gated. */
   reset(): Promise<SeedResult> {
     return this.http.request<SeedResult>('/admin/reset', { method: 'POST', admin: true });
   }
