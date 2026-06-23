@@ -27,7 +27,7 @@ Legend per step: **Do → confirms: requirement.**
 10. **Concurrency demo** (Wallets → expand → Concurrency): **Simulate** (dry-run nonce timeline, no funds) always works; on the funded wallet, **Fire 5 concurrent sends** → "5/5 serialized — unique, consecutive nonces ✓" (self-sends; proves the per-wallet nonce lock). — *correctness under concurrency*
 
 ## D. Code deliverables
-11. **Tests:** `pnpm --filter @vencura/api test` (~91 unit/integration + a DB e2e in CI). **Security writeup:** `docs/SECURITY.md` + `docs/architecture.html`. **SDK / example scripts:** `packages/sdk`.
+11. **Tests:** `pnpm --filter @vencura/api test` (~91 unit/integration + a DB e2e in CI). **Security writeup:** `docs/SECURITY.md`. **Architecture:** `docs/ARCHITECTURE.md`. **SDK / example scripts:** `packages/sdk`.
 
 ## Requirement coverage
 

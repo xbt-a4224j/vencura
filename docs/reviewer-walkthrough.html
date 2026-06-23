@@ -76,7 +76,7 @@
           A custodial Ethereum-wallet API + admin. This is the happy path that exercises the four required
           operations and the three things the design is really about: <b>key custody</b>,
           <b>correctness under concurrency</b>, and <b>chain-as-source-of-truth</b>. The landing page has three
-          doors — start at the <b>Playground</b> (the typed SDK, live), then <b>Admin</b> (the ops console),
+          entry points — start at the <b>Playground</b> (the typed SDK, live), then <b>Admin</b> (the ops console),
           then <b>User</b> (the end-to-end product). ~10 minutes, no setup.
         </p>
         <div class="links">
@@ -193,7 +193,7 @@
       <div class="step">
         <h3><span class="num">1</span> Open the landing page → start in the Playground</h3>
         <div class="row do"><span class="tag">Do</span><p>Open <a class="ext" href="https://vencura-alpha.vercel.app" target="_blank" rel="noreferrer">the app ↗</a>. The landing page has <b>three tiles</b> — <b>Playground</b> (start here), <b>Admin</b>, <b>User</b> — plus a "Reviewer? Start here" ribbon. Open the <b>Playground</b> first.</p></div>
-        <div class="row see"><span class="tag">See</span><p>A live in-browser TypeScript editor over the typed SDK, preloaded with <b>six runnable examples</b>: <code>01 provision</code>, <code>02 balance</code>, <code>03 sign</code>, <code>04 send</code>, <code>05 concurrency</code>, <code>06 token flow</code>. Run <code>01</code>–<code>03</code> (read-only) and, when you want a real tx, <code>04</code>/<code>06</code> (tagged <code>tx</code> — broadcasts to Sepolia, ~15–30s). The senior bits — the per-wallet <b>nonce lock</b> (<code>05</code>) and <b>idempotency</b> (<code>04</code>) — live here.</p></div>
+        <div class="row see"><span class="tag">See</span><p>A live in-browser TypeScript editor over the typed SDK, preloaded with <b>six runnable examples</b>: <code>01 provision</code>, <code>02 balance</code>, <code>03 sign</code>, <code>04 send</code>, <code>05 concurrency</code>, <code>06 token flow</code>. Run <code>01</code>–<code>03</code> (read-only) and, when you want a real tx, <code>04</code>/<code>06</code> (tagged <code>tx</code> — broadcasts to Sepolia, ~15–30s). The concurrency-critical paths — the per-wallet <b>nonce lock</b> (<code>05</code>) and <b>idempotency</b> (<code>04</code>) — live here.</p></div>
         <figure>
           <svg viewBox="0 0 820 96" role="img" aria-label="Playground over the typed SDK">
             <rect x="10" y="34" width="170" height="34" rx="6" fill="#eef2ff" stroke="#c7d2fe"/>
@@ -300,7 +300,7 @@
             <line x1="630" y1="64" x2="630" y2="75" stroke="#c8cdd6" stroke-width="1" stroke-dasharray="3 2"/>
           </svg>
         </figure>
-        <p class="proves"><b>Proves:</b> key custody — the centerpiece. AES-256-GCM at rest behind the pluggable <code>Signer</code>; key decrypted in memory only at sign time, then dropped.</p>
+        <p class="proves"><b>Proves:</b> key custody. AES-256-GCM at rest behind the pluggable <code>Signer</code>; key decrypted in memory only at sign time, then dropped.</p>
         <figure class="screenshot">
           <img src="img_6.png" alt="Screenshot 1 — wallet card showing address, ETH balance, and activity feed after auto-funding" />
           <figcaption>Screenshot #1 — wallet auto-provisioned, balance visible, activity feed populated</figcaption>
@@ -435,7 +435,7 @@
             <text class="lblsm" x="667" y="181" text-anchor="start">queued</text>
           </svg>
         </figure>
-        <p class="proves"><b>Proves:</b> correctness under concurrency — a first-class requirement. The advisory lock serializes the read-nonce→sign→broadcast→persist section per wallet; idempotency is backstopped by a unique constraint.</p>
+        <p class="proves"><b>Proves:</b> correctness under concurrency. The advisory lock serializes the read-nonce→sign→broadcast→persist section per wallet; idempotency is backstopped by a unique constraint.</p>
         <figure class="screenshot">
           <img src="img_demo4.png" alt="Screenshot 4 — concurrency demo results showing 5 sends with unique consecutive nonces, no contention" />
           <figcaption>Screenshot #4 — 5 concurrent sends serialized through the nonce lock, all confirmed</figcaption>
@@ -518,8 +518,8 @@
         <a href="https://vencura-alpha.vercel.app/api/docs" target="_blank" rel="noreferrer">Swagger ↗</a> ·
         <a href="REQUIREMENTS.md">requirements</a> ·
         <a href="SECURITY.md">security writeup</a> ·
-        <a href="architecture.html">architecture</a>.
-        <br />Chain is the source of truth; the DB is a derived cache. The thesis: custody, concurrency-correctness, and chain-truth — not just “it sends a tx.”
+        <a href="ARCHITECTURE.md">architecture</a>.
+        <br />Chain is the source of truth; the DB is a derived cache. Scope: custody, concurrency-correctness, and chain-truth.
       </footer>
     </div>
   </body>
