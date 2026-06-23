@@ -7,32 +7,38 @@ the chain RPC (**Infura**/Sepolia). Pushes to `main` run CI, then Vercel and Rai
 ## Topology
 
 ```mermaid
-%%{init: {"theme": "neutral", "flowchart": {"useMaxWidth": true}}}%%
 graph LR
-    Dev["Developer\npush to main"]
-    Dev --> GH["GitHub Actions CI\nlint · typecheck · test · build"]
+    Dev(["👤 Developer<br/>push to main"]):::dev --> GH["⚙️ GitHub Actions CI<br/>lint · typecheck · test · build"]:::ci
+    User(["🌐 Browser"]):::user
 
-    Browser["Browser\n(end user)"]
-
-    subgraph Vercel["Vercel"]
-        Web["Web SPA\npackages/web (React/Vite)\nstatic build"]
+    subgraph VercelBox["▲ Vercel — static hosting"]
+        Web["Web SPA<br/>React / Vite build"]:::vercel
     end
 
-    subgraph Railway["Railway (Docker)"]
-        API["NestJS API\npackages/api\n+ in-process pollers"]
+    subgraph RailwayBox["🚂 Railway — deployed service"]
+        API["NestJS API<br/>+ in-process pollers<br/><i>(runs as a container)</i>"]:::railway
     end
 
-    Neon[("Neon\nPostgres")]
-    Infura["Infura\nSepolia RPC"]
+    Neon[("🐘 Neon<br/>Postgres")]:::neon
+    Infura["🔗 Infura<br/>Sepolia RPC"]:::infura
 
-    Browser -->|"HTTPS\nload app"| Web
-    Browser -->|"/api/* (rewrite)\nor direct"| API
+    User -->|"load app · HTTPS"| Web
+    User -->|"/api/* rewrite · or direct"| API
     Web -.->|"rewrite /api/*"| API
     API -->|"Prisma · TLS"| Neon
     API -->|"viem · JSON-RPC"| Infura
-
     GH -.->|"deploy on green"| Web
     GH -.->|"deploy on green"| API
+
+    classDef dev fill:#64748b,stroke:#334155,color:#ffffff;
+    classDef ci fill:#475569,stroke:#1e293b,color:#ffffff;
+    classDef user fill:#0ea5e9,stroke:#0369a1,color:#ffffff;
+    classDef vercel fill:#1f2937,stroke:#000000,color:#ffffff;
+    classDef railway fill:#8b5cf6,stroke:#6d28d9,color:#ffffff;
+    classDef neon fill:#16a34a,stroke:#15803d,color:#ffffff;
+    classDef infura fill:#f97316,stroke:#c2410c,color:#ffffff;
+    style VercelBox fill:#1f293722,stroke:#94a3b8,stroke-width:1px;
+    style RailwayBox fill:#8b5cf622,stroke:#a78bfa,stroke-width:1px;
 ```
 
 ## Hosts
@@ -40,7 +46,7 @@ graph LR
 | Host | Runs | Notes |
 | --- | --- | --- |
 | **Vercel** | `packages/web` static SPA | `/api/*` rewrite → Railway (see [`vercel.json`](../vercel.json)) |
-| **Railway** | `packages/api` (Docker) | NestJS + in-process pollers; reachable directly at its `*.up.railway.app` URL |
+| **Railway** | `packages/api` — deployed service | NestJS + in-process pollers, run as a container; reachable directly at its `*.up.railway.app` URL |
 | **Neon** | Postgres | reached via Prisma over TLS (`DATABASE_URL`) |
 | **Infura** | Sepolia JSON-RPC | reached via viem (`RPC_URL`) |
 

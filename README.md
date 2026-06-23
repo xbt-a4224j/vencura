@@ -16,6 +16,54 @@ React admin to drive it. Four core actions over REST — **create wallet**, **ge
 > correctness under concurrency** (per-wallet nonce lock + idempotency), with a custodial → MPC → non-custodial
 > story. Full spec: [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) · security: [`docs/SECURITY.md`](docs/SECURITY.md).
 
+## Architecture at a glance
+
+```mermaid
+graph LR
+    Dev(["👤 Developer<br/>push to main"]):::dev --> GH["⚙️ GitHub Actions CI<br/>lint · typecheck · test · build"]:::ci
+    User(["🌐 Browser"]):::user
+
+    subgraph VercelBox["▲ Vercel — static hosting"]
+        Web["Web SPA<br/>React / Vite build"]:::vercel
+    end
+
+    subgraph RailwayBox["🚂 Railway — deployed service"]
+        API["NestJS API<br/>+ in-process pollers<br/><i>(runs as a container)</i>"]:::railway
+    end
+
+    Neon[("🐘 Neon<br/>Postgres")]:::neon
+    Infura["🔗 Infura<br/>Sepolia RPC"]:::infura
+
+    User -->|"load app · HTTPS"| Web
+    User -->|"/api/* rewrite · or direct"| API
+    Web -.->|"rewrite /api/*"| API
+    API -->|"Prisma · TLS"| Neon
+    API -->|"viem · JSON-RPC"| Infura
+    GH -.->|"deploy on green"| Web
+    GH -.->|"deploy on green"| API
+
+    classDef dev fill:#64748b,stroke:#334155,color:#ffffff;
+    classDef ci fill:#475569,stroke:#1e293b,color:#ffffff;
+    classDef user fill:#0ea5e9,stroke:#0369a1,color:#ffffff;
+    classDef vercel fill:#1f2937,stroke:#000000,color:#ffffff;
+    classDef railway fill:#8b5cf6,stroke:#6d28d9,color:#ffffff;
+    classDef neon fill:#16a34a,stroke:#15803d,color:#ffffff;
+    classDef infura fill:#f97316,stroke:#c2410c,color:#ffffff;
+    style VercelBox fill:#1f293722,stroke:#94a3b8,stroke-width:1px;
+    style RailwayBox fill:#8b5cf622,stroke:#a78bfa,stroke-width:1px;
+```
+
+Web on **Vercel**, the API as a deployed service on **Railway**, Postgres on **Neon**, RPC on **Infura/Sepolia**.
+Full diagrams and writeups in the docs:
+
+| Doc | What's in it |
+| --- | --- |
+| [Architecture](docs/ARCHITECTURE.md) | System wiring + the send-under-concurrency and key-custody flows (diagrams) |
+| [Deployment](docs/DEPLOYMENT.md) | Topology, the four hosts, deploy-time config, GitHub environments |
+| [Security](docs/SECURITY.md) | Threat model, custody design + evolution path, honest weaknesses |
+| [Requirements](docs/REQUIREMENTS.md) | The full requirement set the build satisfies |
+| [Reviewer walkthrough](docs/reviewer-walkthrough.html) | ~10-min guided tour of the live app, no setup |
+
 ## Try the live app
 
 | | Live ([Vercel](https://vencura-alpha.vercel.app)) | Local (`pnpm dev`) |
@@ -65,14 +113,4 @@ All vars live in [`.env.example`](.env.example) (copied to `.env` by bootstrap).
 deploy: `RPC_URL` (Infura/Alchemy Sepolia URL), `CONFIRMATIONS` (`3`–`12` for reorg safety), and the three
 generated secrets `MASTER_ENCRYPTION_KEY` / `JWT_SECRET` / `ADMIN_API_KEY` (`openssl rand -hex 32`).
 **Secrets come from the environment and are never committed — only `.env.example` is.**
-
-## Docs
-
-| Doc | What's in it |
-| --- | --- |
-| [Architecture](docs/ARCHITECTURE.md) | System wiring + the send-under-concurrency and key-custody flows (diagrams) |
-| [Deployment](docs/DEPLOYMENT.md) | Topology, the four hosts, deploy-time config, GitHub environments |
-| [Security](docs/SECURITY.md) | Threat model, custody design + evolution path, honest weaknesses |
-| [Requirements](docs/REQUIREMENTS.md) | The full requirement set the build satisfies |
-| [Reviewer walkthrough](docs/reviewer-walkthrough.html) | ~10-min guided tour of the live app, no setup |
 
