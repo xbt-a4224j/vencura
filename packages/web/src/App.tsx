@@ -1631,10 +1631,6 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
                 <dt>Owner holds (available to distribute)</dt>
                 <dd>{toEth(supply.ownerBal)} VCD</dd>
               </div>
-              <div>
-                <dt>Distributed to holders</dt>
-                <dd>{toEth((BigInt(supply.total) - BigInt(supply.ownerBal)).toString())} VCD</dd>
-              </div>
             </dl>
           )}
           <h4>1 · Distribute to a holder</h4>
