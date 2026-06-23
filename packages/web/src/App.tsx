@@ -225,8 +225,8 @@ function Landing({ onPick }: { onPick: (view: 'user' | 'admin' | 'playground') =
       </header>
       <p className="reviewer-ribbon">
         <strong>Reviewer? Start here →</strong> <b>Playground</b> (the typed SDK, live) → <b>Admin</b> (the
-        ops platform) → <b>User</b> (the end-to-end product). The senior bits — the per-wallet{' '}
-        <b>nonce lock</b> and <b>idempotency</b> — are Playground examples <code>05</code> &amp; <code>04</code>.
+        ops console) → <b>User</b> (the end-to-end product). The per-wallet{' '}
+        <b>nonce lock</b> and <b>idempotency</b> are Playground examples <code>05</code> &amp; <code>04</code>.
       </p>
       <div className="tiles">
         <button type="button" className="tile" onClick={() => onPick('playground')}>
