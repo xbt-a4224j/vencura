@@ -18,10 +18,12 @@ export const tokenStore = {
   clear: () => localStorage.removeItem(TOKEN_KEY),
 };
 
-/** The admin key gates /admin/*. Operator-entered, kept in localStorage — never baked into the
- *  bundle (a static SPA can't hold a secret). */
+/** The admin key gates /admin/*. Operator-entered, kept in localStorage. The deployed demo also
+ *  seeds it from `VITE_ADMIN_KEY` so a reviewer who's already past the site password gate can drive
+ *  the admin console without a manual paste — acceptable because the whole app is gated and /admin/*
+ *  is demo-only (reset/seed) on Sepolia testnet. Unset in local dev → operator pastes it as before. */
 export const adminKeyStore = {
-  get: () => localStorage.getItem(ADMIN_KEY) ?? '',
+  get: () => localStorage.getItem(ADMIN_KEY) || import.meta.env.VITE_ADMIN_KEY || '',
   set: (k: string) => localStorage.setItem(ADMIN_KEY, k),
 };
 

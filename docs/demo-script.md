@@ -1,7 +1,7 @@
 # VenCura — Demo Script
 
 **App:** https://vencura-alpha.vercel.app
-**Admin:** `admin@vencura.local` / `demo-password` (auto-loads in the Admin view) · **Admin key:** the deploy's `ADMIN_API_KEY` (for seed / reset / create-account)
+**Admin console:** keyed by `x-admin-key` (the deploy's `ADMIN_API_KEY`, for seed / reset / create-account) — auto-loads from `VITE_ADMIN_KEY` in the deployed gated build; paste it manually in local dev. **Seeded user:** `admin@vencura.local` / `demo-password`.
 **Funded admin wallet:** `0x547d…0D42` · **Demo token:** `VCD` at `0x3870…872b`
 
 > **Model reminders:** one account = one wallet · register-if-none / login-after (no picker; the admin is **not** a user) · **no auto-refresh — click Refresh** · recipients are a pasted `0x` address · the logo (◆ VenCura) links Home.
