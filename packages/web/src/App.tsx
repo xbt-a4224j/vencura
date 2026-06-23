@@ -2116,10 +2116,57 @@ function Root() {
   return <Landing onPick={setView} />;
 }
 
+const SITE_USER = import.meta.env.VITE_SITE_USERNAME as string | undefined;
+const SITE_PASS = import.meta.env.VITE_SITE_PASSWORD as string | undefined;
+const GATE_KEY = 'vencura.siteUnlocked';
+
+function SiteGate({ children }: { children: React.ReactNode }) {
+  const gateActive = !!(SITE_USER && SITE_PASS);
+  const [unlocked, setUnlocked] = useState(() => !gateActive || sessionStorage.getItem(GATE_KEY) === '1');
+  const [user, setUser] = useState('');
+  const [pass, setPass] = useState('');
+  const [err, setErr] = useState(false);
+
+  if (unlocked) return <>{children}</>;
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (user === SITE_USER && pass === SITE_PASS) {
+      sessionStorage.setItem(GATE_KEY, '1');
+      setUnlocked(true);
+    } else {
+      setErr(true);
+      setPass('');
+    }
+  };
+
+  return (
+    <main className="app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+      <section className="picker" style={{ maxWidth: 340, width: '100%' }}>
+        <h2 style={{ marginBottom: 20 }}>VenCura</h2>
+        <form onSubmit={submit} className="form-grid">
+          <label className="field">
+            <span>Username</span>
+            <input autoFocus autoComplete="username" value={user} onChange={(e) => { setErr(false); setUser(e.target.value); }} />
+          </label>
+          <label className="field">
+            <span>Password</span>
+            <input type="password" autoComplete="current-password" value={pass} onChange={(e) => { setErr(false); setPass(e.target.value); }} />
+          </label>
+          {err && <p role="alert" style={{ margin: 0 }}>Invalid credentials.</p>}
+          <button type="submit" disabled={!user || !pass}>Enter</button>
+        </form>
+      </section>
+    </main>
+  );
+}
+
 export function App() {
   return (
-    <AuthProvider>
-      <Root />
-    </AuthProvider>
+    <SiteGate>
+      <AuthProvider>
+        <Root />
+      </AuthProvider>
+    </SiteGate>
   );
 }
