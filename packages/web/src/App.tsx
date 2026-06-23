@@ -1647,7 +1647,7 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
             value={dist.amt}
             onChange={(e) => setDist({ ...dist, amt: e.target.value })}
           />{' '}
-          <button onClick={distribute} disabled={busy || !dist.to}>
+          <button onClick={distribute} disabled={busy || !dist.to || !dist.amt}>
             Send tokens
           </button>
           <h4>2 · After the holder approves — pull with transferFrom</h4>
@@ -1664,7 +1664,7 @@ function TokenTab({ wallets }: { wallets: Wallet[] }) {
             value={pull.amt}
             onChange={(e) => setPull({ ...pull, amt: e.target.value })}
           />{' '}
-          <button onClick={transferFrom} disabled={busy || !pull.from}>
+          <button onClick={transferFrom} disabled={busy || !pull.from || !pull.amt}>
             transferFrom → admin
           </button>
           <h4>Check allowance</h4>
