@@ -1,6 +1,12 @@
 # VenCura — custodial Ethereum wallets over an API
 
+
 [![CI](https://github.com/xbt-a4224j/vencura/actions/workflows/ci.yml/badge.svg)](https://github.com/xbt-a4224j/vencura/actions/workflows/ci.yml)
+
+Admin view of the custodial ETH wallet platform:
+<img width="899" height="670" alt="image" src="https://github.com/user-attachments/assets/bc1a5fc0-5400-4a86-87f6-cced203d02df" />
+
+
 
 A backend **API platform that creates and operates custodial Ethereum wallets** on users' behalf, with a
 React admin to drive it. Four core actions over REST — **create wallet**, **get balance**, **sign message**,
