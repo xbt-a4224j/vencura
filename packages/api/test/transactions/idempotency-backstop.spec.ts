@@ -5,7 +5,7 @@ import { ChainService } from '@/infra/chain/chain.service';
 import { EventsService } from '@/infra/events/events.service';
 import { LOCK } from '@/infra/lock/lock';
 import { PrismaService } from '@/infra/prisma/prisma.service';
-import { SIGNER } from '@/signer/signer';
+import { SignerRegistry } from '@/signer/signer-registry.service';
 import { WalletsService } from '@/wallets/wallets.service';
 import { TransactionsService } from '@/transactions/transactions.service';
 
@@ -48,10 +48,10 @@ async function build(prisma: ReturnType<typeof makePrisma>) {
       TransactionsService,
       { provide: PrismaService, useValue: prisma },
       { provide: ChainService, useValue: chainMock },
-      { provide: WalletsService, useValue: { findOwnedOrThrow: vi.fn().mockResolvedValue({ id: 'w1', address: '0xabc' }) } },
+      { provide: WalletsService, useValue: { findOwnedOrThrow: vi.fn().mockResolvedValue({ id: 'w1', address: '0xabc', signerScheme: 'encrypted' }) } },
       { provide: EventsService, useValue: { record: vi.fn(), emit: vi.fn() } },
       { provide: LOCK, useValue: passThroughLock },
-      { provide: SIGNER, useValue: signerMock },
+      { provide: SignerRegistry, useValue: { get: () => signerMock } },
     ],
   }).compile();
   return moduleRef.get(TransactionsService);

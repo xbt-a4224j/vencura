@@ -11,7 +11,7 @@ import { ChainService } from '@/infra/chain/chain.service';
 import { LockModule } from '@/infra/lock/lock.module';
 import { LOCK } from '@/infra/lock/lock';
 import { EventsModule } from '@/infra/events/events.module';
-import { SIGNER } from '@/signer/signer';
+import { SignerRegistry } from '@/signer/signer-registry.service';
 import { TransactionsModule } from '@/transactions/transactions.module';
 
 const prismaMock = {
@@ -46,8 +46,8 @@ describe('Send HTTP', () => {
       .useValue(prismaMock)
       .overrideProvider(ChainService)
       .useValue(chainMock)
-      .overrideProvider(SIGNER)
-      .useValue(signerMock)
+      .overrideProvider(SignerRegistry)
+      .useValue({ get: () => signerMock })
       .overrideProvider(LOCK)
       .useValue(lockMock)
       .compile();
@@ -60,7 +60,7 @@ describe('Send HTTP', () => {
   afterAll(async () => app?.close());
 
   beforeEach(() => {
-    prismaMock.wallet.findFirst.mockResolvedValue({ id: 'w1', address: '0xabc' });
+    prismaMock.wallet.findFirst.mockResolvedValue({ id: 'w1', address: '0xabc', signerScheme: 'encrypted' });
   });
 
   it('sends and returns a pending tx (201)', async () => {

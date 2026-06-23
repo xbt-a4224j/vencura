@@ -2,7 +2,7 @@ import { Test } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '@/infra/prisma/prisma.service';
 import { EventsService } from '@/infra/events/events.service';
-import { SIGNER } from '@/signer/signer';
+import { SignerRegistry } from '@/signer/signer-registry.service';
 import { WalletsService } from '@/wallets/wallets.service';
 
 const prismaMock = { wallet: { create: vi.fn(), findMany: vi.fn() } };
@@ -22,7 +22,7 @@ describe('WalletsService', () => {
       providers: [
         WalletsService,
         { provide: PrismaService, useValue: prismaMock },
-        { provide: SIGNER, useValue: signerMock },
+        { provide: SignerRegistry, useValue: { get: () => signerMock } },
         { provide: EventsService, useValue: eventsMock },
       ],
     }).compile();
@@ -36,17 +36,18 @@ describe('WalletsService', () => {
       encryptionIv: 'iv',
       encryptionAuthTag: 'tag',
     });
-    prismaMock.wallet.create.mockResolvedValue({ id: 'w1', address: '0xWALLET' });
+    prismaMock.wallet.create.mockResolvedValue({ id: 'w1', address: '0xWALLET', signerScheme: 'encrypted' });
 
     const result = await service.create('user-1');
 
     const persisted = prismaMock.wallet.create.mock.calls[0][0].data;
     expect(persisted).toMatchObject({
       userId: 'user-1',
+      signerScheme: 'encrypted',
       encryptedPrivateKey: 'ct',
       encryptionAuthTag: 'tag',
     });
-    expect(result).toEqual({ id: 'w1', address: '0xWALLET' });
+    expect(result).toEqual({ id: 'w1', address: '0xWALLET', signerScheme: 'encrypted' });
     expect(JSON.stringify(result)).not.toContain('ct'); // no key material leaks
   });
 
@@ -58,13 +59,13 @@ describe('WalletsService', () => {
 
   it('listAll maps every wallet to an overview: owner email, self flag, cached balance (0 fallback)', async () => {
     prismaMock.wallet.findMany.mockResolvedValue([
-      { id: 'w1', address: '0xADMIN', userId: 'admin-1', user: { email: 'admin@vencura.local' }, balances: [{ confirmed: '1000', asOfBlock: 42 }] },
-      { id: 'w2', address: '0xUSER', userId: 'user-9', user: { email: 'u@example.com' }, balances: [] },
+      { id: 'w1', address: '0xADMIN', userId: 'admin-1', signerScheme: 'encrypted', user: { email: 'admin@vencura.local' }, balances: [{ confirmed: '1000', asOfBlock: 42 }] },
+      { id: 'w2', address: '0xUSER', userId: 'user-9', signerScheme: 'shamir', user: { email: 'u@example.com' }, balances: [] },
     ]);
     const out = await service.listAll('admin-1');
     expect(out).toEqual([
-      { id: 'w1', address: '0xADMIN', email: 'admin@vencura.local', self: true, confirmed: '1000', asOfBlock: 42 },
-      { id: 'w2', address: '0xUSER', email: 'u@example.com', self: false, confirmed: '0', asOfBlock: null },
+      { id: 'w1', address: '0xADMIN', email: 'admin@vencura.local', self: true, confirmed: '1000', asOfBlock: 42, signerScheme: 'encrypted' },
+      { id: 'w2', address: '0xUSER', email: 'u@example.com', self: false, confirmed: '0', asOfBlock: null, signerScheme: 'shamir' },
     ]);
   });
 });

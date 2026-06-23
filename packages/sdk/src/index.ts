@@ -198,8 +198,12 @@ class AuthApi {
 
 class WalletsApi {
   constructor(private readonly http: Http) {}
+  /** Create a wallet with an explicit key scheme. Returns the new wallet. */
+  create(p: { scheme?: 'encrypted' | 'shamir' } = {}): Promise<Wallet> {
+    return this.http.request<Wallet>('/wallets', { method: 'POST', body: { scheme: p.scheme ?? 'encrypted' }, auth: true });
+  }
   /** One wallet per account: returns it (encrypted key generated server-side), creating +
-   *  master-funding it on first call. This is the wallet-creation path. */
+   *  master-funding it on first call. This is the auto-provision path. */
   provision(): Promise<Wallet> {
     return this.http.request<Wallet>('/wallets/provision', { method: 'POST', auth: true });
   }

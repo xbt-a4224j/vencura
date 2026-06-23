@@ -16,3 +16,4 @@ export * from './contract.schema';
 export * from './message.schema';
 export * from './models';
 export * from './send.schema';
+export * from './wallet.schema';

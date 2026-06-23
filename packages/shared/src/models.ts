@@ -14,6 +14,7 @@ export interface AuthResult {
 export interface Wallet {
   id: string;
   address: string;
+  signerScheme: string;
   createdAt?: string;
 }
 
@@ -26,6 +27,7 @@ export interface WalletOverview {
   self: boolean;
   confirmed: string;
   asOfBlock: number | null;
+  signerScheme: string;
 }
 
 /** A platform wallet for the admin holder picker (address + owner email). */

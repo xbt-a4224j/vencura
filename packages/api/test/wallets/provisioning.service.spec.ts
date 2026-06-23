@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChainService } from '@/infra/chain/chain.service';
 import { LOCK } from '@/infra/lock/lock';
 import { PrismaService } from '@/infra/prisma/prisma.service';
-import { SIGNER } from '@/signer/signer';
+import { SignerRegistry } from '@/signer/signer-registry.service';
 import { ProvisioningService } from '@/wallets/provisioning.service';
 import { WalletsService } from '@/wallets/wallets.service';
 
@@ -32,7 +32,7 @@ function build(prisma: unknown, wallets: unknown) {
       { provide: WalletsService, useValue: wallets },
       { provide: ChainService, useValue: chainMock },
       { provide: LOCK, useValue: new SerialLock() },
-      { provide: SIGNER, useValue: signerMock },
+      { provide: SignerRegistry, useValue: { get: () => signerMock } },
     ],
   })
     .compile()

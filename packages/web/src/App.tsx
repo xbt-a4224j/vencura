@@ -1032,6 +1032,12 @@ function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
           <code>{wallet.address}</code> ↗
         </a>
         <CopyButton value={wallet.address} label="⧉" />
+        <span
+          className={`pill ${wallet.signerScheme === 'shamir' ? 'signed' : 'confirmed'}`}
+          title={`Key custody: ${wallet.signerScheme === 'shamir' ? 'Shamir 2-of-2 split' : 'AES-256-GCM encrypted at rest'}`}
+        >
+          {wallet.signerScheme === 'shamir' ? 'Shamir 2-of-2' : 'AES-256-GCM'}
+        </span>
       </div>
       <div>
         <button
@@ -1121,10 +1127,13 @@ function WalletItem({ wallet, email }: { wallet: Wallet; email: string }) {
 
 // Wallets as collapsed accordion rows: only the open wallet's action panel is mounted, so the page
 // height stops scaling with wallet count (audit #1). One open at a time.
-// One wallet per account: ensure it exists (provision is idempotent + master-funds a new one),
-// then render its single panel — no create button, no list.
 function WalletsTab({ wallets, onChange, email }: { wallets: Wallet[]; onChange: () => void; email: string }) {
   const [error, setError] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [scheme, setScheme] = useState<'encrypted' | 'shamir'>('encrypted');
+  const [busy, setBusy] = useState(false);
+
+  // Auto-provision the first wallet on load (idempotent, always encrypted — the quick-start path).
   useEffect(() => {
     if (wallets.length === 0) {
       v.wallets
@@ -1134,14 +1143,58 @@ function WalletsTab({ wallets, onChange, email }: { wallets: Wallet[]; onChange:
     }
   }, [wallets.length, onChange]);
 
-  if (error) return <p role="alert">{error}</p>;
-  if (wallets.length === 0) return <p className="bal-sub">Setting up your wallet…</p>;
+  const createWallet = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await v.wallets.create({ scheme });
+      onChange();
+      setShowCreate(false);
+      setScheme('encrypted');
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (wallets.length === 0 && !error) return <p className="bal-sub">Setting up your wallet…</p>;
   return (
-    <ul>
-      {wallets.map((w) => (
-        <WalletItem key={w.id} wallet={w} email={email} />
-      ))}
-    </ul>
+    <>
+      {error && <p role="alert">{error}</p>}
+      <div style={{ marginBottom: 16 }}>
+        <button type="button" onClick={() => setShowCreate((s) => !s)}>
+          {showCreate ? 'Cancel' : '+ New wallet'}
+        </button>
+        {showCreate && (
+          <form
+            onSubmit={createWallet}
+            style={{ marginTop: 12, padding: '12px 16px', border: '1px solid var(--border)', borderRadius: 8, maxWidth: 520 }}
+          >
+            <p style={{ margin: '0 0 10px', fontWeight: 600 }}>Key custody scheme</p>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 8, cursor: 'pointer' }}>
+              <input type="radio" name="scheme" value="encrypted" checked={scheme === 'encrypted'} onChange={() => setScheme('encrypted')} style={{ marginTop: 3 }} />
+              <span>
+                <strong>AES-256-GCM</strong> — private key encrypted at rest with the platform master key. Single-key custody, fast.
+              </span>
+            </label>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 12, cursor: 'pointer' }}>
+              <input type="radio" name="scheme" value="shamir" checked={scheme === 'shamir'} onChange={() => setScheme('shamir')} style={{ marginTop: 3 }} />
+              <span>
+                <strong>Shamir 2-of-2</strong> — key split into two shares; both required to sign. Full key is never persisted.
+              </span>
+            </label>
+            <button type="submit" disabled={busy}>{busy ? 'Creating…' : 'Create wallet'}</button>
+          </form>
+        )}
+      </div>
+      <ul>
+        {wallets.map((w) => (
+          <WalletItem key={w.id} wallet={w} email={email} />
+        ))}
+      </ul>
+    </>
   );
 }
 
@@ -1901,7 +1954,7 @@ function AdminWalletsTab({ adminEmail }: { adminEmail: string }) {
 
   const self = rows.find((r) => r.self);
   const others = rows.filter((r) => !r.self);
-  const labels: Wallet[] = rows.map((r) => ({ id: r.id, address: r.address }));
+  const labels: Wallet[] = rows.map((r) => ({ id: r.id, address: r.address, signerScheme: r.signerScheme }));
   const itemsFor = (id: string) => acts.filter((a) => (a as { walletId?: string | null }).walletId === id);
 
   return (
@@ -1914,7 +1967,7 @@ function AdminWalletsTab({ adminEmail }: { adminEmail: string }) {
       <h3 className="cap">Operator · {adminEmail}</h3>
       {self ? (
         <ul>
-          <WalletItem wallet={{ id: self.id, address: self.address }} email={adminEmail} />
+          <WalletItem wallet={{ id: self.id, address: self.address, signerScheme: self.signerScheme }} email={adminEmail} />
         </ul>
       ) : (
         <p className="bal-sub">No operator wallet provisioned yet.</p>

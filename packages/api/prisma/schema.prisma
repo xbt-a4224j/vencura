@@ -35,6 +35,10 @@ model Wallet {
   encryptionIv        String
   encryptionAuthTag   String
 
+  // Which custody scheme this wallet was created with. Determines which Signer impl handles
+  // sign/send for this wallet. Existing wallets default to 'encrypted' (AES-256-GCM).
+  signerScheme String @default("encrypted")
+
   // Next nonce to use; the per-wallet nonce lock serializes reads/increments (T-016).
   nextNonce Int      @default(0)
   createdAt DateTime @default(now())

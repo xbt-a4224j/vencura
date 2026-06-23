@@ -6,7 +6,7 @@ import { ChainService } from '@/infra/chain/chain.service';
 import { WalletsService } from '@/wallets/wallets.service';
 import { EventsService } from '@/infra/events/events.service';
 import { LOCK } from '@/infra/lock/lock';
-import { SIGNER } from '@/signer/signer';
+import { SignerRegistry } from '@/signer/signer-registry.service';
 import { TransactionsService } from '@/transactions/transactions.service';
 
 // A real in-process serializing lock double — proves the service's nonce logic under serialization.
@@ -25,7 +25,7 @@ function makePrisma() {
   return {
     _txs: txs,
     wallet: {
-      findFirst: vi.fn().mockResolvedValue({ id: 'w1', address: '0xabc' }),
+      findFirst: vi.fn().mockResolvedValue({ id: 'w1', address: '0xabc', signerScheme: 'encrypted' }),
       findUnique: vi.fn().mockImplementation(() => Promise.resolve({ nextNonce, address: '0xabc' })),
       update: vi.fn().mockImplementation(({ data }) => {
         nextNonce = data.nextNonce;
@@ -61,7 +61,7 @@ async function build(prisma: ReturnType<typeof makePrisma>) {
       { provide: WalletsService, useValue: { findOwnedOrThrow: prisma.wallet.findFirst } },
       { provide: EventsService, useValue: { record: vi.fn(), emit: vi.fn() } },
       { provide: LOCK, useValue: new SerialLock() },
-      { provide: SIGNER, useValue: signerMock },
+      { provide: SignerRegistry, useValue: { get: () => signerMock } },
     ],
   }).compile();
   return moduleRef.get(TransactionsService);

@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Inject, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { NATIVE_ASSET, type ContractWriteInput, type Hex, type SendTransactionInput } from '@vencura/shared';
 import { type Abi, encodeFunctionData, erc20Abi } from 'viem';
@@ -7,7 +7,7 @@ import { ChainService } from '../infra/chain/chain.service';
 import { EventsService } from '../infra/events/events.service';
 import { LOCK, type Lock } from '../infra/lock/lock';
 import { PrismaService } from '../infra/prisma/prisma.service';
-import { SIGNER, type Signer } from '../signer/signer';
+import { SignerRegistry } from '../signer/signer-registry.service';
 import { WalletsService } from '../wallets/wallets.service';
 
 @Injectable()
@@ -19,7 +19,7 @@ export class TransactionsService {
     private readonly wallets: WalletsService,
     private readonly events: EventsService,
     @Inject(LOCK) private readonly lock: Lock,
-    @Inject(SIGNER) private readonly signer: Signer,
+    private readonly registry: SignerRegistry,
   ) {}
 
   /** Write an arbitrary contract method: encode the call, then route it through the same
@@ -76,7 +76,7 @@ export class TransactionsService {
             };
 
       const request = await this.chain.prepareTransaction(built);
-      const raw = (await this.signer.signTransaction(walletId, request)) as Hex;
+      const raw = (await this.registry.get(wallet.signerScheme).signTransaction(walletId, request)) as Hex;
       let txHash: Hex;
       try {
         txHash = await this.chain.sendRawTransaction(raw);

@@ -1,8 +1,8 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { NATIVE_ASSET, type WalletOverview } from '@vencura/shared';
 import { PrismaService } from '../infra/prisma/prisma.service';
 import { EventsService } from '../infra/events/events.service';
-import { SIGNER, type Signer } from '../signer/signer';
+import { SignerRegistry } from '../signer/signer-registry.service';
 
 @Injectable()
 export class WalletsService {
@@ -10,24 +10,22 @@ export class WalletsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(SIGNER) private readonly signer: Signer,
+    private readonly registry: SignerRegistry,
     private readonly events: EventsService,
   ) {}
 
-  async create(userId: string): Promise<{ id: string; address: string }> {
-    // createKey returns { address, encryptedPrivateKey, encryptionIv, encryptionAuthTag } —
-    // the column shape, so it spreads straight into the wallet row.
-    const key = await this.signer.createKey();
+  async create(userId: string, scheme = 'encrypted'): Promise<{ id: string; address: string; signerScheme: string }> {
+    const key = await this.registry.get(scheme).createKey();
     const wallet = await this.prisma.wallet.create({
-      data: { userId, ...key },
-      select: { id: true, address: true },
+      data: { userId, signerScheme: scheme, ...key },
+      select: { id: true, address: true, signerScheme: true },
     });
-    this.logger.log(`wallet created: ${wallet.address} (user ${userId})`);
+    this.logger.log(`wallet created: ${wallet.address} (user ${userId}, scheme ${scheme})`);
     await this.events.record({
       userId,
       walletId: wallet.id,
       type: 'wallet.created',
-      detail: { address: wallet.address },
+      detail: { address: wallet.address, scheme },
       msg: `wallet created: ${wallet.address}`,
     });
     return wallet;
@@ -36,7 +34,7 @@ export class WalletsService {
   list(userId: string) {
     return this.prisma.wallet.findMany({
       where: { userId },
-      select: { id: true, address: true, createdAt: true },
+      select: { id: true, address: true, signerScheme: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -50,6 +48,7 @@ export class WalletsService {
         id: true,
         address: true,
         userId: true,
+        signerScheme: true,
         user: { select: { email: true } },
         balances: { where: { asset: NATIVE_ASSET }, select: { confirmed: true, asOfBlock: true } },
       },
@@ -62,6 +61,7 @@ export class WalletsService {
       self: w.userId === adminUserId,
       confirmed: w.balances[0]?.confirmed ?? '0',
       asOfBlock: w.balances[0]?.asOfBlock ?? null,
+      signerScheme: w.signerScheme,
     }));
   }
 
@@ -77,10 +77,10 @@ export class WalletsService {
 
   /** Authz seam: resolve a wallet only if it belongs to the user. 404 (not 403) → no ownership
    *  enumeration. Reused by balances + transactions so the ownership check lives in one place. */
-  async findOwnedOrThrow(walletId: string, userId: string): Promise<{ id: string; address: string }> {
+  async findOwnedOrThrow(walletId: string, userId: string): Promise<{ id: string; address: string; signerScheme: string }> {
     const wallet = await this.prisma.wallet.findFirst({
       where: { id: walletId, userId },
-      select: { id: true, address: true },
+      select: { id: true, address: true, signerScheme: true },
     });
     if (!wallet) throw new NotFoundException('wallet not found');
     return wallet;

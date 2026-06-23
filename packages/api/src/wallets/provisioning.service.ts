@@ -5,7 +5,7 @@ import { privateKeyToAddress } from 'viem/accounts';
 import { ChainService } from '../infra/chain/chain.service';
 import { LOCK, type Lock } from '../infra/lock/lock';
 import { PrismaService } from '../infra/prisma/prisma.service';
-import { SIGNER, type Signer } from '../signer/signer';
+import { SignerRegistry } from '../signer/signer-registry.service';
 import { WalletsService } from './wallets.service';
 
 /** Seed funding handed to each freshly provisioned wallet from the master wallet. */
@@ -26,7 +26,7 @@ export class ProvisioningService {
     private readonly wallets: WalletsService,
     private readonly chain: ChainService,
     @Inject(LOCK) private readonly lock: Lock,
-    @Inject(SIGNER) private readonly signer: Signer,
+    private readonly registry: SignerRegistry,
   ) {}
 
   /** The master wallet that funds new accounts: the wallet at the address derived from the
@@ -82,7 +82,7 @@ export class ProvisioningService {
           value: PROVISION_ETH,
           nonce,
         });
-        const raw = (await this.signer.signTransaction(master.id, request)) as Hex;
+        const raw = (await this.registry.get('encrypted').signTransaction(master.id, request)) as Hex;
         const txHash = await this.chain.sendRawTransaction(raw);
         this.logger.log(`master funded ${to} with 0.001 ETH: ${txHash} (nonce ${nonce})`);
 
