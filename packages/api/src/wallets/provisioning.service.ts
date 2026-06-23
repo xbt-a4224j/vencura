@@ -61,7 +61,7 @@ export class ProvisioningService {
 
   /** SYSTEM transfer of PROVISION_ETH from the master wallet to `to`, serialized on the
    *  master wallet's nonce. Best-effort: a gasless/missing master logs and leaves it unfunded. */
-  private async fundFromMaster(to: Hex): Promise<void> {
+  async fundFromMaster(to: Hex): Promise<void> {
     const master = await this.findMaster();
     if (!master) {
       this.logger.warn(`no master wallet — leaving ${to} unfunded`);

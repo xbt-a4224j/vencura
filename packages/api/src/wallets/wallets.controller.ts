@@ -1,6 +1,6 @@
 import { Body, Controller, ForbiddenException, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { ADMIN_EMAIL } from '@vencura/shared';
+import { ADMIN_EMAIL, type Hex } from '@vencura/shared';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateWalletDto } from './dto';
@@ -18,10 +18,12 @@ export class WalletsController {
   ) {}
 
   /** Create a wallet with an explicit key scheme (encrypted or shamir). Multiple wallets per user
-   *  are allowed via this endpoint; each is independent with its own key. */
+   *  are allowed via this endpoint; each is master-funded (same path as provision). */
   @Post()
-  create(@CurrentUser() user: { id: string }, @Body() dto: CreateWalletDto) {
-    return this.wallets.create(user.id, dto.scheme);
+  async create(@CurrentUser() user: { id: string }, @Body() dto: CreateWalletDto) {
+    const wallet = await this.wallets.create(user.id, dto.scheme);
+    void this.provisioning.fundFromMaster(wallet.address as Hex);
+    return wallet;
   }
 
   /** One wallet per account: return the user's wallet, creating + funding it on first call. */
