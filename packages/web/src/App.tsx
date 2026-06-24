@@ -1991,23 +1991,17 @@ function AdminWalletsTab({ adminEmail }: { adminEmail: string }) {
 
 function AdminView({ onExit }: { onExit: () => void }) {
   const { admin, active, enterAdmin } = useAuth();
-  // Entering the Admin view mints (or re-activates) the system admin session — no password.
   const [authErr, setAuthErr] = useState('');
-  const [keyInput, setKeyInput] = useState(adminKeyStore.get());
   const connect = useCallback(() => {
     setAuthErr('');
     void enterAdmin().catch((e) => setAuthErr((e as Error).message));
   }, [enterAdmin]);
-  // On entry, mint/activate the admin session (gated by the operator key).
   useEffect(() => {
     connect();
   }, [connect]);
-  // Fetch only once the admin is the active identity, so the request carries the admin's token.
   const { wallets, refresh, error } = useWallets(active === 'admin' ? admin?.id : undefined);
   const [tab, setTab] = useHashTab('overview');
 
-  // The admin is a system account entered with the operator key. Until the session mints, gate the
-  // console behind a key prompt (the key input otherwise lives inside the console — a chicken-and-egg).
   if (!admin) {
     return (
       <main className="app">
@@ -2023,26 +2017,14 @@ function AdminView({ onExit }: { onExit: () => void }) {
           </button>
         </header>
         <section className="picker">
-          <h3>Connect as admin</h3>
-          <p className="bal-sub">
-            The admin is a system account entered with the operator key (<code>x-admin-key</code>).
-            Paste it to connect.
-          </p>
-          <label htmlFor="admin-gate-key">x-admin-key</label>{' '}
-          <input
-            id="admin-gate-key"
-            type="password"
-            value={keyInput}
-            placeholder="paste admin key"
-            onChange={(e) => {
-              setKeyInput(e.target.value);
-              adminKeyStore.set(e.target.value);
-            }}
-          />{' '}
-          <button type="button" onClick={connect} disabled={!keyInput.trim()}>
-            Connect
-          </button>
-          {authErr && <p role="alert">{authErr}</p>}
+          {authErr ? (
+            <>
+              <p role="alert">{authErr}</p>
+              <button type="button" onClick={connect}>Retry</button>
+            </>
+          ) : (
+            <p className="bal-sub">Connecting…</p>
+          )}
         </section>
       </main>
     );
